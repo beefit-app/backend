@@ -116,7 +116,7 @@ const handleSearch = debounce(search, 400);
 ---
 ## Execução
 
-# Como Começar (Passo a Passo)
+## Como Começar (Passo a Passo)
 
 Graças ao suporte automatizado do Spring Boot com o Docker Compose, você não precisa subir o banco de dados manualmente pelo terminal antes de iniciar a aplicação. Tudo é resolvido de forma integrada na inicialização do app.
 
@@ -167,20 +167,14 @@ O Spring Boot irá ler automaticamente o arquivo docker-compose.yml, baixar as i
 As principais dependências e tecnologias configuradas no arquivo pom.xml incluem:
 
 ```bash
-Spring Web (Web MVC)
-Camada base para construção da API RESTful e gerenciamento dos endpoints HTTP e eventos em tempo real (SSE).
-Spring Data JPA & Hibernate
-Camada de persistência responsável pelo mapeamento objeto-relacional das entidades diretamente para o banco de dados.
-PostgreSQL Driver
-Driver oficial de conectividade com o banco de dados PostgreSQL utilizado no MVP.
-Spring Boot Docker Compose Support
-Módulo responsável pelo gerenciamento automático do ciclo de vida dos contêineres de desenvolvimento.
-Spring Security & Validation
-Recursos de segurança para proteção de endpoints via JWT e validação de payloads recebidos nas requisições HTTP.
-Lombok
-Biblioteca voltada à produtividade, reduzindo código repetitivo (boilerplate) através de anotações automáticas.
-Estrutura de Pastas
+Spring Web (Web MVC) -> Camada base para construção da API RESTful e gerenciamento dos endpoints HTTP e eventos em tempo real (SSE).
+Spring Data JPA & Hibernate -> Camada de persistência responsável pelo mapeamento objeto-relacional das entidades diretamente para o banco de dados.
+PostgreSQL Driver -> Driver oficial de conectividade com o banco de dados PostgreSQL utilizado no MVP.
+Spring Boot Docker Compose Support -> Módulo responsável pelo gerenciamento automático do ciclo de vida dos contêineres de desenvolvimento.
+Spring Security & Validation -> Recursos de segurança para proteção de endpoints via JWT e validação de payloads recebidos nas requisições HTTP.
+Lombok -> Biblioteca voltada à produtividade, reduzindo código repetitivo (boilerplate) através de anotações automáticas.
 ```
+#Estrutura de Pastas
 
 O código-fonte segue boas práticas de separação de responsabilidades (atendendo ao requisito RNF-009), organizando-se da seguinte forma:
 
