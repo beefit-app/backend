@@ -174,10 +174,11 @@ Spring Boot Docker Compose Support -> Módulo responsável pelo gerenciamento au
 Spring Security & Validation -> Recursos de segurança para proteção de endpoints via JWT e validação de payloads recebidos nas requisições HTTP.
 Lombok -> Biblioteca voltada à produtividade, reduzindo código repetitivo (boilerplate) através de anotações automáticas.
 ```
-#Estrutura de Pastas
+# Estrutura de Pastas
 
 O código-fonte segue boas práticas de separação de responsabilidades (atendendo ao requisito RNF-009), organizando-se da seguinte forma:
 
+```bash
 src/main/java/com/beefit/api/
 │
 ├── configuration/   # Configurações globais (CORS, Security, filtros JWT)
@@ -187,6 +188,7 @@ src/main/java/com/beefit/api/
 ├── service/         # Regras de negócio e serviços do sistema
 │
 └── BeefitApiApplication.java  # Classe principal do Spring Boot
+```
 
 # Configurações Importantes & Segurança
 
