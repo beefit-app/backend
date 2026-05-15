@@ -1,0 +1,38 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: beefit_db
+    restart: always
+    environment:
+      POSTGRES_DB: beefit_db
+      POSTGRES_USER: beefit_user
+      POSTGRES_PASSWORD: beefit_password
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - "beefit_network"
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: beefit_pgadmin
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@beefit.com
+      PGADMIN_DEFAULT_PASSWORD: admin_password
+    ports:
+      - "8081:80"
+    networks:
+      - beefit_network
+    depends_on:
+      - postgres
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  beefit_network:
+    driver: bridge
