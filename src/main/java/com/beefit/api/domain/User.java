@@ -1,5 +1,6 @@
 package com.beefit.api.domain;
 
+import com.beefit.api.domain.enums.Role;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import lombok.AllArgsConstructor;
@@ -72,5 +73,6 @@ public class User {
 
     @NotBlank
     @Column(nullable = false)
-    private String role; // USER ou ADMIN
+    @Enumerated(EnumType.STRING)
+    private Role role; // USER ou ADMIN
 }
