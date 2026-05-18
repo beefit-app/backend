@@ -23,4 +23,9 @@ spring:
       readiness:
         wait: always
 
+beefit:
+  security:
+    token:
+      secret: ${JWT_SECRET:my_secret_key}
+
 # Lembrar de Adicionar Configurações para o Módulo de Segurança (JWT)
