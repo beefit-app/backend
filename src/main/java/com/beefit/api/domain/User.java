@@ -77,7 +77,7 @@ public class User implements UserDetails {
     @Column(name = "offensive_honeys", nullable = false)
     private Integer offensiveHoneys = 0; // Começa zerado
 
-    @NotBlank
+    @NotNull
     @Column(nullable = false)
     @Enumerated(EnumType.STRING)
     private UserRole role; // USER ou ADMIN
