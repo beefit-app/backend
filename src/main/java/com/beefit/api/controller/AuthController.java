@@ -46,10 +46,10 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity register(@RequestBody @Valid RegisterDTO data){
 
-        User registred = registerMapper.toEntity(data);
+        User registered = registerMapper.toEntity(data);
 
         // Chama o service passando os dados de cadastro
-        this.authService.register(registred);
+        this.authService.register(registered);
 
         // Retornando sucesso sempre por enquanto
         return ResponseEntity.ok().build();

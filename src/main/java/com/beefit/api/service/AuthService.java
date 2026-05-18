@@ -32,12 +32,12 @@ public class AuthService implements UserDetailsService {
         return user;
     }
 
-    public void register(User registred){
+    public void register(User registered){
 
-        registred.setPasswordHash(passwordEncoder.encode(registred.getPasswordHash()));
-        registred.setRole(UserRole.USER);
+        registered.setPasswordHash(passwordEncoder.encode(registered.getPasswordHash()));
+        registered.setRole(UserRole.USER);
 
-        userRepository.save(registred);
+        userRepository.save(registered);
     }
 
 }
