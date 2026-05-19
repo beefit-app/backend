@@ -62,11 +62,6 @@ public class User implements UserDetails {
     private Boolean ghostMode = false; // Desativado por padrão
 
     @NotNull
-    @PositiveOrZero
-    @Column(nullable = false)
-    private Integer level = 1; // User começa nível 1
-
-    @NotNull
     @Min(1)
     @Max(7)
     @Column(name = "weekly_goal", nullable = false)

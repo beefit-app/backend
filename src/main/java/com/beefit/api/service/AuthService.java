@@ -3,6 +3,8 @@ package com.beefit.api.service;
 import com.beefit.api.domain.User;
 import com.beefit.api.domain.enums.UserRole;
 import com.beefit.api.dto.RegisterDTO;
+import com.beefit.api.exception.EmailAlreadyInUse;
+import com.beefit.api.exception.UsernameAlreadyInUse;
 import com.beefit.api.repository.UserRepository;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -32,12 +34,20 @@ public class AuthService implements UserDetailsService {
         return user;
     }
 
-    public void register(User registred){
+    public void register(User registered) throws UsernameAlreadyInUse, EmailAlreadyInUse {
 
-        registred.setPasswordHash(passwordEncoder.encode(registred.getPasswordHash()));
-        registred.setRole(UserRole.USER);
+        if(userRepository.findByUsername(registered.getUsername()) != null){
+            throw new UsernameAlreadyInUse("Esse nome de usuário já está em uso.");
+        };
 
-        userRepository.save(registred);
+        if(userRepository.findByEmail(registered.getEmail()) != null){
+            throw new EmailAlreadyInUse("Esse email já está em uso.");
+        };
+
+        registered.setPasswordHash(passwordEncoder.encode(registered.getPasswordHash()));
+        registered.setRole(UserRole.USER);
+
+        userRepository.save(registered);
     }
 
 }
