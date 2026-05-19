@@ -5,6 +5,8 @@ import com.beefit.api.domain.enums.UserRole;
 import com.beefit.api.dto.AuthenticationDTO;
 import com.beefit.api.dto.LoginResponseDTO;
 import com.beefit.api.dto.RegisterDTO;
+import com.beefit.api.exception.EmailAlreadyInUse;
+import com.beefit.api.exception.UsernameAlreadyInUse;
 import com.beefit.api.mapper.RegisterMapper;
 import com.beefit.api.service.AuthService;
 import com.beefit.api.service.TokenService;
