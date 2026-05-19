@@ -51,13 +51,7 @@ public class AuthController {
         User registred = registerMapper.toEntity(data);
 
         // Chama o service passando os dados de cadastro
-        try {
-            this.authService.register(registred);
-        } catch (UsernameAlreadyInUse e) {
-            return ResponseEntity.badRequest().build();
-        } catch (EmailAlreadyInUse e) {
-            return ResponseEntity.badRequest().build();
-        }
+        this.authService.register(registred);
 
         // Retornando sucesso sempre por enquanto
         return ResponseEntity.ok().build();
