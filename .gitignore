@@ -35,3 +35,8 @@ build/
 ### Docker persistence data (Não enviar para o Git) ###
 .docker-data/
 postgres_data/
+
+# Postman
+Postman/
+.postman/
+*.postman_collection.json
