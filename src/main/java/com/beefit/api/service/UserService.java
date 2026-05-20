@@ -1,6 +1,8 @@
 package com.beefit.api.service;
 
 import com.beefit.api.domain.User;
+import com.beefit.api.dto.ChangePasswordDTO;
+import com.beefit.api.dto.DeleteUserRequest;
 import com.beefit.api.dto.UpdateProfileRequest;
 import com.beefit.api.dto.UserProfileResponse;
 import com.beefit.api.exception.UserNotFoundException;
@@ -16,7 +18,7 @@ import java.util.UUID;
 public class UserService {
 
     @Autowired
-    private UserRepository userRepository;
+    private static UserRepository userRepository;
 
     // Logica para Visualizar o Perfil (RF-003)
     public UserProfileResponse getUserProfile(UUID userId) {
@@ -62,5 +64,32 @@ public class UserService {
         } else {
             throw new UserNotFoundException();
         }
+    }
+    //Method created to change the account password(RF - 004)
+    @Transactional
+    public static void changeUserPassword(UUID userID, ChangePasswordDTO dto) {
+        Optional<User> userOptional = userRepository.findById(userID);
+
+        if (userOptional.isPresent()) {
+            User user = userOptional.get();
+
+            user.setPasswordHash(dto.newPassword());
+        } else {
+            throw new UserNotFoundException();
+        }
+    }
+
+    //delete account (RF - 004)
+    @Transactional
+    public void deleteAccount(UUID userId, DeleteUserRequest dto) {
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Usuário não encontrado."));
+
+        if (user.getPassword() != null && !user.getPassword().matches(dto.password())) {
+            throw new IllegalArgumentException("Senha incorreta. Operação cancelada.");
+        }
+
+        userRepository.delete(user);
     }
 }
