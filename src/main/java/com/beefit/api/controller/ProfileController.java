@@ -1,8 +1,11 @@
 package com.beefit.api.controller;
 
+import com.beefit.api.dto.DeleteUserRequest;
 import com.beefit.api.dto.UpdateProfileRequest;
 import com.beefit.api.dto.UserProfileResponse;
+import com.beefit.api.dto.ChangePasswordDTO;
 import com.beefit.api.service.UserService;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -28,5 +31,18 @@ public class ProfileController {
     public ResponseEntity<Void> updateProfile(@PathVariable UUID id, @RequestBody UpdateProfileRequest request) {
         userService.updateUserProfile(id, request);
         return ResponseEntity.noContent().build(); // Retorna HTTP 204 No Content (sucesso sem corpo de resposta)
+    }
+
+    @PutMapping("/{id}/senha")
+    // Se a senha for inválida, o Spring retorna um erro 400 (Bad Request) automaticamente
+    public ResponseEntity<String> changePassword(@PathVariable UUID id, @Valid @RequestBody ChangePasswordDTO dto) {
+        UserService.changeUserPassword(id, dto);
+        return ResponseEntity.ok("Senha alterada com sucesso!");
+    }
+
+    @DeleteMapping("/me")
+    public ResponseEntity<Void> deleteAccount(@PathVariable UUID id, @Valid @RequestBody DeleteUserRequest dto) {
+        userService.deleteAccount(id, dto);
+        return ResponseEntity.noContent().build();
     }
 }
