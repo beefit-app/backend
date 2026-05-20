@@ -7,7 +7,9 @@ import com.beefit.api.dto.UpdateProfileRequest;
 import com.beefit.api.dto.UserProfileResponse;
 import com.beefit.api.exception.UserNotFoundException;
 import com.beefit.api.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,10 +17,11 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Service
+@RequiredArgsConstructor
 public class UserService {
 
-    @Autowired
-    private static UserRepository userRepository;
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
 
     // Logica para Visualizar o Perfil (RF-003)
     public UserProfileResponse getUserProfile(UUID userId) {
@@ -37,7 +40,6 @@ public class UserService {
                     user.getUsername(),
                     user.getBiography(),
                     user.getProfilePicture(),
-                    user.getLevel(),
                     user.getOffensiveHoneys(),
                     mockCardsCount,
                     mockTotalWorkouts
@@ -67,16 +69,13 @@ public class UserService {
     }
     //Method created to change the account password(RF - 004)
     @Transactional
-    public static void changeUserPassword(UUID userID, ChangePasswordDTO dto) {
-        Optional<User> userOptional = userRepository.findById(userID);
+    public void changeUserPassword(UUID userId, ChangePasswordDTO dto) {
 
-        if (userOptional.isPresent()) {
-            User user = userOptional.get();
+        User user = userRepository.findById(userId)
+                .orElseThrow(UserNotFoundException::new);
 
-            user.setPasswordHash(dto.newPassword());
-        } else {
-            throw new UserNotFoundException();
-        }
+        // Como está dentro de um @Transactional o hibernate salva sozinho.
+        user.setPasswordHash(passwordEncoder.encode(dto.newPassword()));
     }
 
     //delete account (RF - 004)
@@ -84,9 +83,9 @@ public class UserService {
     public void deleteAccount(UUID userId, DeleteUserRequest dto) {
 
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado."));
+                .orElseThrow(UserNotFoundException::new);
 
-        if (user.getPassword() != null && !user.getPassword().matches(dto.password())) {
+        if (user.getPassword() != null && !passwordEncoder.matches(dto.password(), user.getPassword())) {
             throw new IllegalArgumentException("Senha incorreta. Operação cancelada.");
         }
 

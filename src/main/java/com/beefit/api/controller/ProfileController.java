@@ -36,11 +36,11 @@ public class ProfileController {
     @PutMapping("/{id}/senha")
     // Se a senha for inválida, o Spring retorna um erro 400 (Bad Request) automaticamente
     public ResponseEntity<String> changePassword(@PathVariable UUID id, @Valid @RequestBody ChangePasswordDTO dto) {
-        UserService.changeUserPassword(id, dto);
+        userService.changeUserPassword(id, dto);
         return ResponseEntity.ok("Senha alterada com sucesso!");
     }
 
-    @DeleteMapping("/me")
+    @DeleteMapping("/{id}/me")
     public ResponseEntity<Void> deleteAccount(@PathVariable UUID id, @Valid @RequestBody DeleteUserRequest dto) {
         userService.deleteAccount(id, dto);
         return ResponseEntity.noContent().build();
