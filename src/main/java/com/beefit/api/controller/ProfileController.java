@@ -1,18 +1,16 @@
 package com.beefit.api.controller;
 
 import com.beefit.api.domain.User;
+import com.beefit.api.dto.ChangePasswordDTO;
 import com.beefit.api.dto.DeleteUserRequest;
 import com.beefit.api.dto.UpdateProfileRequest;
 import com.beefit.api.dto.UserProfileResponse;
-import com.beefit.api.dto.ChangePasswordDTO;
 import com.beefit.api.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/profile")
