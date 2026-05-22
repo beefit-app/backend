@@ -5,9 +5,11 @@ import com.beefit.api.domain.enums.UserRole;
 import com.beefit.api.dto.AuthenticationDTO;
 import com.beefit.api.dto.LoginResponseDTO;
 import com.beefit.api.dto.RegisterDTO;
+import com.beefit.api.dto.UserResponseDTO;
 import com.beefit.api.exception.EmailAlreadyInUse;
 import com.beefit.api.exception.UsernameAlreadyInUse;
 import com.beefit.api.mapper.RegisterMapper;
+import com.beefit.api.mapper.UserResponseMapper;
 import com.beefit.api.service.AuthService;
 import com.beefit.api.service.TokenService;
 import jakarta.validation.Valid;
@@ -28,6 +30,7 @@ public class AuthController {
 
     private final AuthService authService;
     private final RegisterMapper registerMapper;
+    private final UserResponseMapper userResponseMapper;
     private final TokenService tokenService;
     private final AuthenticationManager authenticationManager;
 
@@ -38,9 +41,11 @@ public class AuthController {
         var usernamePassword = new UsernamePasswordAuthenticationToken(data.email(), data.password());
         var auth = authenticationManager.authenticate(usernamePassword);
 
-        var token = tokenService.generateToken((User) auth.getPrincipal());
+        var token = tokenService.generateToken((User)auth.getPrincipal());
 
-        return ResponseEntity.ok(new LoginResponseDTO(token)); // Só quebrando o galho aqui, ta sempre retornando status ok com corpo vazio
+        UserResponseDTO login = userResponseMapper.toDto((User) auth.getPrincipal());
+
+        return ResponseEntity.ok(new LoginResponseDTO(token, login)); // Só quebrando o galho aqui, ta sempre retornando status ok com corpo vazio
 
     }
 
