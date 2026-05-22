@@ -5,7 +5,6 @@ public record UserProfileResponse(
         String username,
         String biography,
         String profilePicture,
-        Integer level,
         Integer offensiveHoneys,
         Integer cardsCount,
         Integer totalWorkouts
