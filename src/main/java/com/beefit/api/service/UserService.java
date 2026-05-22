@@ -69,16 +69,13 @@ public class UserService {
     }
     //Method created to change the account password(RF - 004)
     @Transactional
-    public void changeUserPassword(UUID userID, ChangePasswordDTO dto) {
-        Optional<User> userOptional = userRepository.findById(userID);
+    public void changeUserPassword(UUID userId, ChangePasswordDTO dto) {
 
-        if (userOptional.isPresent()) {
-            User user = userOptional.get();
+        User user = userRepository.findById(userId)
+                .orElseThrow(UserNotFoundException::new);
 
-            user.setPasswordHash(passwordEncoder.encode(dto.newPassword()));
-        } else {
-            throw new UserNotFoundException();
-        }
+        // Como está dentro de um @Transactional o hibernate salva sozinho.
+        user.setPasswordHash(passwordEncoder.encode(dto.newPassword()));
     }
 
     //delete account (RF - 004)
@@ -86,9 +83,9 @@ public class UserService {
     public void deleteAccount(UUID userId, DeleteUserRequest dto) {
 
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado."));
+                .orElseThrow(UserNotFoundException::new);
 
-        if (user.getPassword() != null && !passwordEncoder.matches(dto.password(), user.getPasswordHash())) {
+        if (user.getPassword() != null && !passwordEncoder.matches(dto.password(), user.getPassword())) {
             throw new IllegalArgumentException("Senha incorreta. Operação cancelada.");
         }
 
