@@ -32,33 +32,28 @@ public class AuthController {
     private final RegisterMapper registerMapper;
     private final UserResponseMapper userResponseMapper;
     private final TokenService tokenService;
-    private final AuthenticationManager authenticationManager;
 
     // Endpoint de Login
     @PostMapping("/login")
-    public ResponseEntity login(@RequestBody @Valid AuthenticationDTO data){
+    public ResponseEntity<LoginResponseDTO> login(@RequestBody @Valid AuthenticationDTO data){
 
-        var usernamePassword = new UsernamePasswordAuthenticationToken(data.email(), data.password());
-        var auth = authenticationManager.authenticate(usernamePassword);
+        LoginResponseDTO login = authService.login(data.email(), data.password());
 
-        var token = tokenService.generateToken((User)auth.getPrincipal());
-
-        UserResponseDTO login = userResponseMapper.toDto((User) auth.getPrincipal());
-
-        return ResponseEntity.ok(new LoginResponseDTO(token, login)); // Só quebrando o galho aqui, ta sempre retornando status ok com corpo vazio
-
+        return ResponseEntity.ok(login);
     }
 
     // Endpoint de Cadastro
     @PostMapping("/register")
-    public ResponseEntity register(@RequestBody @Valid RegisterDTO data){
+    public ResponseEntity<LoginResponseDTO> register(@RequestBody @Valid RegisterDTO data){
 
         User registered = registerMapper.toEntity(data);
 
         // Chama o service passando os dados de cadastro
         this.authService.register(registered);
 
+        LoginResponseDTO login = authService.login(data.email(), data.password());
+
         // Retornando sucesso sempre por enquanto
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok(login);
     }
 }
