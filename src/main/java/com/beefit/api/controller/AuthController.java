@@ -21,6 +21,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.crypto.bcrypt.BCrypt;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.bind.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -28,32 +29,37 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class AuthController {
 
-    private final AuthService authService;
-    private final RegisterMapper registerMapper;
-    private final UserResponseMapper userResponseMapper;
-    private final TokenService tokenService;
+  private final AuthService authService;
+  private final RegisterMapper registerMapper;
+  private final UserResponseMapper userResponseMapper;
+  private final TokenService tokenService;
 
-    // Endpoint de Login
-    @PostMapping("/login")
-    public ResponseEntity<LoginResponseDTO> login(@RequestBody @Valid AuthenticationDTO data){
+  // Endpoint de Login
+  @PostMapping("/login")
+  public ResponseEntity<LoginResponseDTO> login(@RequestBody @Valid AuthenticationDTO data) {
 
-        LoginResponseDTO login = authService.login(data.email(), data.password());
+    LoginResponseDTO login = authService.login(data.email(), data.password());
 
-        return ResponseEntity.ok(login);
-    }
+    return ResponseEntity.ok(login);
+  }
 
-    // Endpoint de Cadastro
-    @PostMapping("/register")
-    public ResponseEntity<LoginResponseDTO> register(@RequestBody @Valid RegisterDTO data){
+  // Endpoint de Cadastro
+  @PostMapping("/register")
+  public ResponseEntity<LoginResponseDTO> register(@RequestBody @Valid RegisterDTO data) {
 
-        User registered = registerMapper.toEntity(data);
+    User registered = registerMapper.toEntity(data);
 
-        // Chama o service passando os dados de cadastro
-        this.authService.register(registered);
+    // Chama o service passando os dados de cadastro
+    this.authService.register(registered);
 
-        LoginResponseDTO login = authService.login(data.email(), data.password());
+    LoginResponseDTO login = authService.login(data.email(), data.password());
 
-        // Retornando sucesso sempre por enquanto
-        return ResponseEntity.ok(login);
-    }
+    // Retornando sucesso sempre por enquanto
+    return ResponseEntity.ok(login);
+  }
+
+  @GetMapping("/me")
+  public UserResponseDTO getAuthUser(@AuthenticationPrincipal User user) {
+    return userResponseMapper.toDto(user);
+  }
 }
