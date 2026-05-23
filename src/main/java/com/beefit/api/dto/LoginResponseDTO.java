@@ -1,4 +1,4 @@
 package com.beefit.api.dto;
 
-public record LoginResponseDTO(String token) {
+public record LoginResponseDTO(String token, UserResponseDTO userResponseDTO) {
 }
