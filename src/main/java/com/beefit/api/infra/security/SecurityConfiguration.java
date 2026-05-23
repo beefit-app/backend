@@ -1,7 +1,7 @@
 package com.beefit.api.infra.security;
 
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
-import org.apache.tomcat.util.net.openssl.ciphers.Authentication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -27,6 +27,22 @@ public class SecurityConfiguration {
         return http
                 .csrf(csrf -> csrf.disable()) // Desativa o Csrf
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) // Passa de Statefull par Stateless
+                .exceptionHandling(exception -> exception
+                        .authenticationEntryPoint((request, response, authException) -> {
+
+                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                            response.setContentType("application/json");
+
+                            response.getWriter().write("""
+                                                            {
+                                                                "status": 401,
+                                                                "error": "Unauthorized",
+                                                                "message": "Credenciais inválidas."
+                                                            }
+                                                          """);
+                        })
+                )
+
                 .authorizeHttpRequests(authorize -> authorize
                         //.requestMatchers(HttpMethod.POST, "/dashboard").hasRole("ADMIN")
                         // Rotas exclusivas de admin ou de autenticação devem ser adicionadas aqui
