@@ -3,16 +3,12 @@ package com.beefit.api.service;
 import com.beefit.api.domain.User;
 import com.beefit.api.domain.enums.UserRole;
 import com.beefit.api.dto.LoginResponseDTO;
-import com.beefit.api.dto.RegisterDTO;
 import com.beefit.api.dto.UserResponseDTO;
 import com.beefit.api.exception.EmailAlreadyInUse;
 import com.beefit.api.exception.UsernameAlreadyInUse;
 import com.beefit.api.mapper.UserResponseMapper;
 import com.beefit.api.repository.UserRepository;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -20,7 +16,6 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.web.bind.annotation.RequestBody;
 
 @Service
 @RequiredArgsConstructor
