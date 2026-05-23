@@ -1,17 +1,13 @@
 package com.beefit.api.exception;
 
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.Setter;
-
 import java.time.LocalDateTime;
+import java.util.List;
 
-@Getter
-@Setter
-@AllArgsConstructor
-public class ErrorResponse {
-    private LocalDateTime timestamp;
-    private int status;
-    private String error;
-    private String message;
-}
+public record ErrorResponse (
+    LocalDateTime timestamp,
+    Integer status,
+    String error,
+    String message,
+    List<ErrorCampo> fields,
+    String path)
+{ }
