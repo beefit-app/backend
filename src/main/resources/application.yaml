@@ -25,6 +25,8 @@ spring:
 
 beefit:
   security:
+    cors:
+      allowed-origins: "http://localhost:5173"
     token:
       secret: ${JWT_SECRET:my_secret_key}
 

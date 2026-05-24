@@ -40,3 +40,6 @@ postgres_data/
 Postman/
 .postman/
 *.postman_collection.json
+
+#Configuration & env
+resources/application.yaml

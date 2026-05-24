@@ -1,0 +1,33 @@
+spring:
+  application:
+    name: beefit-api
+
+  # Configurações do Hibernate / JPA
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      # Garante que o UUID seja gravado de forma legível no banco de dados
+      boot:
+        registry:
+          selector:
+            default_strategy: org.hibernate.id.uuid.UuidGenerator
+      hibernate:
+        format_sql: true
+
+  # Configurações do Docker Compose do Spring
+  docker:
+    compose:
+      lifecycle-management: start-and-stop
+      readiness:
+        wait: always
+
+beefit:
+  security:
+    cors:
+      allowed-origins: ""
+    token:
+      secret: ${JWT_SECRET:my_secret_key}
+
+# Lembrar de Adicionar Configurações para o Módulo de Segurança (JWT)
