@@ -25,7 +25,7 @@ public class AuthController implements GenericController {
     private final RegisterMapper registerMapper;
     private final UserResponseMapper userResponseMapper;
 
-  // Endpoint de Login
+    // Endpoint de Login
     @PostMapping("/login")
     public ResponseEntity<LoginResponseDTO> login(@RequestBody @Valid AuthenticationDTO data) {
 
@@ -34,7 +34,7 @@ public class AuthController implements GenericController {
         return ResponseEntity.ok(login);
     }
 
-  // Endpoint de Cadastro
+    // Endpoint de Cadastro
     @PostMapping("/register")
     public ResponseEntity<LoginResponseDTO> register(@RequestBody @Valid RegisterDTO data) {
 
