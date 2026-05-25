@@ -2,8 +2,19 @@ package com.beefit.api.domain;
 
 
 import com.beefit.api.domain.enums.MuscleGroups;
-import jakarta.persistence.*;
-import jakarta.validation.constraints.NotEmpty;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.OrderBy;
+import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -12,6 +23,7 @@ import lombok.Setter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -39,14 +51,9 @@ public class WorkoutTemplate {
     @Column(name = "muscle_groups", columnDefinition = "varchar[]")
     private List<MuscleGroups> muscleGroupsList;
 
-    // Declaração da tabela intermediária
-    @JoinTable(
-            name = "workout_template_exercises",
-            joinColumns = @JoinColumn(name = "workout_template_id"),
-            inverseJoinColumns = @JoinColumn(name = "catalog_exercise_id")
-    )
-    @ManyToMany
-    private List<CatalogExercise> exerciseList;
+    @OneToMany(mappedBy = "workoutTemplate", orphanRemoval = true)
+    @OrderBy("order ASC")
+    private List<TemplateExercise> exercises = new ArrayList<>();
 
     @OneToOne
     @JoinColumn(name = "friend_source_id")
