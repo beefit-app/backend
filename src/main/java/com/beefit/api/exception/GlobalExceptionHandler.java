@@ -4,6 +4,8 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+import javax.xml.catalog.Catalog;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -68,4 +70,54 @@ public class GlobalExceptionHandler {
                 request.getRequestURI());
     }
 
+    @ExceptionHandler({ WorkoutSessionNotFoundException.class, WorkoutTemplateNotFoundException.class,
+            CatalogExerciseNotFound.class })
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public ErrorResponse handleWorkoutElementsNotFoundException(RuntimeException e,
+            HttpServletRequest request) {
+        return new ErrorResponse(
+                LocalDateTime.now(),
+                HttpStatus.NOT_FOUND.value(),
+                "Elementos do treino não encontrado.",
+                e.getMessage(),
+                List.of(),
+                request.getRequestURI());
+    }
+
+    @ExceptionHandler(InvalidWorkoutSessionStateException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleInvalidStateExceptions(InvalidWorkoutSessionStateException e,
+            HttpServletRequest request) {
+        return new ErrorResponse(LocalDateTime.now(),
+                HttpStatus.NOT_FOUND.value(),
+                "Estado da sessão de treino inválida",
+                e.getMessage(),
+                List.of(),
+                request.getRequestURI());
+    }
+
+    @ExceptionHandler(WorkoutAlreadyInProgressException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleWorkoutAlreadyInProgressException(WorkoutAlreadyInProgressException e,
+            HttpServletRequest request) {
+        return new ErrorResponse(LocalDateTime.now(),
+                HttpStatus.CONFLICT.value(),
+                "O usuário já possui um treino ativo",
+                e.getMessage(),
+                List.of(),
+                request.getRequestURI());
+
+    }
+
+    @ExceptionHandler(InvalidMuscleGroupException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleInvaidMuscleGroupException(InvalidMuscleGroupException e, HttpServletRequest request) {
+        return new ErrorResponse(LocalDateTime.now(),
+                HttpStatus.BAD_REQUEST.value(),
+                null,
+                e.getMessage(),
+                List.of(),
+                request.getRequestURI());
+
+    }
 }
