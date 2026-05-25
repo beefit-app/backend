@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.UUID;
 
 @Entity
-@Table(name="workout_sessions")
+@Table(name = "workout_sessions")
 @AllArgsConstructor
 @NoArgsConstructor
 @Getter
@@ -37,7 +37,7 @@ public class WorkoutSession {
     private LocalDateTime finishedAt;
 
     @Column(name = "duration_seconds")
-    private Integer durationsSeconds;
+    private Integer durationSeconds;
 
     @Column(name = "estimated_calories")
     private Double estimatedCalories;
@@ -63,7 +63,8 @@ public class WorkoutSession {
     @OrderBy("order ASC") // Garante que ao dar getExercises(), eles venham na ordem
     private List<SessionExercise> exercises = new ArrayList<>();
 
-    // Método auxiliar (Helper) para garantir que o relacionamento bidirecional funcione perfeitamente no Java
+    // Método auxiliar (Helper) para garantir que o relacionamento bidirecional
+    // funcione perfeitamente no Java
     public void addExercise(SessionExercise exercise) {
         this.exercises.add(exercise);
         exercise.setWorkout(this); // Seta o lado inverso da relação automaticamente
