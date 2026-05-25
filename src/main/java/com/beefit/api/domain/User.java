@@ -47,7 +47,7 @@ public class User implements UserDetails {
     @Column(name = "body_weight", nullable = false)
     private Float bodyWeight;
 
-    @Column(name = "profile_picture",nullable = true)
+    @Column(name = "profile_picture")
     private String profilePicture;
 
     @Column(nullable = true, length = 500)
@@ -66,6 +66,14 @@ public class User implements UserDetails {
     @Max(7)
     @Column(name = "weekly_goal", nullable = false)
     private Integer weeklyGoal;
+
+    @PositiveOrZero
+    @Column(name = "workouts_count", nullable = false)
+    private Integer workoutsCount = 0;
+
+    @PositiveOrZero
+    @Column(name = "cards_count", nullable = false)
+    private Integer cardsCount = 0;
 
     @NotNull
     @Min(0)
