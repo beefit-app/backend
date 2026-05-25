@@ -3,6 +3,7 @@ package com.beefit.api.domain;
 
 import com.beefit.api.domain.enums.MuscleGroups;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -38,8 +39,13 @@ public class WorkoutTemplate {
     @Column(name = "muscle_groups", columnDefinition = "varchar[]")
     private List<MuscleGroups> muscleGroupsList;
 
-    @NotNull
-    @Column(name = "exercise_list", nullable = false)
+    // Declaração da tabela intermediária
+    @JoinTable(
+            name = "workout_template_exercises",
+            joinColumns = @JoinColumn(name = "workout_template_id"),
+            inverseJoinColumns = @JoinColumn(name = "catalog_exercise_id")
+    )
+    @ManyToMany
     private List<CatalogExercise> exerciseList;
 
     @OneToOne
