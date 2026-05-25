@@ -4,8 +4,6 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
-import javax.xml.catalog.Catalog;
-
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -89,8 +87,8 @@ public class GlobalExceptionHandler {
     public ErrorResponse handleInvalidStateExceptions(InvalidWorkoutSessionStateException e,
             HttpServletRequest request) {
         return new ErrorResponse(LocalDateTime.now(),
-                HttpStatus.NOT_FOUND.value(),
-                "Estado da sessão de treino inválida",
+                HttpStatus.BAD_REQUEST.value(),
+                "Estado da sessão de treino inválido",
                 e.getMessage(),
                 List.of(),
                 request.getRequestURI());

@@ -2,7 +2,9 @@ package com.beefit.api.service;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
@@ -10,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.beefit.api.domain.CatalogExercise;
 import com.beefit.api.domain.SessionExercise;
+import com.beefit.api.domain.TemplateExercise;
 import com.beefit.api.domain.User;
 import com.beefit.api.domain.WorkoutSession;
 import com.beefit.api.domain.WorkoutTemplate;
@@ -57,7 +60,7 @@ public class WorkoutSessionService {
         session.setIsPrivate(request.isPrivate());
         session.setStatus(WorkoutStatus.IN_PROGRESS);
 
-        List<SessionExercise> sessionExercises = resolveInitialExercises(request);
+        List<SessionExercise> sessionExercises = resolveInitialExercises(userId, request);
 
         for (SessionExercise sessionExercise : sessionExercises) {
             session.addExercise(sessionExercise);
@@ -72,24 +75,24 @@ public class WorkoutSessionService {
     // exercícios,
     // ou seja, caso haja um template pré-definido, o treino já mostra os exercícios
     // corretamente
-    private List<SessionExercise> resolveInitialExercises(StartWorkoutRequestDTO request) {
+    private List<SessionExercise> resolveInitialExercises(UUID userId, StartWorkoutRequestDTO request) {
         if (request.templateId() == null) {
             return buildExercisesFromRequest(request.exercises());
         }
-        return buildExercisesFromTemplate(request.templateId());
+        return buildExercisesFromTemplate(userId, request.templateId());
     }
 
-    private List<SessionExercise> buildExercisesFromTemplate(UUID templateId) {
+    private List<SessionExercise> buildExercisesFromTemplate(UUID userId, UUID templateId) {
         WorkoutTemplate template = workoutTemplateRepository.findById(templateId)
                 .orElseThrow(WorkoutTemplateNotFoundException::new);
+        validateTemplateAccess(userId, template);
 
         List<SessionExercise> exercises = new ArrayList<>();
-        int order = 1;
 
-        for (CatalogExercise exercise : template.getExerciseList()) {
+        for (TemplateExercise templateExercise : template.getExercises()) {
             SessionExercise sessionExercise = new SessionExercise();
-            sessionExercise.setExercise(exercise);
-            sessionExercise.setOrder(order++);
+            sessionExercise.setExercise(templateExercise.getCatalogExercise());
+            sessionExercise.setOrder(templateExercise.getOrder());
             exercises.add(sessionExercise);
         }
 
@@ -97,6 +100,7 @@ public class WorkoutSessionService {
     }
 
     private List<SessionExercise> buildExercisesFromRequest(List<StartWorkoutExerciseItemDTO> items) {
+        validateExerciseOrders(items);
         List<SessionExercise> exercises = new ArrayList<>();
 
         for (StartWorkoutExerciseItemDTO item : items) {
@@ -113,10 +117,28 @@ public class WorkoutSessionService {
 
     private void validateExerciseSource(StartWorkoutRequestDTO request) {
         boolean hasTemplate = request.templateId() != null;
-        boolean hasExercises = request.exercises() != null;
+        boolean hasExercises = request.exercises() != null && !request.exercises().isEmpty();
 
         if (hasTemplate == hasExercises) {
-            throw new InvalidWorkoutSessionStateException();
+            throw new InvalidWorkoutSessionStateException(
+                    "Informe exatamente uma origem de exercícios: templateId ou exercises.");
+        }
+    }
+
+    private void validateExerciseOrders(List<StartWorkoutExerciseItemDTO> items) {
+        Set<Integer> usedOrders = new HashSet<>();
+
+        for (StartWorkoutExerciseItemDTO item : items) {
+            if (!usedOrders.add(item.order())) {
+                throw new InvalidWorkoutSessionStateException("A ordem dos exercícios não pode ser duplicada.");
+            }
+        }
+    }
+
+    private void validateTemplateAccess(UUID userId, WorkoutTemplate template) {
+        if (template.getUser() == null || template.getUser().getId() == null
+                || !template.getUser().getId().equals(userId)) {
+            throw new WorkoutTemplateNotFoundException();
         }
     }
 

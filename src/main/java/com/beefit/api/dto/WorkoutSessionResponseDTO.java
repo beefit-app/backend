@@ -13,5 +13,6 @@ public record WorkoutSessionResponseDTO(
         @Nullable LocalDateTime finishedAt,
         @Nullable Integer durationSeconds,
         List<String> muscleGroups,
-        Boolean isPrivate) {
+        Boolean isPrivate,
+        List<SessionExerciseResponseDTO> exercises) {
 }
