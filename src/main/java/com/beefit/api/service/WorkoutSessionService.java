@@ -6,6 +6,9 @@ import java.util.List;
 import java.util.UUID;
 
 import com.beefit.api.domain.*;
+import com.beefit.api.domain.enums.SocialEvent;
+import com.beefit.api.dto.DataSocialEventDTO;
+import com.beefit.api.dto.SocialEventDTO;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +32,7 @@ public class WorkoutSessionService {
     private final WorkoutTemplateRepository workoutTemplateRepository;
     private final UserRepository userRepository;
     private final WorkoutSessionMapper workoutSessionMapper;
+    private final SseService sseService;
 
     @Transactional
     public WorkoutSessionResponseDTO startWorkout(UUID userId, StartWorkoutRequestDTO request) {
@@ -54,6 +58,10 @@ public class WorkoutSessionService {
         }
 
         WorkoutSession savedSession = workoutSessionRepository.save(session);
+
+        DataSocialEventDTO dataSocialEventDTO = new DataSocialEventDTO(user.getId(), user.getUsername(), savedSession.getStartedAt());
+
+        sseService.broadcast(new SocialEventDTO(SocialEvent.WORKOUT_STARTED, dataSocialEventDTO));
 
         return workoutSessionMapper.toDto(savedSession);
     }
