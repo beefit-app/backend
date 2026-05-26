@@ -62,10 +62,6 @@ public class WorkoutSessionService {
         return workoutSessionMapper.toDto(savedSession);
     }
 
-    // Esse método é o responsável por definir como o treino ativo trata os
-    // exercícios,
-    // ou seja, caso haja um template pré-definido, o treino já mostra os exercícios
-    // corretamente
     private List<SessionExercise> resolveInitialExercises(UUID userId, StartWorkoutRequestDTO request) {
         if (request.templateId() == null) {
             return List.of();
