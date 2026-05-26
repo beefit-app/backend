@@ -94,6 +94,18 @@ public class GlobalExceptionHandler {
                 request.getRequestURI());
     }
 
+    @ExceptionHandler(InvalidWorkoutSnapshotException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleInvalidWorkoutSnapshotException(InvalidWorkoutSnapshotException e,
+            HttpServletRequest request) {
+        return new ErrorResponse(LocalDateTime.now(),
+                HttpStatus.BAD_REQUEST.value(),
+                "Snapshot do treino inválido",
+                e.getMessage(),
+                List.of(),
+                request.getRequestURI());
+    }
+
     @ExceptionHandler(WorkoutAlreadyInProgressException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
     public ErrorResponse handleWorkoutAlreadyInProgressException(WorkoutAlreadyInProgressException e,

@@ -70,4 +70,9 @@ public class WorkoutSession {
         exercise.setWorkout(this); // Seta o lado inverso da relação automaticamente
     }
 
+    public void removeExercise(SessionExercise exercise) {
+        this.exercises.remove(exercise);
+        exercise.setWorkout(null);
+    }
+
 }

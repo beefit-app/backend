@@ -33,6 +33,11 @@ public class SessionExercise {
 
     // Uma lista ordenada de séries
     @OneToMany(mappedBy = "exercise", cascade = CascadeType.ALL, orphanRemoval = true)
-    @OrderBy("sequence ASC") // Garante que a série 1 venha antes da série 2
+    @OrderBy("order ASC") // Garante que a série 1 venha antes da série 2
     private List<Set> sets = new ArrayList<>();
+
+    public void addSet(Set set) {
+        this.sets.add(set);
+        set.setExercise(this);
+    }
 }
