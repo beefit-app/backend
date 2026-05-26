@@ -68,4 +68,54 @@ public class GlobalExceptionHandler {
                 request.getRequestURI());
     }
 
+    @ExceptionHandler({ WorkoutSessionNotFoundException.class, WorkoutTemplateNotFoundException.class,
+            CatalogExerciseNotFound.class })
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public ErrorResponse handleWorkoutElementsNotFoundException(RuntimeException e,
+            HttpServletRequest request) {
+        return new ErrorResponse(
+                LocalDateTime.now(),
+                HttpStatus.NOT_FOUND.value(),
+                "Elementos do treino não encontrado.",
+                e.getMessage(),
+                List.of(),
+                request.getRequestURI());
+    }
+
+    @ExceptionHandler(InvalidWorkoutSessionStateException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleInvalidStateExceptions(InvalidWorkoutSessionStateException e,
+            HttpServletRequest request) {
+        return new ErrorResponse(LocalDateTime.now(),
+                HttpStatus.BAD_REQUEST.value(),
+                "Estado da sessão de treino inválido",
+                e.getMessage(),
+                List.of(),
+                request.getRequestURI());
+    }
+
+    @ExceptionHandler(WorkoutAlreadyInProgressException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleWorkoutAlreadyInProgressException(WorkoutAlreadyInProgressException e,
+            HttpServletRequest request) {
+        return new ErrorResponse(LocalDateTime.now(),
+                HttpStatus.CONFLICT.value(),
+                "O usuário já possui um treino ativo",
+                e.getMessage(),
+                List.of(),
+                request.getRequestURI());
+
+    }
+
+    @ExceptionHandler(InvalidMuscleGroupException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleInvaidMuscleGroupException(InvalidMuscleGroupException e, HttpServletRequest request) {
+        return new ErrorResponse(LocalDateTime.now(),
+                HttpStatus.BAD_REQUEST.value(),
+                null,
+                e.getMessage(),
+                List.of(),
+                request.getRequestURI());
+
+    }
 }

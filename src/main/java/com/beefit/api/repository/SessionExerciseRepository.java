@@ -6,9 +6,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 import java.util.UUID;
 
-public interface SessionExerciseRepository extends JpaRepository<SessionExercise, UUID> {
+public interface SessionExerciseRepository extends JpaRepository<SessionExercise, Long> {
 
     // Busca todos os exercícios de uma sessão específica ordenados pela coluna 'exercise_order'
     List<SessionExercise> findByWorkoutIdOrderByOrderAsc(UUID workoutId);
 }
-

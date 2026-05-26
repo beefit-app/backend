@@ -5,11 +5,12 @@ import lombok.Getter;
 @Getter
 public enum WorkoutStatus {
     IN_PROGRESS("in_progress"),
-    FINISHED("finished");
+    FINISHED("finished"),
+    CANCELED("canceled");
 
     final String status;
 
-    WorkoutStatus(String status){
+    WorkoutStatus(String status) {
         this.status = status;
     }
 }

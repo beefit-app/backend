@@ -1,0 +1,18 @@
+package com.beefit.api.dto;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.UUID;
+
+import jakarta.annotation.Nullable;
+
+public record WorkoutSessionResponseDTO(
+        UUID id,
+        String status,
+        LocalDateTime startedAt,
+        @Nullable LocalDateTime finishedAt,
+        @Nullable Integer durationSeconds,
+        List<String> muscleGroups,
+        Boolean isPrivate,
+        List<SessionExerciseResponseDTO> exercises) {
+}
