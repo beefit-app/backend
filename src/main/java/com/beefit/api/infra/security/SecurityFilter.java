@@ -11,6 +11,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
+import org.springframework.web.servlet.HandlerMapping;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
@@ -19,8 +20,23 @@ import java.io.IOException;
 @RequiredArgsConstructor
 public class SecurityFilter extends OncePerRequestFilter {
 
+    private static final String[] PUBLIC_PATH_PREFIXES = {
+            "/auth/"
+    };
+
     private final TokenService tokenService;
     private final UserRepository userRepository;
+
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String path = resolveRequestPath(request);
+        for (String prefix : PUBLIC_PATH_PREFIXES) {
+            if (path.startsWith(prefix)) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
@@ -41,6 +57,14 @@ public class SecurityFilter extends OncePerRequestFilter {
             SecurityContextHolder.getContext().setAuthentication(authentication);
         }
         filterChain.doFilter(request, response);
+    }
+
+    private String resolveRequestPath(HttpServletRequest request) {
+        Object pathWithinHandlerMapping = request.getAttribute(HandlerMapping.PATH_WITHIN_HANDLER_MAPPING_ATTRIBUTE);
+        if (pathWithinHandlerMapping instanceof String path && !path.isBlank()) {
+            return path;
+        }
+        return request.getServletPath();
     }
 
     private String recoverToken(HttpServletRequest request){
