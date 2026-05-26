@@ -9,7 +9,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 
 public record FinishWorkoutExerciseDTO(
-        @Nullable Long sessionExerciseId,
+        @Nullable UUID sessionExerciseId,
         @NotNull UUID catalogExerciseId,
         @NotNull @Positive Integer order,
         @NotNull @Valid List<FinishWorkoutSetDTO> sets) {

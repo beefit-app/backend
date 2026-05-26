@@ -17,21 +17,16 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.beefit.api.domain.CatalogExercise;
 import com.beefit.api.domain.SessionExercise;
-import com.beefit.api.domain.TemplateExercise;
 import com.beefit.api.domain.User;
 import com.beefit.api.domain.WorkoutSession;
 import com.beefit.api.domain.WorkoutTemplate;
-import com.beefit.api.domain.*;
 import com.beefit.api.domain.enums.SocialEvent;
-import com.beefit.api.dto.DataSocialEventDTO;
-import com.beefit.api.dto.SocialEventDTO;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import com.beefit.api.domain.enums.WorkoutStatus;
+import com.beefit.api.dto.DataSocialEventDTO;
 import com.beefit.api.dto.FinishWorkoutExerciseDTO;
 import com.beefit.api.dto.FinishWorkoutSetDTO;
 import com.beefit.api.dto.FinishWorkoutSnapshotRequestDTO;
+import com.beefit.api.dto.SocialEventDTO;
 import com.beefit.api.dto.StartWorkoutRequestDTO;
 import com.beefit.api.dto.WorkoutSessionResponseDTO;
 import com.beefit.api.exception.CatalogExerciseNotFound;
@@ -84,7 +79,8 @@ public class WorkoutSessionService {
 
         WorkoutSession savedSession = workoutSessionRepository.save(session);
 
-        DataSocialEventDTO dataSocialEventDTO = new DataSocialEventDTO(user.getId(), user.getUsername(), savedSession.getStartedAt());
+        DataSocialEventDTO dataSocialEventDTO = new DataSocialEventDTO(user.getId(), user.getUsername(),
+                savedSession.getStartedAt());
 
         sseService.broadcast(new SocialEventDTO(SocialEvent.WORKOUT_STARTED, dataSocialEventDTO));
 
@@ -120,7 +116,8 @@ public class WorkoutSessionService {
         return buildExercisesFromTemplate(userId, request.templateId());
     }
 
-    // Revisar método. Eu (Ryan) troquei de TemplateExercise para CatalogExercise pois estava dando
+    // Revisar método. Eu (Ryan) troquei de TemplateExercise para CatalogExercise
+    // pois estava dando
     // problema. Confere a estrutura do WorkoutTemplate lá também
     private List<SessionExercise> buildExercisesFromTemplate(UUID userId, UUID templateId) {
         WorkoutTemplate template = workoutTemplateRepository.findById(templateId)
@@ -187,7 +184,7 @@ public class WorkoutSessionService {
         validateUniqueExerciseOrders(requestedExercises);
         validateUniqueExerciseIds(requestedExercises);
 
-        Map<Long, SessionExercise> existingExercisesById = new HashMap<>();
+        Map<UUID, SessionExercise> existingExercisesById = new HashMap<>();
         for (SessionExercise exercise : session.getExercises()) {
             existingExercisesById.put(exercise.getId(), exercise);
         }
@@ -203,7 +200,7 @@ public class WorkoutSessionService {
 
     private SessionExercise resolveSessionExercise(WorkoutSession session,
             FinishWorkoutExerciseDTO requestedExercise,
-            Map<Long, SessionExercise> existingExercisesById) {
+            Map<UUID, SessionExercise> existingExercisesById) {
         if (requestedExercise.sessionExerciseId() == null) {
             CatalogExercise catalogExercise = catalogExerciseRepository.findById(requestedExercise.catalogExerciseId())
                     .orElseThrow(CatalogExerciseNotFound::new);
@@ -291,7 +288,7 @@ public class WorkoutSessionService {
     }
 
     private void validateUniqueExerciseIds(List<FinishWorkoutExerciseDTO> requestedExercises) {
-        Set<Long> seenIds = new HashSet<>();
+        Set<UUID> seenIds = new HashSet<>();
         for (FinishWorkoutExerciseDTO exercise : requestedExercises) {
             if (exercise.sessionExerciseId() != null && !seenIds.add(exercise.sessionExerciseId())) {
                 throw new InvalidWorkoutSnapshotException("O snapshot contém exercícios duplicados.");
