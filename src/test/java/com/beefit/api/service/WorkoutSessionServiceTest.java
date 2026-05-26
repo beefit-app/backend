@@ -24,7 +24,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.beefit.api.domain.CatalogExercise;
-import com.beefit.api.domain.TemplateExercise;
 import com.beefit.api.domain.User;
 import com.beefit.api.domain.SessionExercise;
 import com.beefit.api.domain.Set;
@@ -65,6 +64,9 @@ class WorkoutSessionServiceTest {
 
     @Mock
     private WorkoutSessionMapper workoutSessionMapper;
+
+    @Mock
+    private SseService sseService;
 
     @InjectMocks
     private WorkoutSessionService workoutSessionService;
@@ -113,21 +115,15 @@ class WorkoutSessionServiceTest {
         UUID templateId = UUID.randomUUID();
         CatalogExercise firstCatalogExercise = new CatalogExercise();
         firstCatalogExercise.setId(UUID.randomUUID());
+        firstCatalogExercise.setOrder(1);
         CatalogExercise secondCatalogExercise = new CatalogExercise();
         secondCatalogExercise.setId(UUID.randomUUID());
-
-        TemplateExercise firstTemplateExercise = new TemplateExercise();
-        firstTemplateExercise.setCatalogExercise(firstCatalogExercise);
-        firstTemplateExercise.setOrder(1);
-
-        TemplateExercise secondTemplateExercise = new TemplateExercise();
-        secondTemplateExercise.setCatalogExercise(secondCatalogExercise);
-        secondTemplateExercise.setOrder(2);
+        secondCatalogExercise.setOrder(2);
 
         WorkoutTemplate template = new WorkoutTemplate();
         template.setId(templateId);
         template.setUser(user);
-        template.setExercises(List.of(firstTemplateExercise, secondTemplateExercise));
+        template.setExerciseList(List.of(firstCatalogExercise, secondCatalogExercise));
 
         StartWorkoutRequestDTO request = new StartWorkoutRequestDTO(
                 List.of(MuscleGroups.BACK),
@@ -207,10 +203,10 @@ class WorkoutSessionServiceTest {
         CatalogExercise removableCatalogExercise = catalogExercise(UUID.randomUUID(), "Puxada");
         CatalogExercise newCatalogExercise = catalogExercise(UUID.randomUUID(), "Agachamento");
 
-        SessionExercise existingExercise = sessionExercise(10L, existingCatalogExercise, 1);
+        SessionExercise existingExercise = sessionExercise(UUID.randomUUID(), existingCatalogExercise, 1);
         existingExercise.addSet(set(existingSetId, 1, 40.0, 10));
 
-        SessionExercise removableExercise = sessionExercise(20L, removableCatalogExercise, 2);
+        SessionExercise removableExercise = sessionExercise(UUID.randomUUID(), removableCatalogExercise, 2);
         removableExercise.addSet(set(UUID.randomUUID(), 1, 20.0, 12));
 
         WorkoutSession session = inProgressSession(workoutId);
@@ -285,7 +281,7 @@ class WorkoutSessionServiceTest {
     void finishWorkoutRejectsExistingExerciseCatalogChange() {
         UUID workoutId = UUID.randomUUID();
         CatalogExercise existingCatalogExercise = catalogExercise(UUID.randomUUID(), "Supino");
-        SessionExercise existingExercise = sessionExercise(10L, existingCatalogExercise, 1);
+        SessionExercise existingExercise = sessionExercise(UUID.randomUUID(), existingCatalogExercise, 1);
         WorkoutSession session = inProgressSession(workoutId);
         session.addExercise(existingExercise);
 
@@ -382,7 +378,7 @@ class WorkoutSessionServiceTest {
         return catalogExercise;
     }
 
-    private SessionExercise sessionExercise(Long id, CatalogExercise catalogExercise, Integer order) {
+    private SessionExercise sessionExercise(UUID id, CatalogExercise catalogExercise, Integer order) {
         SessionExercise sessionExercise = new SessionExercise();
         sessionExercise.setId(id);
         sessionExercise.setExercise(catalogExercise);
