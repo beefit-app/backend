@@ -38,8 +38,12 @@ public class WorkoutTemplate {
     @Column(name = "muscle_groups", columnDefinition = "varchar[]")
     private List<MuscleGroups> muscleGroupsList;
 
-    @NotNull
-    @Column(name = "exercise_list", nullable = false)
+    @JoinTable(
+            name = "workout_template_exercises",
+            joinColumns = @JoinColumn(name = "workout_template_id"),
+            inverseJoinColumns = @JoinColumn(name = "catalog_exercise_id")
+    )
+    @ManyToMany
     private List<CatalogExercise> exerciseList;
 
     @OneToOne

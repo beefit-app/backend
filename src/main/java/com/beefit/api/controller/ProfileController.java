@@ -12,9 +12,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.beefit.api.domain.User;
 import com.beefit.api.dto.ChangePasswordDTO;
-import com.beefit.api.dto.DeleteUserRequest;
+import com.beefit.api.dto.DeleteUserRequestDTO;
 import com.beefit.api.dto.UpdateAccountSettingsRequestDTO;
-import com.beefit.api.dto.UpdateProfileRequest;
+import com.beefit.api.dto.UpdateProfileRequestDTO;
 import com.beefit.api.dto.UserProfileResponseDTO;
 import com.beefit.api.service.UserService;
 
@@ -37,7 +37,7 @@ public class ProfileController {
     // Rota para Editar o Perfil: PUT http://localhost:8080/api/profile/{id}
     @PutMapping("/me")
     public ResponseEntity<Void> updateProfile(@AuthenticationPrincipal User user,
-            @Valid @RequestBody UpdateProfileRequest request) {
+            @Valid @RequestBody UpdateProfileRequestDTO request) {
         userService.updateUserProfile(user.getId(), request);
         return ResponseEntity.noContent().build(); // Retorna HTTP 204 No Content (sucesso sem corpo de resposta)
     }
@@ -61,7 +61,7 @@ public class ProfileController {
 
     @DeleteMapping("/me")
     public ResponseEntity<Void> deleteAccount(@AuthenticationPrincipal User user,
-            @Valid @RequestBody DeleteUserRequest dto) {
+            @Valid @RequestBody DeleteUserRequestDTO dto) {
         userService.deleteAccount(user.getId(), dto);
         return ResponseEntity.noContent().build();
     }
