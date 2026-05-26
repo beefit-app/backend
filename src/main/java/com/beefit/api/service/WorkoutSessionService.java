@@ -5,14 +5,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+import com.beefit.api.domain.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.beefit.api.domain.SessionExercise;
-import com.beefit.api.domain.TemplateExercise;
-import com.beefit.api.domain.User;
-import com.beefit.api.domain.WorkoutSession;
-import com.beefit.api.domain.WorkoutTemplate;
 import com.beefit.api.domain.enums.WorkoutStatus;
 import com.beefit.api.dto.StartWorkoutRequestDTO;
 import com.beefit.api.dto.WorkoutSessionResponseDTO;
@@ -69,6 +65,8 @@ public class WorkoutSessionService {
         return buildExercisesFromTemplate(userId, request.templateId());
     }
 
+    // Revisar método. Eu (Ryan) troquei de TemplateExercise para CatalogExercise pois estava dando
+    // problema. Confere a estrutura do WorkoutTemplate lá também
     private List<SessionExercise> buildExercisesFromTemplate(UUID userId, UUID templateId) {
         WorkoutTemplate template = workoutTemplateRepository.findById(templateId)
                 .orElseThrow(WorkoutTemplateNotFoundException::new);
@@ -76,10 +74,10 @@ public class WorkoutSessionService {
 
         List<SessionExercise> exercises = new ArrayList<>();
 
-        for (TemplateExercise templateExercise : template.getExercises()) {
+        for (CatalogExercise catalogExercise : template.getExerciseList()) {
             SessionExercise sessionExercise = new SessionExercise();
-            sessionExercise.setExercise(templateExercise.getCatalogExercise());
-            sessionExercise.setOrder(templateExercise.getOrder());
+            sessionExercise.setExercise(catalogExercise);
+            sessionExercise.setOrder(catalogExercise.getOrder());
             exercises.add(sessionExercise);
         }
 
