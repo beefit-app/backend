@@ -51,9 +51,13 @@ public class WorkoutTemplate {
     @Column(name = "muscle_groups", columnDefinition = "varchar[]")
     private List<MuscleGroups> muscleGroupsList;
 
-    @OneToMany(mappedBy = "workoutTemplate", orphanRemoval = true)
-    @OrderBy("order ASC")
-    private List<TemplateExercise> exercises = new ArrayList<>();
+    @JoinTable(
+            name = "workout_template_exercises",
+            joinColumns = @JoinColumn(name = "workout_template_id"),
+            inverseJoinColumns = @JoinColumn(name = "catalog_exercise_id")
+    )
+    @ManyToMany
+    private List<CatalogExercise> exerciseList;
 
     @OneToOne
     @JoinColumn(name = "friend_source_id")
