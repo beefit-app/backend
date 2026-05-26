@@ -21,6 +21,13 @@ import com.beefit.api.domain.TemplateExercise;
 import com.beefit.api.domain.User;
 import com.beefit.api.domain.WorkoutSession;
 import com.beefit.api.domain.WorkoutTemplate;
+import com.beefit.api.domain.*;
+import com.beefit.api.domain.enums.SocialEvent;
+import com.beefit.api.dto.DataSocialEventDTO;
+import com.beefit.api.dto.SocialEventDTO;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.beefit.api.domain.enums.WorkoutStatus;
 import com.beefit.api.dto.FinishWorkoutExerciseDTO;
 import com.beefit.api.dto.FinishWorkoutSetDTO;
@@ -50,6 +57,7 @@ public class WorkoutSessionService {
     private final CatalogExerciseRepository catalogExerciseRepository;
     private final UserRepository userRepository;
     private final WorkoutSessionMapper workoutSessionMapper;
+    private final SseService sseService;
 
     @Transactional
     public WorkoutSessionResponseDTO startWorkout(UUID userId, StartWorkoutRequestDTO request) {
@@ -75,6 +83,10 @@ public class WorkoutSessionService {
         }
 
         WorkoutSession savedSession = workoutSessionRepository.save(session);
+
+        DataSocialEventDTO dataSocialEventDTO = new DataSocialEventDTO(user.getId(), user.getUsername(), savedSession.getStartedAt());
+
+        sseService.broadcast(new SocialEventDTO(SocialEvent.WORKOUT_STARTED, dataSocialEventDTO));
 
         return workoutSessionMapper.toDto(savedSession);
     }
@@ -108,6 +120,8 @@ public class WorkoutSessionService {
         return buildExercisesFromTemplate(userId, request.templateId());
     }
 
+    // Revisar método. Eu (Ryan) troquei de TemplateExercise para CatalogExercise pois estava dando
+    // problema. Confere a estrutura do WorkoutTemplate lá também
     private List<SessionExercise> buildExercisesFromTemplate(UUID userId, UUID templateId) {
         WorkoutTemplate template = workoutTemplateRepository.findById(templateId)
                 .orElseThrow(WorkoutTemplateNotFoundException::new);
@@ -115,10 +129,10 @@ public class WorkoutSessionService {
 
         List<SessionExercise> exercises = new ArrayList<>();
 
-        for (TemplateExercise templateExercise : template.getExercises()) {
+        for (CatalogExercise catalogExercise : template.getExerciseList()) {
             SessionExercise sessionExercise = new SessionExercise();
-            sessionExercise.setExercise(templateExercise.getCatalogExercise());
-            sessionExercise.setOrder(templateExercise.getOrder());
+            sessionExercise.setExercise(catalogExercise);
+            sessionExercise.setOrder(catalogExercise.getOrder());
             exercises.add(sessionExercise);
         }
 

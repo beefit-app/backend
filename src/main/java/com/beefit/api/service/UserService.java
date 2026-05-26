@@ -2,9 +2,9 @@ package com.beefit.api.service;
 
 import com.beefit.api.domain.User;
 import com.beefit.api.dto.ChangePasswordDTO;
-import com.beefit.api.dto.DeleteUserRequest;
+import com.beefit.api.dto.DeleteUserRequestDTO;
 import com.beefit.api.dto.UpdateAccountSettingsRequestDTO;
-import com.beefit.api.dto.UpdateProfileRequest;
+import com.beefit.api.dto.UpdateProfileRequestDTO;
 import com.beefit.api.dto.UserProfileResponseDTO;
 import com.beefit.api.exception.InvalidPasswordException;
 import com.beefit.api.exception.UserNotFoundException;
@@ -53,7 +53,7 @@ public class UserService {
 
     // Lógica para Editar o Perfil (RF-003)
     @Transactional
-    public void updateUserProfile(UUID userId, UpdateProfileRequest request) {
+    public void updateUserProfile(UUID userId, UpdateProfileRequestDTO request) {
         Optional<User> userOptional = userRepository.findById(userId);
 
         if (userOptional.isPresent()) {
@@ -93,7 +93,7 @@ public class UserService {
     }
 
     @Transactional
-    public void deleteAccount(UUID userId, DeleteUserRequest dto) {
+    public void deleteAccount(UUID userId, DeleteUserRequestDTO dto) {
 
         User user = userRepository.findById(userId)
                 .orElseThrow(UserNotFoundException::new);

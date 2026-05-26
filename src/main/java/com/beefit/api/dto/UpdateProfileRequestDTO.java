@@ -1,6 +1,6 @@
 package com.beefit.api.dto;
 
-public record UpdateProfileRequest(
+public record UpdateProfileRequestDTO(
         String fullName,
         String biography,
         String profilePicture,
