@@ -1,9 +1,14 @@
 package com.beefit.api.service;
 
+import com.beefit.api.domain.User;
 import com.beefit.api.domain.WorkoutTemplate;
 import com.beefit.api.dto.WorkoutTemplateRequestDTO;
 import com.beefit.api.dto.WorkoutTemplateResponseDTO;
+import com.beefit.api.exception.UserNotFoundException;
+import com.beefit.api.mapper.WorkoutTemplateResponseMapper;
+import com.beefit.api.repository.UserRepository;
 import com.beefit.api.repository.WorkoutTemplateRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -11,19 +16,32 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.UUID;
 
+@RequiredArgsConstructor
 @Service
 public class WorkoutTemplateService {
 
-    @Autowired
-    private WorkoutTemplateRepository WTRepository;
+    private final WorkoutTemplateRepository WTRepository;
+    private final UserRepository userRepository;
+    private final WorkoutTemplateResponseMapper workoutTemplateResponseMapper;
 
     @Transactional
-    public WorkoutTemplateResponseDTO createTemplate(WorkoutTemplateRequestDTO requestDTO, UUID userID){
+    //Lembrar de implementar o id do amigo na parte do social
+    public WorkoutTemplateResponseDTO createTemplate(WorkoutTemplateRequestDTO requestDTO, UUID userID /*, UUID friendID*/){
         WorkoutTemplate template = new WorkoutTemplate();
         template.setName(requestDTO.name());
         template.setMuscleGroupsList(requestDTO.muscleGroups());
         template.setExerciseList(requestDTO.exercises());
-        template.setId(userID);
+
+        User user = userRepository.findById(userID)
+                .orElseThrow(UserNotFoundException::new);
+
+        /*
+        if(friendID !== null){
+            User friend = userRepository.findById(userID).orElse(null);
+        }
+        */
+
+        template.setUser(user);
 
         WorkoutTemplate savedTemplate = WTRepository.save(template);
 
@@ -40,11 +58,7 @@ public class WorkoutTemplateService {
 
         List<WorkoutTemplate> templates = WTRepository.findByUserId(userID);
 
-        return templates.stream().map(t -> new WorkoutTemplateResponseDTO(
-                t.getId(),
-                t.getName(),
-                t.getMuscleGroupsList(),
-                t.getExerciseList())).toList();
+        return templates.stream().map(workoutTemplateResponseMapper::toDto).toList();
     }
 
 
