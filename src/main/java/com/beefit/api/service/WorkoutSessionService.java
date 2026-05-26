@@ -106,6 +106,12 @@ public class WorkoutSessionService {
         session.setStatus(WorkoutStatus.FINISHED);
 
         WorkoutSession savedSession = workoutSessionRepository.save(session);
+
+        User user = userRepository.findById(userId).orElseThrow(UserNotFoundException::new);
+        DataSocialEventDTO dataSocialEventDTO = new DataSocialEventDTO(userId, user.getUsername(),
+                request.finishedAt());
+
+        sseService.broadcast(new SocialEventDTO(SocialEvent.WORKOUT_FINISHED, dataSocialEventDTO));
         return workoutSessionMapper.toDto(savedSession);
     }
 
