@@ -39,8 +39,4 @@ public class CatalogExercise {
 
     @Column(length = 1000)
     private String description;
-
-    @NotNull
-    @Column(name = "exercise_order", nullable = false)
-    private Integer order;
 }

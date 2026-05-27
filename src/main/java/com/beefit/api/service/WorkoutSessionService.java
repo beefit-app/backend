@@ -13,15 +13,11 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
+import com.beefit.api.domain.*;
 import org.hibernate.Hibernate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.beefit.api.domain.CatalogExercise;
-import com.beefit.api.domain.SessionExercise;
-import com.beefit.api.domain.User;
-import com.beefit.api.domain.WorkoutSession;
-import com.beefit.api.domain.WorkoutTemplate;
 import com.beefit.api.domain.enums.SocialEvent;
 import com.beefit.api.domain.enums.WorkoutStatus;
 import com.beefit.api.dto.DataSocialEventDTO;
@@ -167,10 +163,10 @@ public class WorkoutSessionService {
 
         List<SessionExercise> exercises = new ArrayList<>();
 
-        for (CatalogExercise catalogExercise : template.getExerciseList()) {
+        for (TemplateExercise templateExercise : template.getExerciseList()) {
             SessionExercise sessionExercise = new SessionExercise();
-            sessionExercise.setExercise(catalogExercise);
-            sessionExercise.setOrder(catalogExercise.getOrder());
+            sessionExercise.setExercise(templateExercise.getCatalogExercise());
+            sessionExercise.setOrder(templateExercise.getOrder());
             exercises.add(sessionExercise);
         }
 
