@@ -3,6 +3,7 @@ package com.beefit.api.service;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
@@ -245,17 +246,17 @@ class WorkoutSessionServiceTest {
         assertEquals(request.finishedAt(), savedSession.getFinishedAt());
         assertEquals(2700, savedSession.getDurationSeconds());
         assertEquals(List.of(MuscleGroups.CHEST, MuscleGroups.LEGS), savedSession.getMuscleGroupsList());
-        assertEquals(3, savedSession.getExercises().size());
+        assertEquals(2, savedSession.getExercises().size());
         assertEquals(newCatalogExercise, savedSession.getExercises().get(0).getExercise());
         assertEquals(existingCatalogExercise, savedSession.getExercises().get(1).getExercise());
-        assertEquals(removableCatalogExercise, savedSession.getExercises().get(2).getExercise());
+        assertNull(removableExercise.getWorkout());
 
         SessionExercise updatedExercise = savedSession.getExercises().get(1);
         assertEquals(2, updatedExercise.getSets().size());
         assertEquals(45.0, updatedExercise.getSets().get(0).getWeightKg());
         assertEquals(8, updatedExercise.getSets().get(0).getReps());
         assertEquals(42.5, updatedExercise.getSets().get(1).getWeightKg());
-        assertEquals(80.0 * 5 + 45.0 * 8 + 42.5 * 10 + 20.0 * 12, savedSession.getTotalVolume());
+        assertEquals(80.0 * 5 + 45.0 * 8 + 42.5 * 10, savedSession.getTotalVolume());
         assertEquals(WorkoutStatus.FINISHED.getStatus(), response.status());
     }
 

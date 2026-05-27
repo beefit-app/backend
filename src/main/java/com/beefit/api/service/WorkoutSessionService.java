@@ -195,12 +195,21 @@ public class WorkoutSessionService {
             existingExercisesById.put(exercise.getId(), exercise);
         }
 
+        Set<UUID> retainedExerciseIds = new HashSet<>();
         for (FinishWorkoutExerciseDTO requestedExercise : requestedExercises) {
             SessionExercise sessionExercise = resolveSessionExercise(session, requestedExercise, existingExercisesById);
             sessionExercise.setOrder(requestedExercise.order());
             reconcileSets(sessionExercise, requestedExercise.sets());
+
+            if (sessionExercise.getId() != null) {
+                retainedExerciseIds.add(sessionExercise.getId());
+            }
         }
 
+        List<SessionExercise> omittedExercises = session.getExercises().stream()
+                .filter(exercise -> exercise.getId() != null && !retainedExerciseIds.contains(exercise.getId()))
+                .toList();
+        omittedExercises.forEach(session::removeExercise);
         session.getExercises().sort(Comparator.comparing(SessionExercise::getOrder));
     }
 
