@@ -26,7 +26,7 @@ public class SseService {
 
         for(SseEmitter emitter:emitters){
             try {
-                emitter.send(SseEmitter.event().name(socialEventDTO.type().name()).data(socialEventDTO.dataSocialEvent()));
+                emitter.send(SseEmitter.event().name(socialEventDTO.type().name()).data(socialEventDTO.workoutPresenceEvent()));
             } catch (IOException e) {
                 closedEmitters.add(emitter);
             }

@@ -41,4 +41,12 @@ public class WorkoutController implements GenericController {
         WorkoutSessionResponseDTO response = workoutSessionService.finishWorkout(user.getId(), workoutId, request);
         return ResponseEntity.ok(response);
     }
+
+    @PostMapping("/{workoutId}/muscle-groups/{muscleGroup}")
+    public ResponseEntity<WorkoutSessionResponseDTO> addMuscleGroup(@AuthenticationPrincipal User user,
+            @PathVariable UUID workoutId,
+            @PathVariable String muscleGroup) {
+        WorkoutSessionResponseDTO response = workoutSessionService.addMuscleGroup(user.getId(), workoutId, muscleGroup);
+        return ResponseEntity.ok(response);
+    }
 }

@@ -3,6 +3,7 @@ package com.beefit.api.service;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
@@ -30,18 +31,23 @@ import com.beefit.api.domain.Set;
 import com.beefit.api.domain.WorkoutSession;
 import com.beefit.api.domain.WorkoutTemplate;
 import com.beefit.api.domain.enums.MuscleGroups;
+import com.beefit.api.domain.enums.SocialEvent;
 import com.beefit.api.domain.enums.WorkoutStatus;
 import com.beefit.api.dto.FinishWorkoutExerciseDTO;
 import com.beefit.api.dto.FinishWorkoutSetDTO;
 import com.beefit.api.dto.FinishWorkoutSnapshotRequestDTO;
 import com.beefit.api.dto.StartWorkoutExerciseItemDTO;
 import com.beefit.api.dto.StartWorkoutRequestDTO;
+import com.beefit.api.dto.SocialEventDTO;
 import com.beefit.api.dto.WorkoutSessionResponseDTO;
+import com.beefit.api.exception.InvalidMuscleGroupException;
+import com.beefit.api.exception.InvalidWorkoutSessionStateException;
 import com.beefit.api.exception.InvalidWorkoutSnapshotException;
 import com.beefit.api.exception.WorkoutAlreadyInProgressException;
 import com.beefit.api.exception.WorkoutSessionNotFoundException;
 import com.beefit.api.exception.WorkoutTemplateNotFoundException;
 import com.beefit.api.mapper.WorkoutSessionMapper;
+import com.beefit.api.mapper.WorkoutMuscleGroupMapper;
 import com.beefit.api.repository.CatalogExerciseRepository;
 import com.beefit.api.repository.UserRepository;
 import com.beefit.api.repository.WorkoutSessionRepository;
@@ -66,6 +72,9 @@ class WorkoutSessionServiceTest {
     private WorkoutSessionMapper workoutSessionMapper;
 
     @Mock
+    private WorkoutMuscleGroupMapper workoutMuscleGroupMapper;
+
+    @Mock
     private SseService sseService;
 
     @InjectMocks
@@ -79,6 +88,11 @@ class WorkoutSessionServiceTest {
         userId = UUID.randomUUID();
         user = new User();
         user.setId(userId);
+        user.setUsername("theo");
+        user.setFullName("Theo");
+        user.setBodyWeight(75.0F);
+        user.setOffensiveHoneys(0);
+        user.setWorkoutsCount(0);
     }
 
     @Test
@@ -150,6 +164,7 @@ class WorkoutSessionServiceTest {
         assertEquals(savedSession, savedSession.getExercises().get(0).getWorkout());
         assertEquals(secondCatalogExercise, savedSession.getExercises().get(1).getExercise());
         assertEquals(2, savedSession.getExercises().get(1).getOrder());
+        verify(sseService, never()).broadcast(any(SocialEventDTO.class));
     }
 
     @Test
@@ -232,6 +247,10 @@ class WorkoutSessionServiceTest {
 
         when(workoutSessionRepository.findById(workoutId)).thenReturn(Optional.of(session));
         when(catalogExerciseRepository.findById(newCatalogExercise.getId())).thenReturn(Optional.of(newCatalogExercise));
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(workoutSessionRepository.existsFinishedWorkoutToday(
+                any(UUID.class), any(WorkoutStatus.class), any(LocalDateTime.class), any(LocalDateTime.class)))
+                .thenReturn(false);
         when(workoutSessionRepository.save(any(WorkoutSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(workoutSessionMapper.toDto(any(WorkoutSession.class))).thenReturn(finishedResponseDto(workoutId));
 
@@ -244,19 +263,176 @@ class WorkoutSessionServiceTest {
         assertEquals(WorkoutStatus.FINISHED, savedSession.getStatus());
         assertEquals(request.finishedAt(), savedSession.getFinishedAt());
         assertEquals(2700, savedSession.getDurationSeconds());
+        assertEquals(337.5, savedSession.getEstimatedCalories());
         assertEquals(List.of(MuscleGroups.CHEST, MuscleGroups.LEGS), savedSession.getMuscleGroupsList());
-        assertEquals(3, savedSession.getExercises().size());
+        assertEquals(2, savedSession.getExercises().size());
         assertEquals(newCatalogExercise, savedSession.getExercises().get(0).getExercise());
         assertEquals(existingCatalogExercise, savedSession.getExercises().get(1).getExercise());
-        assertEquals(removableCatalogExercise, savedSession.getExercises().get(2).getExercise());
+        assertNull(removableExercise.getWorkout());
 
         SessionExercise updatedExercise = savedSession.getExercises().get(1);
         assertEquals(2, updatedExercise.getSets().size());
         assertEquals(45.0, updatedExercise.getSets().get(0).getWeightKg());
         assertEquals(8, updatedExercise.getSets().get(0).getReps());
         assertEquals(42.5, updatedExercise.getSets().get(1).getWeightKg());
-        assertEquals(80.0 * 5 + 45.0 * 8 + 42.5 * 10 + 20.0 * 12, savedSession.getTotalVolume());
+        assertEquals(80.0 * 5 + 45.0 * 8 + 42.5 * 10, savedSession.getTotalVolume());
+        assertEquals(1, user.getOffensiveHoneys());
+        assertEquals(1, user.getWorkoutsCount());
+        verify(userRepository).save(user);
         assertEquals(WorkoutStatus.FINISHED.getStatus(), response.status());
+    }
+
+    @Test
+    void finishWorkoutDoesNotBroadcastPrivateSession() {
+        UUID workoutId = UUID.randomUUID();
+        WorkoutSession session = inProgressSession(workoutId);
+        session.setIsPrivate(Boolean.TRUE);
+
+        FinishWorkoutSnapshotRequestDTO request = new FinishWorkoutSnapshotRequestDTO(
+                LocalDateTime.of(2026, 5, 26, 10, 30),
+                List.of(MuscleGroups.CHEST),
+                List.of());
+
+        when(workoutSessionRepository.findById(workoutId)).thenReturn(Optional.of(session));
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(workoutSessionRepository.existsFinishedWorkoutToday(
+                any(UUID.class), any(WorkoutStatus.class), any(LocalDateTime.class), any(LocalDateTime.class)))
+                .thenReturn(false);
+        when(workoutSessionRepository.save(any(WorkoutSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(workoutSessionMapper.toDto(any(WorkoutSession.class))).thenReturn(finishedResponseDto(workoutId));
+
+        workoutSessionService.finishWorkout(userId, workoutId, request);
+
+        verify(sseService, never()).broadcast(any(SocialEventDTO.class));
+    }
+
+    @Test
+    void finishWorkoutDoesNotIncrementHoneyForSecondWorkoutOnSameDay() {
+        UUID workoutId = UUID.randomUUID();
+        WorkoutSession session = inProgressSession(workoutId);
+        session.setIsPrivate(Boolean.TRUE);
+        user.setOffensiveHoneys(3);
+        user.setWorkoutsCount(4);
+
+        FinishWorkoutSnapshotRequestDTO request = new FinishWorkoutSnapshotRequestDTO(
+                LocalDateTime.of(2026, 5, 26, 10, 30),
+                List.of(MuscleGroups.CHEST),
+                List.of());
+
+        when(workoutSessionRepository.findById(workoutId)).thenReturn(Optional.of(session));
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(workoutSessionRepository.existsFinishedWorkoutToday(
+                any(UUID.class), any(WorkoutStatus.class), any(LocalDateTime.class), any(LocalDateTime.class)))
+                .thenReturn(true);
+        when(workoutSessionRepository.save(any(WorkoutSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(workoutSessionMapper.toDto(any(WorkoutSession.class))).thenReturn(finishedResponseDto(workoutId));
+
+        workoutSessionService.finishWorkout(userId, workoutId, request);
+
+        assertEquals(3, user.getOffensiveHoneys());
+        assertEquals(5, user.getWorkoutsCount());
+        verify(userRepository).save(user);
+    }
+
+    @Test
+    void addMuscleGroupUpdatesPublicSessionAndBroadcastsOnce() {
+        UUID workoutId = UUID.randomUUID();
+        WorkoutSession session = inProgressSession(workoutId);
+
+        when(workoutSessionRepository.findById(workoutId)).thenReturn(Optional.of(session));
+        when(workoutMuscleGroupMapper.toDomain("pernas")).thenReturn(MuscleGroups.LEGS);
+        when(workoutMuscleGroupMapper.toApi(List.of(MuscleGroups.CHEST, MuscleGroups.LEGS)))
+                .thenReturn(List.of("peito", "pernas"));
+        when(workoutSessionRepository.save(any(WorkoutSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(workoutSessionMapper.toDto(any(WorkoutSession.class))).thenReturn(responseDto());
+
+        workoutSessionService.addMuscleGroup(userId, workoutId, "pernas");
+
+        assertEquals(List.of(MuscleGroups.CHEST, MuscleGroups.LEGS), session.getMuscleGroupsList());
+        verify(workoutSessionRepository).save(session);
+
+        ArgumentCaptor<SocialEventDTO> eventCaptor = ArgumentCaptor.forClass(SocialEventDTO.class);
+        verify(sseService).broadcast(eventCaptor.capture());
+        SocialEventDTO event = eventCaptor.getValue();
+        assertEquals(SocialEvent.WORKOUT_MUSCLE_GROUP_ADDED, event.type());
+        assertEquals(workoutId, event.workoutPresenceEvent().workoutId());
+        assertEquals(List.of("peito", "pernas"), event.workoutPresenceEvent().muscleGroups());
+    }
+
+    @Test
+    void addMuscleGroupIsIdempotentWhenGroupAlreadyExists() {
+        UUID workoutId = UUID.randomUUID();
+        WorkoutSession session = inProgressSession(workoutId);
+
+        when(workoutSessionRepository.findById(workoutId)).thenReturn(Optional.of(session));
+        when(workoutMuscleGroupMapper.toDomain("peito")).thenReturn(MuscleGroups.CHEST);
+        when(workoutSessionMapper.toDto(session)).thenReturn(responseDto());
+
+        workoutSessionService.addMuscleGroup(userId, workoutId, "peito");
+
+        verify(workoutSessionRepository, never()).save(any(WorkoutSession.class));
+        verify(sseService, never()).broadcast(any(SocialEventDTO.class));
+    }
+
+    @Test
+    void addMuscleGroupDoesNotBroadcastPrivateSession() {
+        UUID workoutId = UUID.randomUUID();
+        WorkoutSession session = inProgressSession(workoutId);
+        session.setIsPrivate(Boolean.TRUE);
+
+        when(workoutSessionRepository.findById(workoutId)).thenReturn(Optional.of(session));
+        when(workoutMuscleGroupMapper.toDomain("pernas")).thenReturn(MuscleGroups.LEGS);
+        when(workoutSessionRepository.save(any(WorkoutSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(workoutSessionMapper.toDto(any(WorkoutSession.class))).thenReturn(responseDto());
+
+        workoutSessionService.addMuscleGroup(userId, workoutId, "pernas");
+
+        assertEquals(List.of(MuscleGroups.CHEST, MuscleGroups.LEGS), session.getMuscleGroupsList());
+        verify(sseService, never()).broadcast(any(SocialEventDTO.class));
+    }
+
+    @Test
+    void addMuscleGroupRejectsInvalidGroup() {
+        UUID workoutId = UUID.randomUUID();
+        WorkoutSession session = inProgressSession(workoutId);
+
+        when(workoutSessionRepository.findById(workoutId)).thenReturn(Optional.of(session));
+        when(workoutMuscleGroupMapper.toDomain("invalido")).thenThrow(new IllegalArgumentException());
+
+        assertThrows(InvalidMuscleGroupException.class,
+                () -> workoutSessionService.addMuscleGroup(userId, workoutId, "invalido"));
+
+        verify(workoutSessionRepository, never()).save(any(WorkoutSession.class));
+    }
+
+    @Test
+    void addMuscleGroupRejectsFinishedSession() {
+        UUID workoutId = UUID.randomUUID();
+        WorkoutSession session = inProgressSession(workoutId);
+        session.setStatus(WorkoutStatus.FINISHED);
+
+        when(workoutSessionRepository.findById(workoutId)).thenReturn(Optional.of(session));
+
+        assertThrows(InvalidWorkoutSessionStateException.class,
+                () -> workoutSessionService.addMuscleGroup(userId, workoutId, "pernas"));
+
+        verify(workoutMuscleGroupMapper, never()).toDomain(any(String.class));
+    }
+
+    @Test
+    void addMuscleGroupRejectsSessionFromAnotherUser() {
+        UUID workoutId = UUID.randomUUID();
+        WorkoutSession session = inProgressSession(workoutId);
+        User otherUser = new User();
+        otherUser.setId(UUID.randomUUID());
+        session.setUser(otherUser);
+
+        when(workoutSessionRepository.findById(workoutId)).thenReturn(Optional.of(session));
+
+        assertThrows(WorkoutSessionNotFoundException.class,
+                () -> workoutSessionService.addMuscleGroup(userId, workoutId, "pernas"));
+
+        verify(workoutMuscleGroupMapper, never()).toDomain(any(String.class));
     }
 
     @Test

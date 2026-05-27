@@ -1,8 +1,8 @@
 package com.beefit.api.controller;
 
 import com.beefit.api.domain.enums.SocialEvent;
-import com.beefit.api.dto.DataSocialEventDTO;
 import com.beefit.api.dto.SocialEventDTO;
+import com.beefit.api.dto.WorkoutPresenceEventDTO;
 import com.beefit.api.service.SseService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -34,17 +35,20 @@ public class SseController {
     @PostMapping("/test")
     public void test() {
 
-        DataSocialEventDTO dataSocialEvent =
-                new DataSocialEventDTO(
-                        UUID.randomUUID(),
-                        "Murilo",
-                        LocalDateTime.now()
-                );
+        WorkoutPresenceEventDTO presenceEvent = new WorkoutPresenceEventDTO(
+                SocialEvent.WORKOUT_STARTED.name(),
+                UUID.randomUUID(),
+                UUID.randomUUID(),
+                "Murilo",
+                "Murilo",
+                "IN_PROGRESS",
+                LocalDateTime.now(),
+                List.of("peito"));
 
         sseService.broadcast(
                 new SocialEventDTO(
                         SocialEvent.WORKOUT_STARTED,
-                        dataSocialEvent
+                        presenceEvent
                 )
         );
     }

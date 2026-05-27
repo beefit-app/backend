@@ -23,21 +23,24 @@ import com.beefit.api.domain.User;
 import com.beefit.api.domain.WorkoutSession;
 import com.beefit.api.domain.WorkoutTemplate;
 import com.beefit.api.domain.enums.SocialEvent;
+import com.beefit.api.domain.enums.MuscleGroups;
 import com.beefit.api.domain.enums.WorkoutStatus;
-import com.beefit.api.dto.DataSocialEventDTO;
 import com.beefit.api.dto.FinishWorkoutExerciseDTO;
 import com.beefit.api.dto.FinishWorkoutSetDTO;
 import com.beefit.api.dto.FinishWorkoutSnapshotRequestDTO;
 import com.beefit.api.dto.SocialEventDTO;
 import com.beefit.api.dto.StartWorkoutRequestDTO;
+import com.beefit.api.dto.WorkoutPresenceEventDTO;
 import com.beefit.api.dto.WorkoutSessionResponseDTO;
 import com.beefit.api.exception.CatalogExerciseNotFound;
+import com.beefit.api.exception.InvalidMuscleGroupException;
 import com.beefit.api.exception.InvalidWorkoutSessionStateException;
 import com.beefit.api.exception.InvalidWorkoutSnapshotException;
 import com.beefit.api.exception.UserNotFoundException;
 import com.beefit.api.exception.WorkoutAlreadyInProgressException;
 import com.beefit.api.exception.WorkoutSessionNotFoundException;
 import com.beefit.api.exception.WorkoutTemplateNotFoundException;
+import com.beefit.api.mapper.WorkoutMuscleGroupMapper;
 import com.beefit.api.mapper.WorkoutSessionMapper;
 import com.beefit.api.repository.CatalogExerciseRepository;
 import com.beefit.api.repository.UserRepository;
@@ -54,6 +57,7 @@ public class WorkoutSessionService {
     private final CatalogExerciseRepository catalogExerciseRepository;
     private final UserRepository userRepository;
     private final WorkoutSessionMapper workoutSessionMapper;
+    private final WorkoutMuscleGroupMapper workoutMuscleGroupMapper;
     private final SseService sseService;
 
     @Transactional
@@ -81,16 +85,14 @@ public class WorkoutSessionService {
 
         WorkoutSession savedSession = workoutSessionRepository.save(session);
 
-        DataSocialEventDTO dataSocialEventDTO = new DataSocialEventDTO(user.getId(), user.getUsername(),
-                savedSession.getStartedAt());
-
-        sseService.broadcast(new SocialEventDTO(SocialEvent.WORKOUT_STARTED, dataSocialEventDTO));
+        broadcastIfPublic(savedSession, SocialEvent.WORKOUT_STARTED, savedSession.getStartedAt());
 
         return workoutSessionMapper.toDto(savedSession);
     }
 
     @Transactional
-    public WorkoutSessionResponseDTO finishWorkout(UUID userId, UUID workoutId, FinishWorkoutSnapshotRequestDTO request) {
+    public WorkoutSessionResponseDTO finishWorkout(UUID userId, UUID workoutId,
+            FinishWorkoutSnapshotRequestDTO request) {
         WorkoutSession session = workoutSessionRepository.findById(workoutId)
                 .orElseThrow(WorkoutSessionNotFoundException::new);
         initializeWorkoutGraph(session);
@@ -102,51 +104,59 @@ public class WorkoutSessionService {
         session.setMuscleGroupsList(request.muscleGroups());
         reconcileExercises(session, request.exercises());
 
-        // Encerramento do Cronômetro
         session.setFinishedAt(request.finishedAt());
         int durationSeconds = calculateDurationSeconds(session.getStartedAt(), request.finishedAt());
         session.setDurationSeconds(durationSeconds);
 
-        // Estimativa de Calorias Personalizada usando MET e Peso Corporal
-        // Buscamos o usuário mais cedo para aproveitar o objeto tanto na fórmula quanto no Honey abaixo
         User user = userRepository.findById(userId).orElseThrow(UserNotFoundException::new);
         double durationMinutes = durationSeconds / 60.0;
 
-        // METs é a constante científica padrão para musculação tradicional de intensidade moderada
         double MET = 6.0;
         double caloriesBurned = durationMinutes * (MET * user.getBodyWeight() / 60.0);
         session.setEstimatedCalories(caloriesBurned);
 
-        // Volume Total de Carga Levantada
         session.setTotalVolume(calculateTotalVolume(session));
 
-        // Gancho para a Gamificação (RNF-005): Cálculo do Maior Poder de Ataque do treino
         double peakAttackPower = calculatePeakAttackPower(session);
 
         session.setStatus(WorkoutStatus.FINISHED);
 
-        // Incremento da Ofensiva (Honey) com Bloqueio de Dia Civil [RF-011]
         LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
         LocalDateTime endOfDay = LocalDate.now().atTime(LocalTime.MAX);
 
         boolean alreadyTrainedToday = workoutSessionRepository.existsFinishedWorkoutToday(
-                userId, WorkoutStatus.FINISHED, startOfDay, endOfDay
-        );
+                userId, WorkoutStatus.FINISHED, startOfDay, endOfDay);
 
         if (!alreadyTrainedToday) {
             user.setOffensiveHoneys(user.getOffensiveHoneys() + 1);
         }
 
-        // Incrementa o contador vitalício de treinos do usuário
         user.setWorkoutsCount(user.getWorkoutsCount() + 1);
         userRepository.save(user);
 
         WorkoutSession savedSession = workoutSessionRepository.save(session);
 
-        DataSocialEventDTO dataSocialEventDTO = new DataSocialEventDTO(userId, user.getUsername(),
-                request.finishedAt());
+        broadcastIfPublic(savedSession, SocialEvent.WORKOUT_FINISHED, request.finishedAt());
+        return workoutSessionMapper.toDto(savedSession);
+    }
 
-        sseService.broadcast(new SocialEventDTO(SocialEvent.WORKOUT_FINISHED, dataSocialEventDTO));
+    @Transactional
+    public WorkoutSessionResponseDTO addMuscleGroup(UUID userId, UUID workoutId, String muscleGroupValue) {
+        WorkoutSession session = workoutSessionRepository.findById(workoutId)
+                .orElseThrow(WorkoutSessionNotFoundException::new);
+
+        validateWorkoutOwnership(userId, session);
+        validateWorkoutInProgress(session);
+
+        MuscleGroups muscleGroup = parseMuscleGroup(muscleGroupValue);
+        if (session.getMuscleGroupsList().contains(muscleGroup)) {
+            return workoutSessionMapper.toDto(session);
+        }
+
+        session.getMuscleGroupsList().add(muscleGroup);
+        WorkoutSession savedSession = workoutSessionRepository.save(session);
+
+        broadcastIfPublic(savedSession, SocialEvent.WORKOUT_MUSCLE_GROUP_ADDED, LocalDateTime.now());
         return workoutSessionMapper.toDto(savedSession);
     }
 
@@ -230,12 +240,21 @@ public class WorkoutSessionService {
             existingExercisesById.put(exercise.getId(), exercise);
         }
 
+        Set<UUID> retainedExerciseIds = new HashSet<>();
         for (FinishWorkoutExerciseDTO requestedExercise : requestedExercises) {
             SessionExercise sessionExercise = resolveSessionExercise(session, requestedExercise, existingExercisesById);
             sessionExercise.setOrder(requestedExercise.order());
             reconcileSets(sessionExercise, requestedExercise.sets());
+
+            if (sessionExercise.getId() != null) {
+                retainedExerciseIds.add(sessionExercise.getId());
+            }
         }
 
+        List<SessionExercise> omittedExercises = session.getExercises().stream()
+                .filter(exercise -> exercise.getId() != null && !retainedExerciseIds.contains(exercise.getId()))
+                .toList();
+        omittedExercises.forEach(session::removeExercise);
         session.getExercises().sort(Comparator.comparing(SessionExercise::getOrder));
     }
 
@@ -319,6 +338,33 @@ public class WorkoutSessionService {
                 .sum();
     }
 
+    private MuscleGroups parseMuscleGroup(String muscleGroupValue) {
+        try {
+            return workoutMuscleGroupMapper.toDomain(muscleGroupValue);
+        } catch (IllegalArgumentException exception) {
+            throw new InvalidMuscleGroupException(muscleGroupValue);
+        }
+    }
+
+    private void broadcastIfPublic(WorkoutSession session, SocialEvent eventType, LocalDateTime occurredAt) {
+        if (Boolean.TRUE.equals(session.getIsPrivate())) {
+            return;
+        }
+
+        User user = session.getUser();
+        WorkoutPresenceEventDTO presenceEvent = new WorkoutPresenceEventDTO(
+                eventType.name(),
+                session.getId(),
+                user.getId(),
+                user.getUsername(),
+                user.getFullName(),
+                session.getStatus().getStatus(),
+                occurredAt,
+                workoutMuscleGroupMapper.toApi(session.getMuscleGroupsList()));
+
+        sseService.broadcast(new SocialEventDTO(eventType, presenceEvent));
+    }
+
     private void validateUniqueExerciseOrders(List<FinishWorkoutExerciseDTO> requestedExercises) {
         Set<Integer> seenOrders = new HashSet<>();
         for (FinishWorkoutExerciseDTO exercise : requestedExercises) {
@@ -355,9 +401,11 @@ public class WorkoutSessionService {
         }
     }
 
-    //[RN-001 / RNF-005] Lógica Isolada para a Fórmula de Epley com Teto de Repetições
-    //Varre todas as séries realizadas no treino para encontrar a de maior "Poder de Ataque".
-    //Fórmula: 1RM = Peso * (1 + Reps / 30)
+    // [RN-001 / RNF-005] Lógica Isolada para a Fórmula de Epley com Teto de
+    // Repetições
+    // Varre todas as séries realizadas no treino para encontrar a de maior "Poder
+    // de Ataque".
+    // Fórmula: 1RM = Peso * (1 + Reps / 30)
 
     private double calculatePeakAttackPower(WorkoutSession session) {
         return session.getExercises().stream()
@@ -367,7 +415,8 @@ public class WorkoutSessionService {
                         return 0.0;
                     }
 
-                    // [RN-001] Aplica o teto limitador de 10 repetições exigido pela regra de negócio
+                    // [RN-001] Aplica o teto limitador de 10 repetições exigido pela regra de
+                    // negócio
                     int repsForEpley = Math.min(set.getReps(), 10);
 
                     // Executa o cálculo da estimativa de uma repetição máxima (Poder de Ataque)
