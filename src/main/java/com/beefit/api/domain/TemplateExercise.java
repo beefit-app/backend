@@ -25,7 +25,7 @@ import lombok.Setter;
 public class TemplateExercise {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
     @ManyToOne
