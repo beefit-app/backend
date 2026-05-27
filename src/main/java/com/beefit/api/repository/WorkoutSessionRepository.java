@@ -3,7 +3,10 @@ package com.beefit.api.repository;
 import com.beefit.api.domain.WorkoutSession;
 import com.beefit.api.domain.enums.WorkoutStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -16,6 +19,20 @@ public interface WorkoutSessionRepository extends JpaRepository<WorkoutSession, 
     List<WorkoutSession> findAllByUserId(UUID id);
 
     // Esse and é reservado e é traduzido na query também
-    // Esse método é capaz de selecionar só os treinos ativos ou finalizados de um certo usuário
+    // Esse metodo é capaz de selecionar só os treinos ativos ou finalizados de um certo usuário
     List<WorkoutSession> findByStatusAndUserId(WorkoutStatus status, UUID id);
+
+
+     // [RF-011] Validação de Dia Civil para a Ofensiva (Honey)
+     // Esta query conta se o usuário já possui algum treino finalizado no intervalo de tempo fornecido.
+     // Será utilizada para garantir que o usuário só ganhe +1 Honey no primeiro treino do dia.
+
+    @Query("SELECT COUNT(w) > 0 FROM WorkoutSession w WHERE w.user.id = :userId " +
+            "AND w.status = :status AND w.finishedAt >= :startOfDay AND w.finishedAt <= :endOfDay")
+    boolean existsFinishedWorkoutToday(
+            @Param("userId") UUID userId,
+            @Param("status") WorkoutStatus status,
+            @Param("startOfDay") LocalDateTime startOfDay,
+            @Param("endOfDay") LocalDateTime endOfDay
+    );
 }

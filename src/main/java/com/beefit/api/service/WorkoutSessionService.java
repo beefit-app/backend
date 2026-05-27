@@ -1,6 +1,8 @@
 package com.beefit.api.service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -89,7 +91,7 @@ public class WorkoutSessionService {
 
     @Transactional
     public WorkoutSessionResponseDTO finishWorkout(UUID userId, UUID workoutId,
-            FinishWorkoutSnapshotRequestDTO request) {
+                                                   FinishWorkoutSnapshotRequestDTO request) {
         WorkoutSession session = workoutSessionRepository.findById(workoutId)
                 .orElseThrow(WorkoutSessionNotFoundException::new);
         initializeWorkoutGraph(session);
@@ -100,14 +102,44 @@ public class WorkoutSessionService {
 
         session.setMuscleGroupsList(request.muscleGroups());
         reconcileExercises(session, request.exercises());
+
+        // Encerramento do Cronômetro
         session.setFinishedAt(request.finishedAt());
-        session.setDurationSeconds(calculateDurationSeconds(session.getStartedAt(), request.finishedAt()));
+        int durationSeconds = calculateDurationSeconds(session.getStartedAt(), request.finishedAt());
+        session.setDurationSeconds(durationSeconds);
+
+        // Estimativa de Calorias Queimadas (7.5 kcal por minuto ativo)
+        double durationMinutes = durationSeconds / 60.0;
+        session.setEstimatedCalories(durationMinutes * 7.5);
+
+        // Volume Total de Carga Levantada
         session.setTotalVolume(calculateTotalVolume(session));
+
+        // Gancho para a Gamificação (RNF-005): Cálculo do Maior Poder de Ataque do treino
+        double peakAttackPower = calculatePeakAttackPower(session);
+
         session.setStatus(WorkoutStatus.FINISHED);
+
+        // Incremento da Ofensiva (Honey) com Bloqueio de Dia Civil [RF-011]
+        User user = userRepository.findById(userId).orElseThrow(UserNotFoundException::new);
+
+        LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
+        LocalDateTime endOfDay = LocalDate.now().atTime(LocalTime.MAX);
+
+        boolean alreadyTrainedToday = workoutSessionRepository.existsFinishedWorkoutToday(
+                userId, WorkoutStatus.FINISHED, startOfDay, endOfDay
+        );
+
+        if (!alreadyTrainedToday) {
+            user.setOffensiveHoneys(user.getOffensiveHoneys() + 1);
+        }
+
+        // Incrementa o contador vitalício de treinos do usuário
+        user.setWorkoutsCount(user.getWorkoutsCount() + 1);
+        userRepository.save(user);
 
         WorkoutSession savedSession = workoutSessionRepository.save(session);
 
-        User user = userRepository.findById(userId).orElseThrow(UserNotFoundException::new);
         DataSocialEventDTO dataSocialEventDTO = new DataSocialEventDTO(userId, user.getUsername(),
                 request.finishedAt());
 
@@ -318,5 +350,27 @@ public class WorkoutSessionService {
                 throw new InvalidWorkoutSnapshotException("O snapshot contém séries duplicadas.");
             }
         }
+    }
+
+    //[RN-001 / RNF-005] Lógica Isolada para a Fórmula de Epley com Teto de Repetições
+    //Varre todas as séries realizadas no treino para encontrar a de maior "Poder de Ataque".
+    //Fórmula: 1RM = Peso * (1 + Reps / 30)
+
+    private double calculatePeakAttackPower(WorkoutSession session) {
+        return session.getExercises().stream()
+                .flatMap(exercise -> exercise.getSets().stream())
+                .mapToDouble(set -> {
+                    if (set.getWeightKg() <= 0 || set.getReps() <= 0) {
+                        return 0.0;
+                    }
+
+                    // [RN-001] Aplica o teto limitador de 10 repetições exigido pela regra de negócio
+                    int repsForEpley = Math.min(set.getReps(), 10);
+
+                    // Executa o cálculo da estimativa de uma repetição máxima (Poder de Ataque)
+                    return set.getWeightKg() * (1.0 + (repsForEpley / 30.0));
+                })
+                .max()
+                .orElse(0.0);
     }
 }

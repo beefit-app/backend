@@ -19,13 +19,13 @@ import lombok.Setter;
 @Entity
 @Table(name = "workout_template_exercises")
 @Getter
-@Setter
+@Setterg
 @AllArgsConstructor
 @NoArgsConstructor
 public class TemplateExercise {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
     @ManyToOne
