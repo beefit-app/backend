@@ -90,6 +90,9 @@ class WorkoutSessionServiceTest {
         user.setId(userId);
         user.setUsername("theo");
         user.setFullName("Theo");
+        user.setBodyWeight(75.0F);
+        user.setOffensiveHoneys(0);
+        user.setWorkoutsCount(0);
     }
 
     @Test
@@ -244,6 +247,10 @@ class WorkoutSessionServiceTest {
 
         when(workoutSessionRepository.findById(workoutId)).thenReturn(Optional.of(session));
         when(catalogExerciseRepository.findById(newCatalogExercise.getId())).thenReturn(Optional.of(newCatalogExercise));
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(workoutSessionRepository.existsFinishedWorkoutToday(
+                any(UUID.class), any(WorkoutStatus.class), any(LocalDateTime.class), any(LocalDateTime.class)))
+                .thenReturn(false);
         when(workoutSessionRepository.save(any(WorkoutSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(workoutSessionMapper.toDto(any(WorkoutSession.class))).thenReturn(finishedResponseDto(workoutId));
 
@@ -256,6 +263,7 @@ class WorkoutSessionServiceTest {
         assertEquals(WorkoutStatus.FINISHED, savedSession.getStatus());
         assertEquals(request.finishedAt(), savedSession.getFinishedAt());
         assertEquals(2700, savedSession.getDurationSeconds());
+        assertEquals(337.5, savedSession.getEstimatedCalories());
         assertEquals(List.of(MuscleGroups.CHEST, MuscleGroups.LEGS), savedSession.getMuscleGroupsList());
         assertEquals(2, savedSession.getExercises().size());
         assertEquals(newCatalogExercise, savedSession.getExercises().get(0).getExercise());
@@ -268,6 +276,9 @@ class WorkoutSessionServiceTest {
         assertEquals(8, updatedExercise.getSets().get(0).getReps());
         assertEquals(42.5, updatedExercise.getSets().get(1).getWeightKg());
         assertEquals(80.0 * 5 + 45.0 * 8 + 42.5 * 10, savedSession.getTotalVolume());
+        assertEquals(1, user.getOffensiveHoneys());
+        assertEquals(1, user.getWorkoutsCount());
+        verify(userRepository).save(user);
         assertEquals(WorkoutStatus.FINISHED.getStatus(), response.status());
     }
 
@@ -283,12 +294,44 @@ class WorkoutSessionServiceTest {
                 List.of());
 
         when(workoutSessionRepository.findById(workoutId)).thenReturn(Optional.of(session));
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(workoutSessionRepository.existsFinishedWorkoutToday(
+                any(UUID.class), any(WorkoutStatus.class), any(LocalDateTime.class), any(LocalDateTime.class)))
+                .thenReturn(false);
         when(workoutSessionRepository.save(any(WorkoutSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(workoutSessionMapper.toDto(any(WorkoutSession.class))).thenReturn(finishedResponseDto(workoutId));
 
         workoutSessionService.finishWorkout(userId, workoutId, request);
 
         verify(sseService, never()).broadcast(any(SocialEventDTO.class));
+    }
+
+    @Test
+    void finishWorkoutDoesNotIncrementHoneyForSecondWorkoutOnSameDay() {
+        UUID workoutId = UUID.randomUUID();
+        WorkoutSession session = inProgressSession(workoutId);
+        session.setIsPrivate(Boolean.TRUE);
+        user.setOffensiveHoneys(3);
+        user.setWorkoutsCount(4);
+
+        FinishWorkoutSnapshotRequestDTO request = new FinishWorkoutSnapshotRequestDTO(
+                LocalDateTime.of(2026, 5, 26, 10, 30),
+                List.of(MuscleGroups.CHEST),
+                List.of());
+
+        when(workoutSessionRepository.findById(workoutId)).thenReturn(Optional.of(session));
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(workoutSessionRepository.existsFinishedWorkoutToday(
+                any(UUID.class), any(WorkoutStatus.class), any(LocalDateTime.class), any(LocalDateTime.class)))
+                .thenReturn(true);
+        when(workoutSessionRepository.save(any(WorkoutSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(workoutSessionMapper.toDto(any(WorkoutSession.class))).thenReturn(finishedResponseDto(workoutId));
+
+        workoutSessionService.finishWorkout(userId, workoutId, request);
+
+        assertEquals(3, user.getOffensiveHoneys());
+        assertEquals(5, user.getWorkoutsCount());
+        verify(userRepository).save(user);
     }
 
     @Test

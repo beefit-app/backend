@@ -1,6 +1,8 @@
 package com.beefit.api.service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -101,10 +103,36 @@ public class WorkoutSessionService {
 
         session.setMuscleGroupsList(request.muscleGroups());
         reconcileExercises(session, request.exercises());
+
         session.setFinishedAt(request.finishedAt());
-        session.setDurationSeconds(calculateDurationSeconds(session.getStartedAt(), request.finishedAt()));
+        int durationSeconds = calculateDurationSeconds(session.getStartedAt(), request.finishedAt());
+        session.setDurationSeconds(durationSeconds);
+
+        User user = userRepository.findById(userId).orElseThrow(UserNotFoundException::new);
+        double durationMinutes = durationSeconds / 60.0;
+
+        double MET = 6.0;
+        double caloriesBurned = durationMinutes * (MET * user.getBodyWeight() / 60.0);
+        session.setEstimatedCalories(caloriesBurned);
+
         session.setTotalVolume(calculateTotalVolume(session));
+
+        double peakAttackPower = calculatePeakAttackPower(session);
+
         session.setStatus(WorkoutStatus.FINISHED);
+
+        LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
+        LocalDateTime endOfDay = LocalDate.now().atTime(LocalTime.MAX);
+
+        boolean alreadyTrainedToday = workoutSessionRepository.existsFinishedWorkoutToday(
+                userId, WorkoutStatus.FINISHED, startOfDay, endOfDay);
+
+        if (!alreadyTrainedToday) {
+            user.setOffensiveHoneys(user.getOffensiveHoneys() + 1);
+        }
+
+        user.setWorkoutsCount(user.getWorkoutsCount() + 1);
+        userRepository.save(user);
 
         WorkoutSession savedSession = workoutSessionRepository.save(session);
 
@@ -371,5 +399,30 @@ public class WorkoutSessionService {
                 throw new InvalidWorkoutSnapshotException("O snapshot contém séries duplicadas.");
             }
         }
+    }
+
+    // [RN-001 / RNF-005] Lógica Isolada para a Fórmula de Epley com Teto de
+    // Repetições
+    // Varre todas as séries realizadas no treino para encontrar a de maior "Poder
+    // de Ataque".
+    // Fórmula: 1RM = Peso * (1 + Reps / 30)
+
+    private double calculatePeakAttackPower(WorkoutSession session) {
+        return session.getExercises().stream()
+                .flatMap(exercise -> exercise.getSets().stream())
+                .mapToDouble(set -> {
+                    if (set.getWeightKg() <= 0 || set.getReps() <= 0) {
+                        return 0.0;
+                    }
+
+                    // [RN-001] Aplica o teto limitador de 10 repetições exigido pela regra de
+                    // negócio
+                    int repsForEpley = Math.min(set.getReps(), 10);
+
+                    // Executa o cálculo da estimativa de uma repetição máxima (Poder de Ataque)
+                    return set.getWeightKg() * (1.0 + (repsForEpley / 30.0));
+                })
+                .max()
+                .orElse(0.0);
     }
 }
