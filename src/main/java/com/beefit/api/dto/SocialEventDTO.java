@@ -4,6 +4,6 @@ import com.beefit.api.domain.enums.SocialEvent;
 
 public record SocialEventDTO(
         SocialEvent type,
-        DataSocialEventDTO dataSocialEvent
+        WorkoutPresenceEventDTO workoutPresenceEvent
 ) {
 }

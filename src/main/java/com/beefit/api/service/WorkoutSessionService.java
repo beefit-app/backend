@@ -21,21 +21,24 @@ import com.beefit.api.domain.User;
 import com.beefit.api.domain.WorkoutSession;
 import com.beefit.api.domain.WorkoutTemplate;
 import com.beefit.api.domain.enums.SocialEvent;
+import com.beefit.api.domain.enums.MuscleGroups;
 import com.beefit.api.domain.enums.WorkoutStatus;
-import com.beefit.api.dto.DataSocialEventDTO;
 import com.beefit.api.dto.FinishWorkoutExerciseDTO;
 import com.beefit.api.dto.FinishWorkoutSetDTO;
 import com.beefit.api.dto.FinishWorkoutSnapshotRequestDTO;
 import com.beefit.api.dto.SocialEventDTO;
 import com.beefit.api.dto.StartWorkoutRequestDTO;
+import com.beefit.api.dto.WorkoutPresenceEventDTO;
 import com.beefit.api.dto.WorkoutSessionResponseDTO;
 import com.beefit.api.exception.CatalogExerciseNotFound;
+import com.beefit.api.exception.InvalidMuscleGroupException;
 import com.beefit.api.exception.InvalidWorkoutSessionStateException;
 import com.beefit.api.exception.InvalidWorkoutSnapshotException;
 import com.beefit.api.exception.UserNotFoundException;
 import com.beefit.api.exception.WorkoutAlreadyInProgressException;
 import com.beefit.api.exception.WorkoutSessionNotFoundException;
 import com.beefit.api.exception.WorkoutTemplateNotFoundException;
+import com.beefit.api.mapper.WorkoutMuscleGroupMapper;
 import com.beefit.api.mapper.WorkoutSessionMapper;
 import com.beefit.api.repository.CatalogExerciseRepository;
 import com.beefit.api.repository.UserRepository;
@@ -52,6 +55,7 @@ public class WorkoutSessionService {
     private final CatalogExerciseRepository catalogExerciseRepository;
     private final UserRepository userRepository;
     private final WorkoutSessionMapper workoutSessionMapper;
+    private final WorkoutMuscleGroupMapper workoutMuscleGroupMapper;
     private final SseService sseService;
 
     @Transactional
@@ -79,10 +83,7 @@ public class WorkoutSessionService {
 
         WorkoutSession savedSession = workoutSessionRepository.save(session);
 
-        DataSocialEventDTO dataSocialEventDTO = new DataSocialEventDTO(user.getId(), user.getUsername(),
-                savedSession.getStartedAt());
-
-        sseService.broadcast(new SocialEventDTO(SocialEvent.WORKOUT_STARTED, dataSocialEventDTO));
+        broadcastIfPublic(savedSession, SocialEvent.WORKOUT_STARTED, savedSession.getStartedAt());
 
         return workoutSessionMapper.toDto(savedSession);
     }
@@ -107,11 +108,27 @@ public class WorkoutSessionService {
 
         WorkoutSession savedSession = workoutSessionRepository.save(session);
 
-        User user = userRepository.findById(userId).orElseThrow(UserNotFoundException::new);
-        DataSocialEventDTO dataSocialEventDTO = new DataSocialEventDTO(userId, user.getUsername(),
-                request.finishedAt());
+        broadcastIfPublic(savedSession, SocialEvent.WORKOUT_FINISHED, request.finishedAt());
+        return workoutSessionMapper.toDto(savedSession);
+    }
 
-        sseService.broadcast(new SocialEventDTO(SocialEvent.WORKOUT_FINISHED, dataSocialEventDTO));
+    @Transactional
+    public WorkoutSessionResponseDTO addMuscleGroup(UUID userId, UUID workoutId, String muscleGroupValue) {
+        WorkoutSession session = workoutSessionRepository.findById(workoutId)
+                .orElseThrow(WorkoutSessionNotFoundException::new);
+
+        validateWorkoutOwnership(userId, session);
+        validateWorkoutInProgress(session);
+
+        MuscleGroups muscleGroup = parseMuscleGroup(muscleGroupValue);
+        if (session.getMuscleGroupsList().contains(muscleGroup)) {
+            return workoutSessionMapper.toDto(session);
+        }
+
+        session.getMuscleGroupsList().add(muscleGroup);
+        WorkoutSession savedSession = workoutSessionRepository.save(session);
+
+        broadcastIfPublic(savedSession, SocialEvent.WORKOUT_MUSCLE_GROUP_ADDED, LocalDateTime.now());
         return workoutSessionMapper.toDto(savedSession);
     }
 
@@ -291,6 +308,33 @@ public class WorkoutSessionService {
                 .flatMap(exercise -> exercise.getSets().stream())
                 .mapToDouble(set -> set.getWeightKg() * set.getReps())
                 .sum();
+    }
+
+    private MuscleGroups parseMuscleGroup(String muscleGroupValue) {
+        try {
+            return workoutMuscleGroupMapper.toDomain(muscleGroupValue);
+        } catch (IllegalArgumentException exception) {
+            throw new InvalidMuscleGroupException(muscleGroupValue);
+        }
+    }
+
+    private void broadcastIfPublic(WorkoutSession session, SocialEvent eventType, LocalDateTime occurredAt) {
+        if (Boolean.TRUE.equals(session.getIsPrivate())) {
+            return;
+        }
+
+        User user = session.getUser();
+        WorkoutPresenceEventDTO presenceEvent = new WorkoutPresenceEventDTO(
+                eventType.name(),
+                session.getId(),
+                user.getId(),
+                user.getUsername(),
+                user.getFullName(),
+                session.getStatus().getStatus(),
+                occurredAt,
+                workoutMuscleGroupMapper.toApi(session.getMuscleGroupsList()));
+
+        sseService.broadcast(new SocialEventDTO(eventType, presenceEvent));
     }
 
     private void validateUniqueExerciseOrders(List<FinishWorkoutExerciseDTO> requestedExercises) {
