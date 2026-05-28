@@ -2,18 +2,35 @@ package com.beefit.api.domain.enums;
 
 import lombok.Getter;
 
+import java.util.List;
+
 @Getter
 public enum MuscleGroups {
-    CHEST("chest"),
-    BACK("back"),
-    LEGS("legs"),
-    SHOULDERS("shoulders"),
-    ARMS("arms"),
-    CORE("core");
+    CHEST(List.of("chest", "peito", "peitoral")),
+    BACK(List.of("back", "costas", "meio-das-costas", "dorsal", "dorsais", "inferior-das-costas", "panturrilhas")),
+    LEGS(List.of("legs", "perna", "quadriceps", "posteriores-de-coxa", "posterior", "isquiotibiais", "adutores", "abdutores")),
+    GLUTES(List.of("glutes", "gluteos")),
+    SHOULDERS(List.of("shoulders", "ombros", "posteriores-de-ombro")),
+    ARMS(List.of("arms", "bracos", "biceps", "triceps", "antebraco", "antebracos")),
+    CORE(List.of("core", "abdomen", "abdominais")),
+    TRAPS(List.of("traps", "trapezius", "trapezio", "pescoco"));
 
-    final String muscle;
+    private final List<String> muscleSynonyms;
 
-    MuscleGroups(String muscle){
-        this.muscle = muscle;
+    MuscleGroups(List<String> muscleSynonyms){
+        this.muscleSynonyms = muscleSynonyms;
+    }
+
+    public static MuscleGroups fromString(String value) {
+
+        String cleanValue = value.toLowerCase().trim();
+
+        for (MuscleGroups group : MuscleGroups.values()) {
+            if (group.getMuscleSynonyms().contains(cleanValue)) {
+                return group;
+            }
+        }
+        // Lança uma exceção clara se o JSON vier com um músculo que você não mapeou
+        throw new IllegalArgumentException("Grupo muscular não suportado: " + value);
     }
 }
