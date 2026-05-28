@@ -40,7 +40,7 @@ public class WorkoutTemplate {
     private List<MuscleGroups> muscleGroupsList;
 
     // Mudei de ManyToMany para OneToMany para montar na mão a tabela intermediária
-    @OneToMany(mappedBy = "workout_template", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "workoutTemplate", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("order ASC") // Aqui nós sempre temos que usar o nome do atributo da tabela filha + ASC
     private List<TemplateExercise> exerciseList;
 
