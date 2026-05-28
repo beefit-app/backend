@@ -130,4 +130,16 @@ public class GlobalExceptionHandler {
                 request.getRequestURI());
 
     }
+
+    @ExceptionHandler(DatabaseSeederFailException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleDatabaseSeederFailException(DatabaseSeederFailException e, HttpServletRequest request) {
+        return new ErrorResponse(LocalDateTime.now(),
+                HttpStatus.CONFLICT.value(),
+                e.getCause().getMessage(),
+                e.getMessage(),
+                List.of(),
+                request.getRequestURI());
+
+    }
 }
