@@ -53,7 +53,8 @@ public class WorkoutTemplateService {
                 savedTemplate.getId(),
                 savedTemplate.getName(),
                 savedTemplate.getMuscleGroupsList(),
-                savedTemplate.getExerciseList());
+                savedTemplate.getExerciseList()
+        );
     }
 
     @Transactional

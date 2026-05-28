@@ -23,7 +23,7 @@ public class SessionExercise {
 
     @ManyToOne
     @JoinColumn(name = "workout_id", nullable = false)
-    private WorkoutSession workout;
+    private WorkoutSession workoutSession;
 
     @ManyToOne
     @JoinColumn(name = "exercise_id", nullable = false)

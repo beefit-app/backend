@@ -39,13 +39,10 @@ public class WorkoutTemplate {
     @Column(name = "muscle_groups", columnDefinition = "varchar[]")
     private List<MuscleGroups> muscleGroupsList;
 
-    @JoinTable(
-            name = "workout_template_exercises",
-            joinColumns = @JoinColumn(name = "workout_template_id"),
-            inverseJoinColumns = @JoinColumn(name = "catalog_exercise_id")
-    )
-    @ManyToMany
-    private List<CatalogExercise> exerciseList;
+    // Mudei de ManyToMany para OneToMany para montar na mão a tabela intermediária
+    @OneToMany(mappedBy = "workoutTemplate", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("order ASC") // Aqui nós sempre temos que usar o nome do atributo da tabela filha + ASC
+    private List<TemplateExercise> exerciseList;
 
     @OneToOne
     @JoinColumn(name = "friend_source_id")

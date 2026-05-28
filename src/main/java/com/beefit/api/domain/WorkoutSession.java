@@ -59,7 +59,7 @@ public class WorkoutSession {
     @Column(name = "status", nullable = false)
     private WorkoutStatus status;
 
-    @OneToMany(mappedBy = "workout", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "workoutSession", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("order ASC") // Garante que ao dar getExercises(), eles venham na ordem
     private List<SessionExercise> exercises = new ArrayList<>();
 
@@ -67,12 +67,12 @@ public class WorkoutSession {
     // funcione perfeitamente no Java
     public void addExercise(SessionExercise exercise) {
         this.exercises.add(exercise);
-        exercise.setWorkout(this); // Seta o lado inverso da relação automaticamente
+        exercise.setWorkoutSession(this); // Seta o lado inverso da relação automaticamente
     }
 
     public void removeExercise(SessionExercise exercise) {
         this.exercises.remove(exercise);
-        exercise.setWorkout(null);
+        exercise.setWorkoutSession(null);
     }
 
 }

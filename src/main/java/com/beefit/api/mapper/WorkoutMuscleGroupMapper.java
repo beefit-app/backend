@@ -37,6 +37,8 @@ public class WorkoutMuscleGroupMapper {
             case CHEST -> "peito";
             case BACK -> "costas";
             case LEGS -> "pernas";
+            case GLUTES -> "gluteos";
+            case TRAPS -> "trapezio";
             case SHOULDERS -> "ombros";
             case ARMS -> "bracos";
             case CORE -> "core";
