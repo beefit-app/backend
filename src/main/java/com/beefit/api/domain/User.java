@@ -80,6 +80,9 @@ public class User implements UserDetails {
     @Column(name = "offensive_honeys", nullable = false)
     private Integer offensiveHoneys = 0; // Começa zerado
 
+    @Column(name = "resets_this_week", nullable = false)
+    private Integer resetsThisWeek = 0;
+
     @NotNull
     @Column(nullable = false)
     @Enumerated(EnumType.STRING)
