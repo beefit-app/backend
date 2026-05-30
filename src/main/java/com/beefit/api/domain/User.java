@@ -72,6 +72,10 @@ public class User implements UserDetails {
     private Integer workoutsCount = 0;
 
     @PositiveOrZero
+    @Column(name = "weekly_workouts_count", nullable = false)
+    private Integer weeklyWorkoutsCount = 0;
+
+    @PositiveOrZero
     @Column(name = "cards_count", nullable = false)
     private Integer cardsCount = 0;
 
