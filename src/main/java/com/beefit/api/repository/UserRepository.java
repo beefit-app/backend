@@ -24,7 +24,5 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     /**
      * The Weekly Counter are setted to 0 every Monday
      */
-    @Modifying
-    @Query("UPDATE User u SET u.weeklyWorkoutsCount = 0")
-    void resetAllWorkoutsCount();
+    void resetAllWeeklyWorkoutsCount();
 }

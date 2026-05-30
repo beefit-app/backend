@@ -35,6 +35,6 @@ public class HoneysScheduleService {
     @Transactional
     public void resetWeeklyCounters(){
 
-        userRepository.resetAllWorkoutsCount();
+        userRepository.resetAllWeeklyWorkoutsCount();
     }
 }
