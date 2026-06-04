@@ -1,8 +1,6 @@
 package com.beefit.api.service;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -10,6 +8,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -48,6 +47,8 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 public class WorkoutSessionService {
+    private static final int MIN_HONEY_WORKOUT_DURATION_SECONDS = 1800;
+
     private final WorkoutSessionRepository workoutSessionRepository;
     private final WorkoutTemplateRepository workoutTemplateRepository;
     private final CatalogExerciseRepository catalogExerciseRepository;
@@ -55,6 +56,17 @@ public class WorkoutSessionService {
     private final WorkoutSessionMapper workoutSessionMapper;
     private final WorkoutMuscleGroupMapper workoutMuscleGroupMapper;
     private final SseService sseService;
+
+    @Transactional(readOnly = true)
+    public Optional<WorkoutSessionResponseDTO> getActiveWorkout(UUID userId) {
+        return workoutSessionRepository.findByStatusAndUserId(WorkoutStatus.IN_PROGRESS, userId)
+                .stream()
+                .findFirst()
+                .map(session -> {
+                    initializeWorkoutGraph(session);
+                    return workoutSessionMapper.toDto(session);
+                });
+    }
 
     @Transactional
     public WorkoutSessionResponseDTO startWorkout(UUID userId, StartWorkoutRequestDTO request) {
@@ -113,21 +125,13 @@ public class WorkoutSessionService {
 
         session.setTotalVolume(calculateTotalVolume(session));
 
-        double peakAttackPower = calculatePeakAttackPower(session);
-
         session.setStatus(WorkoutStatus.FINISHED);
 
-        LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
-        LocalDateTime endOfDay = LocalDate.now().atTime(LocalTime.MAX);
-
-        boolean alreadyTrainedToday = workoutSessionRepository.existsFinishedWorkoutToday(
-                userId, WorkoutStatus.FINISHED, startOfDay, endOfDay);
-
-        if (!alreadyTrainedToday) {
-            user.setOffensiveHoneys(user.getOffensiveHoneys() + 1);
-        }
-
         user.setWorkoutsCount(user.getWorkoutsCount() + 1);
+        if (durationSeconds >= MIN_HONEY_WORKOUT_DURATION_SECONDS) {
+            user.setOffensiveHoneys(user.getOffensiveHoneys() + 1);
+            user.setWeeklyWorkoutsCount(user.getWeeklyWorkoutsCount() + 1);
+        }
         userRepository.save(user);
 
         WorkoutSession savedSession = workoutSessionRepository.save(session);

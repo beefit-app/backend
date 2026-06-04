@@ -1,10 +1,13 @@
 package com.beefit.api.controller;
 
 import java.net.URI;
+import java.util.Optional;
 import java.util.UUID;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -25,6 +28,13 @@ import lombok.AllArgsConstructor;
 @RequestMapping("/api/workout")
 public class WorkoutController implements GenericController {
     private final WorkoutSessionService workoutSessionService;
+
+    @GetMapping("/active")
+    public ResponseEntity<WorkoutSessionResponseDTO> getActiveWorkout(@AuthenticationPrincipal User user) {
+        Optional<WorkoutSessionResponseDTO> response = workoutSessionService.getActiveWorkout(user.getId());
+        return response.map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.status(HttpStatus.NO_CONTENT).build());
+    }
 
     @PostMapping("/start")
     public ResponseEntity<WorkoutSessionResponseDTO> startWorkout(@AuthenticationPrincipal User user,

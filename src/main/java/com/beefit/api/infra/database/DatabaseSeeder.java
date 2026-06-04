@@ -8,6 +8,7 @@ import com.beefit.api.repository.CatalogExerciseRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ClassPathResource;
 
@@ -15,16 +16,15 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 
 @Configuration
 public class DatabaseSeeder implements CommandLineRunner { // Interface faz a classe rodar na inciciação
 
-    private final CatalogExerciseRepository catalogExerciseRepository;
+    private final ObjectProvider<CatalogExerciseRepository> catalogExerciseRepositoryProvider;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public DatabaseSeeder(CatalogExerciseRepository exerciseRepository) {
-        this.catalogExerciseRepository = exerciseRepository;
+    public DatabaseSeeder(ObjectProvider<CatalogExerciseRepository> exerciseRepositoryProvider) {
+        this.catalogExerciseRepositoryProvider = exerciseRepositoryProvider;
     }
 
     @Override
@@ -34,6 +34,11 @@ public class DatabaseSeeder implements CommandLineRunner { // Interface faz a cl
     }
 
     public void catalogExerciseFactory(){
+        CatalogExerciseRepository catalogExerciseRepository = catalogExerciseRepositoryProvider.getIfAvailable();
+
+        if (catalogExerciseRepository == null) {
+            return;
+        }
 
         if(catalogExerciseRepository.count() == 0){
             System.out.println("Tabela de exercícios vazia. Iniciando processo de carga inicial...");
