@@ -32,12 +32,12 @@ public class Friendship {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     // JoinColumn serve para definir qual nome vai para a coluna dessa fk no database
     @JoinColumn(name = "requester_id")
     private User requester;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "addressee_id")
     private User addressee;
 
