@@ -62,7 +62,8 @@ public class SecurityConfiguration {
                         // .requestMatchers(HttpMethod.POST, "/dashboard").hasRole("ADMIN")
                         // Rotas exclusivas de admin ou de autenticação devem ser adicionadas aqui
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers("/auth/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/auth/login").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/auth/register").permitAll()
                         .anyRequest().authenticated())
                 .addFilterBefore(securityFilter, UsernamePasswordAuthenticationFilter.class)
                 .build(); // Builda o Security Filter Chain (Cadeia de verificações para a autenticação)

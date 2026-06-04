@@ -20,8 +20,9 @@ import java.io.IOException;
 @RequiredArgsConstructor
 public class SecurityFilter extends OncePerRequestFilter {
 
-    private static final String[] PUBLIC_PATH_PREFIXES = {
-            "/auth/"
+    private static final String[] PUBLIC_PATHS = {
+            "/auth/login",
+            "/auth/register"
     };
 
     private final TokenService tokenService;
@@ -30,8 +31,8 @@ public class SecurityFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = resolveRequestPath(request);
-        for (String prefix : PUBLIC_PATH_PREFIXES) {
-            if (path.startsWith(prefix)) {
+        for (String publicPath : PUBLIC_PATHS) {
+            if (path.equals(publicPath)) {
                 return true;
             }
         }

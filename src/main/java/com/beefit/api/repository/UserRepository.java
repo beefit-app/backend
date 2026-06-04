@@ -18,11 +18,13 @@ public interface UserRepository extends JpaRepository<User, UUID> {
      * If the goal can't be reached, the offensive counter may reset to 0 if it's already != 0
      */
     @Modifying
-    @Query("UPDATE User u SET u.offensiveHonys = 0 WHERE (u.weeklyWorkoutsCount + :daysRemaining) < u.weeklyGoal AND u.offensiveHoneys > 0")
+    @Query("UPDATE User u SET u.offensiveHoneys = 0 WHERE (u.weeklyWorkoutsCount + :daysRemaining) < u.weeklyGoal AND u.offensiveHoneys > 0")
     void resetOffensiveForFailedGoals(@Param("daysRemaining") int daysRemaining);
 
     /**
      * The Weekly Counter are setted to 0 every Monday
      */
+    @Modifying
+    @Query("UPDATE User u SET u.weeklyWorkoutsCount = 0")
     void resetAllWeeklyWorkoutsCount();
 }
