@@ -3,6 +3,8 @@ package com.beefit.api.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.LocalDateTime;
@@ -133,6 +135,24 @@ class WorkoutTrackServiceTest {
         assertEquals(2, user.getWorkoutsCount());
         assertEquals(2, user.getOffensiveHoneys());
         assertEquals(2, user.getWeeklyWorkoutsCount());
+    }
+
+    @Test
+    void cancelWorkoutMarksSessionCanceledWithoutIncrementingWorkoutCounters() {
+        WorkoutSession session = inProgressSession(LocalDateTime.of(2026, 6, 4, 10, 0));
+
+        when(workoutSessionRepository.findById(session.getId())).thenReturn(Optional.of(session));
+        when(workoutSessionRepository.save(any(WorkoutSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(workoutSessionMapper.toDto(any(WorkoutSession.class))).thenReturn(response(session));
+
+        workoutSessionService.cancelWorkout(userId, session.getId());
+
+        assertEquals(WorkoutStatus.CANCELED, session.getStatus());
+        assertNotNull(session.getFinishedAt());
+        assertEquals(0, user.getWorkoutsCount());
+        assertEquals(0, user.getOffensiveHoneys());
+        assertEquals(0, user.getWeeklyWorkoutsCount());
+        verify(userRepository, never()).save(any(User.class));
     }
 
     @Test

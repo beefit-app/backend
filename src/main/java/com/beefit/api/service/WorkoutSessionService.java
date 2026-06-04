@@ -141,6 +141,28 @@ public class WorkoutSessionService {
     }
 
     @Transactional
+    public WorkoutSessionResponseDTO cancelWorkout(UUID userId, UUID workoutId) {
+        WorkoutSession session = workoutSessionRepository.findById(workoutId)
+                .orElseThrow(WorkoutSessionNotFoundException::new);
+        initializeWorkoutGraph(session);
+
+        validateWorkoutOwnership(userId, session);
+        validateWorkoutInProgress(session);
+
+        LocalDateTime canceledAt = LocalDateTime.now();
+        session.setFinishedAt(canceledAt);
+        session.setDurationSeconds(null);
+        session.setEstimatedCalories(null);
+        session.setTotalVolume(null);
+        session.setStatus(WorkoutStatus.CANCELED);
+
+        WorkoutSession savedSession = workoutSessionRepository.save(session);
+
+        broadcastIfPublic(savedSession, SocialEvent.WORKOUT_CANCELED, canceledAt);
+        return workoutSessionMapper.toDto(savedSession);
+    }
+
+    @Transactional
     public WorkoutSessionResponseDTO addMuscleGroup(UUID userId, UUID workoutId, String muscleGroupValue) {
         WorkoutSession session = workoutSessionRepository.findById(workoutId)
                 .orElseThrow(WorkoutSessionNotFoundException::new);
