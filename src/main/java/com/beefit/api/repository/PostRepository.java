@@ -15,10 +15,10 @@ import java.util.UUID;
 @Repository
 public interface PostRepository extends JpaRepository<Post, UUID> {
 
-
-     // Montagem do Feed Social
-     // Busca as publicações dos amigos com status ACCEPTED.
-     // Utiliza JOIN FETCH para carregar o dono do post e a sessão de treino de uma vez,
+    // Montagem do Feed Social
+    // Busca as publicações dos amigos com status ACCEPTED.
+    // Utiliza JOIN FETCH para carregar o dono do post e a sessão de treino de uma
+    // vez,
     @Query(value = "SELECT p FROM Post p " +
             "JOIN FETCH p.user " +
             "JOIN FETCH p.workoutSession " +
@@ -40,7 +40,8 @@ public interface PostRepository extends JpaRepository<Post, UUID> {
                     "  )")
     Page<Post> findFriendsFeed(@Param("currentUser") User currentUser, Pageable pageable);
 
-    // Traz o post pelo ID, mas já filtrando para garantir que não foi removido pela moderação
+    // Traz o post pelo ID, mas já filtrando para garantir que não foi removido pela
+    // moderação
     Optional<Post> findByIdAndIsRemovedFalse(UUID id);
 
     // Lista páginada dos posts do usuário logado
