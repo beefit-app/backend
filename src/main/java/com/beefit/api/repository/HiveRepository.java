@@ -30,14 +30,14 @@ public interface HiveRepository extends JpaRepository<Hive, UUID> {
     List<Hive> findAllByCreator(User creator);
 
     // Agrupa os membros da colmeia e conta quantos treinos válidos eles têm dentro do período de disputa.
-    @Query("SELECT new com.beefit.api.domain.dto.HiveRankingDTO(m, COUNT(ws)) " +
+    @Query("SELECT new com.beefit.api.dto.HiveRankingDTO(m, COUNT(ws)) " +
             "FROM Hive h " +
             "JOIN h.members m " +
             "LEFT JOIN WorkoutSession ws ON ws.user = m " +
-            "   AND ws.startTime >= h.startDate " + // Considerando que WorkoutSession tem uma data de início
-            "   AND ws.startTime <= h.endDate " +
+            "   AND ws.startedAt >= h.startDate " +
+            "   AND ws.startedAt <= h.endDate " +
             "WHERE h.id = :hiveId " +
-            "GROUP BY m.id " +
+            "GROUP BY m " +
             "ORDER BY COUNT(ws) DESC")
     List<HiveRankingDTO> getRankingForHive(@Param("hiveId") UUID hiveId);
 
