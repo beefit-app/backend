@@ -69,7 +69,7 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler({ WorkoutSessionNotFoundException.class, WorkoutTemplateNotFoundException.class,
-            CatalogExerciseNotFound.class })
+            CatalogExerciseNotFound.class, PostNotFoundException.class })
     @ResponseStatus(HttpStatus.NOT_FOUND)
     public ErrorResponse handleWorkoutElementsNotFoundException(RuntimeException e,
             HttpServletRequest request) {
