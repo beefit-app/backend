@@ -82,6 +82,8 @@ public class WorkoutSessionService {
         session.setEstimatedCalories(null);
         session.setTotalVolume(null);
         session.setMuscleGroupsList(request.muscleGroups());
+        session.setTitle(null);
+        session.setShouldPostWorkout(false);
         session.setIsPrivate(request.isPrivate());
         session.setStatus(WorkoutStatus.IN_PROGRESS);
 
