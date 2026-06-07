@@ -29,6 +29,7 @@ public interface HiveRepository extends JpaRepository<Hive, UUID> {
     // Busca todas colmeias criadas pelo usuário
     List<Hive> findAllByCreator(User creator);
 
+    // Conferir essa query para posterior otimização
     // Agrupa os membros da colmeia e conta quantos treinos válidos eles têm dentro do período de disputa.
     @Query("SELECT new com.beefit.api.dto.HiveRankingDTO(m, COUNT(ws)) " +
             "FROM Hive h " +
@@ -38,7 +39,7 @@ public interface HiveRepository extends JpaRepository<Hive, UUID> {
             "   AND ws.startedAt <= h.endDate " +
             "WHERE h.id = :hiveId " +
             "GROUP BY m " +
-            "ORDER BY COUNT(ws) DESC")
+            "ORDER BY COUNT(ws) DESC, m.offensiveHoneys ASC") // A ofensiva está como critério de desempate
     List<HiveRankingDTO> getRankingForHive(@Param("hiveId") UUID hiveId);
 
     // Pega a pontuação de um usuário específico na colmeia
