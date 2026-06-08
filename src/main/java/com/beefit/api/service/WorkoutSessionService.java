@@ -56,7 +56,7 @@ public class WorkoutSessionService {
     private final WorkoutSessionMapper workoutSessionMapper;
     private final WorkoutMuscleGroupMapper workoutMuscleGroupMapper;
     private final SseService sseService;
-
+    private final com.beefit.api.repository.PostRepository postRepository;
     @Transactional(readOnly = true)
     public Optional<WorkoutSessionResponseDTO> getActiveWorkout(UUID userId) {
         return workoutSessionRepository.findByStatusAndUserId(WorkoutStatus.IN_PROGRESS, userId)
@@ -135,7 +135,17 @@ public class WorkoutSessionService {
             user.setWeeklyWorkoutsCount(user.getWeeklyWorkoutsCount() + 1);
         }
         userRepository.save(user);
+        // Geracao de posts
+        // Só publica se o treino NÃO for privado E se o usuário NÃO estiver em Modo Fantasma
+        if (!session.getIsPrivate() && !user.getGhostMode()) {
+            com.beefit.api.domain.Post autoPost = new com.beefit.api.domain.Post();
+            autoPost.setUser(user);
+            autoPost.setWorkoutSession(session);
+            autoPost.setTotalLikes(0);
+            autoPost.setIsRemoved(false);
 
+            postRepository.save(autoPost);
+        }
         WorkoutSession savedSession = workoutSessionRepository.save(session);
 
         broadcastIfPublic(savedSession, SocialEvent.WORKOUT_FINISHED, request.finishedAt());
