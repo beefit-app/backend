@@ -106,6 +106,44 @@ public class GlobalExceptionHandler {
                 request.getRequestURI());
     }
 
+    @ExceptionHandler({SameUserException.class, FriendshipAlreadyExistException.class})
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleSendRequestException(RuntimeException e,
+                                                               HttpServletRequest request) {
+        return new ErrorResponse(LocalDateTime.now(),
+                HttpStatus.CONFLICT.value(),
+                "Solicitação de amizade inválida",
+                e.getMessage(),
+                List.of(),
+                request.getRequestURI());
+    }
+
+    @ExceptionHandler({FriendshipNotAcceptedException.class,
+            FriendshipNotPendingException.class,
+            FriendshipNotFound.class})
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleFriendshipException(RuntimeException e,
+                                                 HttpServletRequest request) {
+        return new ErrorResponse(LocalDateTime.now(),
+                HttpStatus.CONFLICT.value(),
+                "Não é possível essa ação para a solicitação de amizade",
+                e.getMessage(),
+                List.of(),
+                request.getRequestURI());
+    }
+
+    @ExceptionHandler(DifferentUserException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleDifferentUserException(DifferentUserException e,
+                                                 HttpServletRequest request) {
+        return new ErrorResponse(LocalDateTime.now(),
+                HttpStatus.CONFLICT.value(),
+                "Erro ao responder solicitação",
+                e.getMessage(),
+                List.of(),
+                request.getRequestURI());
+    }
+
     @ExceptionHandler(WorkoutAlreadyInProgressException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
     public ErrorResponse handleWorkoutAlreadyInProgressException(WorkoutAlreadyInProgressException e,
