@@ -46,6 +46,16 @@ public class HiveController {
         return ResponseEntity.noContent().build();
     }
 
+    @PostMapping("{hiveInvite}/join")
+    public ResponseEntity<HiveResponseDTO> joinHive(@AuthenticationPrincipal User user, @PathVariable String hiveInvite){
+
+        Hive hive = hiveService.joinHive(user, hiveInvite);
+
+        HiveResponseDTO response = hiveMapper.toDto(hive);
+
+        return ResponseEntity.ok(response);
+    }
+
     @GetMapping("{hiveId}/getData")
     public ResponseEntity<List<HiveRankingDTO>> getHiveData(@PathVariable UUID hive){
 

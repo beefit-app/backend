@@ -111,6 +111,7 @@ public class GlobalExceptionHandler {
 
     }
 
+
     @ExceptionHandler(DatabaseSeederFailException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
     public ErrorResponse handleDatabaseSeederFailException(DatabaseSeederFailException e, HttpServletRequest request) {
@@ -125,8 +126,10 @@ public class GlobalExceptionHandler {
 
     }
 
+    // Abaixo estão algumas funções "genéricas" para agrupar exceções de mesmo HttpStatus
+
     // Trata erros de recurso não encontrado (Status 404)
-    @ExceptionHandler(HiveNotFoundException.class)
+    @ExceptionHandler({HiveNotFoundException.class})
     public ErrorResponse handleNotFound(RuntimeException e, HttpServletRequest request) {
         return new ErrorResponse(
                 LocalDateTime.now(),
@@ -136,6 +139,20 @@ public class GlobalExceptionHandler {
                 List.of(),
                 request.getRequestURI()
         );
+    }
+
+    // Trata erros de conflito (Status 409)
+    @ExceptionHandler({UserAlreadyInHiveException.class})
+    public ErrorResponse handleUserAlreadyInHiveException(RuntimeException e, HttpServletRequest request) {
+        return new ErrorResponse(
+                LocalDateTime.now(),
+                HttpStatus.CONFLICT.value(),
+                "Conflict",
+                e.getMessage(),
+                List.of(),
+                request.getRequestURI()
+        );
+
     }
 
     // Trata erros de regras de negocio violadas (Status 400)
