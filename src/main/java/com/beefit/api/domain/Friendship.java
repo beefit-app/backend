@@ -17,7 +17,7 @@ import java.util.UUID;
 @Table(name = "friendship", uniqueConstraints = {
         @UniqueConstraint(columnNames = {
                 "requester_id",
-                "adressee_id"
+                "addressee_id"
         })
 })
 @AllArgsConstructor

@@ -57,6 +57,8 @@ public class WorkoutSessionService {
     private final WorkoutMuscleGroupMapper workoutMuscleGroupMapper;
     private final SseService sseService;
     private final com.beefit.api.repository.PostRepository postRepository;
+    private final FriendshipService friendshipService;
+
     @Transactional(readOnly = true)
     public Optional<WorkoutSessionResponseDTO> getActiveWorkout(UUID userId) {
         return workoutSessionRepository.findByStatusAndUserId(WorkoutStatus.IN_PROGRESS, userId)
@@ -396,7 +398,9 @@ public class WorkoutSessionService {
                 occurredAt,
                 workoutMuscleGroupMapper.toApi(session.getMuscleGroupsList()));
 
-        sseService.broadcast(new SocialEventDTO(eventType, presenceEvent));
+        List<User> friends = friendshipService.getFriends(user.getId()).orElseThrow();
+
+        sseService.broadcastToFriends(new SocialEventDTO<>(eventType, presenceEvent), friends);
     }
 
     private void validateUniqueExerciseOrders(List<FinishWorkoutExerciseDTO> requestedExercises) {
