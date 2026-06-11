@@ -29,12 +29,12 @@ class GlobalExceptionHandlerTest {
     void handlePasswordExceptionsReturnsBadRequestPayload() {
         MockHttpServletRequest request = request("/api/profile/me/password");
 
-        ErrorResponse response = handler.handlePasswordExceptions(
+        ErrorResponse response = handler.handleBadRequestRules(
                 new InvalidPasswordException("Senha atual incorreta."),
                 request);
 
         assertEquals(400, response.status());
-        assertEquals("Dados inválidos", response.error());
+        assertEquals("Business Rule Violation", response.error());
         assertEquals("Senha atual incorreta.", response.message());
     }
 
@@ -55,7 +55,7 @@ class GlobalExceptionHandlerTest {
     void handleInvalidMuscleGroupExceptionReturnsBadRequestPayload() {
         MockHttpServletRequest request = request("/api/workout/123/muscle-groups/foo");
 
-        ErrorResponse response = handler.handleInvaidMuscleGroupException(
+        ErrorResponse response = handler.handleBadRequestRules(
                 new InvalidMuscleGroupException("foo"),
                 request);
 

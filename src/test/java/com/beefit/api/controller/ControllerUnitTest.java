@@ -39,6 +39,8 @@ import com.beefit.api.dto.UpdateProfileRequestDTO;
 import com.beefit.api.dto.UserProfileResponseDTO;
 import com.beefit.api.dto.UserResponseDTO;
 import com.beefit.api.dto.WorkoutSessionResponseDTO;
+import com.beefit.api.dto.WorkoutTemplateExerciseRequestDTO;
+import com.beefit.api.dto.WorkoutTemplateExerciseResponseDTO;
 import com.beefit.api.dto.WorkoutTemplateRequestDTO;
 import com.beefit.api.dto.WorkoutTemplateResponseDTO;
 import com.beefit.api.mapper.RegisterMapper;
@@ -158,7 +160,17 @@ class ControllerUnitTest {
         User user = user();
         UUID workoutId = UUID.randomUUID();
         StartWorkoutRequestDTO request = new StartWorkoutRequestDTO(List.of(MuscleGroups.CHEST), Boolean.TRUE, null, List.of());
-        WorkoutSessionResponseDTO dto = new WorkoutSessionResponseDTO(workoutId, "in_progress", null, null, null, List.of("peito"), true, List.of());
+        WorkoutSessionResponseDTO dto = new WorkoutSessionResponseDTO(
+                workoutId,
+                "in_progress",
+                null,
+                null,
+                null,
+                null,
+                null,
+                List.of("peito"),
+                true,
+                List.of());
 
         when(workoutSessionService.startWorkout(user.getId(), request)).thenReturn(dto);
 
@@ -170,7 +182,7 @@ class ControllerUnitTest {
     }
 
     @Test
-    void workoutTemplateControllerReturnsNoContentForEmptyList() {
+    void workoutTemplateControllerReturnsOkWithEmptyList() {
         WorkoutTemplateController controller = new WorkoutTemplateController(workoutTemplateService);
         User user = user();
 
@@ -178,15 +190,24 @@ class ControllerUnitTest {
 
         ResponseEntity<List<WorkoutTemplateResponseDTO>> response = controller.getUserTemplates(user);
 
-        assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(List.of(), response.getBody());
     }
 
     @Test
     void workoutTemplateControllerCreatesTemplateForAuthenticatedUser() {
         WorkoutTemplateController controller = new WorkoutTemplateController(workoutTemplateService);
         User user = user();
-        WorkoutTemplateRequestDTO request = new WorkoutTemplateRequestDTO("Treino A", List.of(MuscleGroups.CHEST), List.of(new com.beefit.api.domain.TemplateExercise()));
-        WorkoutTemplateResponseDTO dto = new WorkoutTemplateResponseDTO(user.getId(), "Treino A", List.of(MuscleGroups.CHEST), request.exercises());
+        UUID catalogExerciseId = UUID.randomUUID();
+        WorkoutTemplateRequestDTO request = new WorkoutTemplateRequestDTO(
+                "Treino A",
+                List.of(MuscleGroups.CHEST),
+                List.of(new WorkoutTemplateExerciseRequestDTO(catalogExerciseId, 1)));
+        WorkoutTemplateResponseDTO dto = new WorkoutTemplateResponseDTO(
+                user.getId(),
+                "Treino A",
+                List.of(MuscleGroups.CHEST),
+                List.of(new WorkoutTemplateExerciseResponseDTO(catalogExerciseId, "Supino", 1)));
 
         when(workoutTemplateService.createTemplate(request, user.getId())).thenReturn(dto);
 

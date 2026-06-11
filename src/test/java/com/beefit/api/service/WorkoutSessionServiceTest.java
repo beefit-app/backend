@@ -225,7 +225,6 @@ class WorkoutSessionServiceTest {
         when(workoutSessionRepository.findById(workoutId)).thenReturn(Optional.of(session));
         when(catalogExerciseRepository.findById(newCatalogExercise.getId())).thenReturn(Optional.of(newCatalogExercise));
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-        when(workoutSessionRepository.existsFinishedWorkoutToday(any(), any(), any(), any())).thenReturn(false);
         when(workoutSessionRepository.save(any(WorkoutSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(workoutSessionMapper.toDto(any(WorkoutSession.class))).thenReturn(responseDto(WorkoutStatus.FINISHED));
 
@@ -373,6 +372,8 @@ class WorkoutSessionServiceTest {
                 UUID.randomUUID(),
                 status.getStatus(),
                 LocalDateTime.now(),
+                null,
+                null,
                 null,
                 null,
                 List.of("peito"),
