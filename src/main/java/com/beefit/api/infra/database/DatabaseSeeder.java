@@ -8,6 +8,7 @@ import com.beefit.api.repository.CatalogExerciseRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ClassPathResource;
 
@@ -18,6 +19,7 @@ import java.util.List;
 import java.util.UUID;
 
 @Configuration
+@ConditionalOnProperty(prefix = "beefit.seed", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class DatabaseSeeder implements CommandLineRunner { // Interface faz a classe rodar na inciciação
 
     private final CatalogExerciseRepository catalogExerciseRepository;
