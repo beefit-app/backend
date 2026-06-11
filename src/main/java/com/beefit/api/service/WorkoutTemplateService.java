@@ -2,14 +2,15 @@ package com.beefit.api.service;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
+import com.beefit.api.domain.*;
+import com.beefit.api.domain.enums.MuscleGroups;
+import com.beefit.api.repository.PostRepository;
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.beefit.api.domain.CatalogExercise;
-import com.beefit.api.domain.TemplateExercise;
-import com.beefit.api.domain.User;
-import com.beefit.api.domain.WorkoutTemplate;
 import com.beefit.api.dto.WorkoutTemplateRequestDTO;
 import com.beefit.api.dto.WorkoutTemplateExerciseRequestDTO;
 import com.beefit.api.dto.WorkoutTemplateExerciseResponseDTO;
@@ -29,6 +30,7 @@ public class WorkoutTemplateService {
     private final WorkoutTemplateRepository WTRepository;
     private final UserRepository userRepository;
     private final CatalogExerciseRepository catalogExerciseRepository;
+    private final PostRepository postRepository;
 
     @Transactional
     // Lembrar de implementar o id do amigo na parte do social
@@ -95,7 +97,45 @@ public class WorkoutTemplateService {
                 template.getId(),
                 template.getName(),
                 template.getMuscleGroupsList(),
-                exercises);
+                template.getExerciseList());
     }
+    public WorkoutTemplateResponseDTO importTemplateFromPost(UUID postId, UUID currentUserId) {
 
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new EntityNotFoundException("Post not found."));
+
+        WorkoutSession session = post.getWorkoutSession();
+
+        List<MuscleGroups> importedMuscleGroups = session.getMuscleGroupsList();
+
+        WorkoutTemplate newTemplate = new WorkoutTemplate();
+        newTemplate.setName("Imported from " + post.getUser().getFullName());
+
+        User user = userRepository.findById(currentUserId).orElseThrow(()-> new EntityNotFoundException("User not found"));
+        newTemplate.setUser(user);
+        newTemplate.setMuscleGroupsList(importedMuscleGroups);
+
+        List<TemplateExercise> importedExercises = session.getExercises().stream()
+                .map(sessionExercise -> {
+                    TemplateExercise templateEx = new TemplateExercise();
+
+                    templateEx.setCatalogExercise(sessionExercise.getExercise());
+
+                    templateEx.setWorkoutTemplate(newTemplate);
+
+                    return templateEx;
+                })
+                .collect(Collectors.toList());
+
+        newTemplate.setExerciseList(importedExercises);
+
+        WorkoutTemplate savedTemplate = WTRepository.save(newTemplate);
+
+        return new WorkoutTemplateResponseDTO(
+                savedTemplate.getId(),
+                savedTemplate.getName(),
+                savedTemplate.getMuscleGroupsList(),
+                savedTemplate.getExerciseList()
+        );
+    }
 }

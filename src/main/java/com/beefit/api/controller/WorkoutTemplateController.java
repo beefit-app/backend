@@ -12,6 +12,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequiredArgsConstructor
@@ -35,5 +36,18 @@ public class WorkoutTemplateController {
         List<WorkoutTemplateResponseDTO> workoutTemplates = WTService.getUserTemplates(user.getId());
 
         return ResponseEntity.ok(workoutTemplates);
+    }
+
+    @PostMapping("/import/{postId}")
+    public ResponseEntity<WorkoutTemplateResponseDTO> importTemplateFromPost(
+            @PathVariable UUID postId,
+            @AuthenticationPrincipal User usuarioAutenticado
+    ) {
+        WorkoutTemplateResponseDTO responseDTO = WTService.importTemplateFromPost(
+                postId,
+                usuarioAutenticado.getId()
+        );
+
+        return ResponseEntity.ok(responseDTO);
     }
 }
