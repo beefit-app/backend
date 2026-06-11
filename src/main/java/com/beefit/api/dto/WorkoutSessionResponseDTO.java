@@ -12,6 +12,8 @@ public record WorkoutSessionResponseDTO(
         LocalDateTime startedAt,
         @Nullable LocalDateTime finishedAt,
         @Nullable Integer durationSeconds,
+        @Nullable Double estimatedCalories,
+        @Nullable Double totalVolume,
         List<String> muscleGroups,
         Boolean isPrivate,
         List<SessionExerciseResponseDTO> exercises) {

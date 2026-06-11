@@ -13,7 +13,7 @@ import java.util.UUID;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/exercises")
+@RequestMapping("/api/exercises/")
 public class ExerciseCatalogController {
 
     private final CatalogExerciseRepository catalogExerciseRepository;

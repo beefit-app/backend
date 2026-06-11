@@ -1,8 +1,6 @@
 package com.beefit.api.service;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -10,6 +8,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -48,6 +47,8 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 public class WorkoutSessionService {
+    private static final int MIN_HONEY_WORKOUT_DURATION_SECONDS = 1800;
+
     private final WorkoutSessionRepository workoutSessionRepository;
     private final WorkoutTemplateRepository workoutTemplateRepository;
     private final CatalogExerciseRepository catalogExerciseRepository;
@@ -55,6 +56,19 @@ public class WorkoutSessionService {
     private final WorkoutSessionMapper workoutSessionMapper;
     private final WorkoutMuscleGroupMapper workoutMuscleGroupMapper;
     private final SseService sseService;
+    private final com.beefit.api.repository.PostRepository postRepository;
+    private final FriendshipService friendshipService;
+
+    @Transactional(readOnly = true)
+    public Optional<WorkoutSessionResponseDTO> getActiveWorkout(UUID userId) {
+        return workoutSessionRepository.findByStatusAndUserId(WorkoutStatus.IN_PROGRESS, userId)
+                .stream()
+                .findFirst()
+                .map(session -> {
+                    initializeWorkoutGraph(session);
+                    return workoutSessionMapper.toDto(session);
+                });
+    }
 
     @Transactional
     public WorkoutSessionResponseDTO startWorkout(UUID userId, StartWorkoutRequestDTO request) {
@@ -70,6 +84,8 @@ public class WorkoutSessionService {
         session.setEstimatedCalories(null);
         session.setTotalVolume(null);
         session.setMuscleGroupsList(request.muscleGroups());
+        session.setTitle(null);
+        session.setShouldPostWorkout(false);
         session.setIsPrivate(request.isPrivate());
         session.setStatus(WorkoutStatus.IN_PROGRESS);
 
@@ -113,26 +129,50 @@ public class WorkoutSessionService {
 
         session.setTotalVolume(calculateTotalVolume(session));
 
-        double peakAttackPower = calculatePeakAttackPower(session);
-
         session.setStatus(WorkoutStatus.FINISHED);
 
-        LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
-        LocalDateTime endOfDay = LocalDate.now().atTime(LocalTime.MAX);
-
-        boolean alreadyTrainedToday = workoutSessionRepository.existsFinishedWorkoutToday(
-                userId, WorkoutStatus.FINISHED, startOfDay, endOfDay);
-
-        if (!alreadyTrainedToday) {
-            user.setOffensiveHoneys(user.getOffensiveHoneys() + 1);
-        }
-
         user.setWorkoutsCount(user.getWorkoutsCount() + 1);
+        if (durationSeconds >= MIN_HONEY_WORKOUT_DURATION_SECONDS) {
+            user.setOffensiveHoneys(user.getOffensiveHoneys() + 1);
+            user.setWeeklyWorkoutsCount(user.getWeeklyWorkoutsCount() + 1);
+        }
         userRepository.save(user);
+        // Geracao de posts
+        // Só publica se o treino NÃO for privado E se o usuário NÃO estiver em Modo Fantasma
+        if (!session.getIsPrivate() && !user.getGhostMode()) {
+            com.beefit.api.domain.Post autoPost = new com.beefit.api.domain.Post();
+            autoPost.setUser(user);
+            autoPost.setWorkoutSession(session);
+            autoPost.setTotalLikes(0);
+            autoPost.setIsRemoved(false);
 
+            postRepository.save(autoPost);
+        }
         WorkoutSession savedSession = workoutSessionRepository.save(session);
 
         broadcastIfPublic(savedSession, SocialEvent.WORKOUT_FINISHED, request.finishedAt());
+        return workoutSessionMapper.toDto(savedSession);
+    }
+
+    @Transactional
+    public WorkoutSessionResponseDTO cancelWorkout(UUID userId, UUID workoutId) {
+        WorkoutSession session = workoutSessionRepository.findById(workoutId)
+                .orElseThrow(WorkoutSessionNotFoundException::new);
+        initializeWorkoutGraph(session);
+
+        validateWorkoutOwnership(userId, session);
+        validateWorkoutInProgress(session);
+
+        LocalDateTime canceledAt = LocalDateTime.now();
+        session.setFinishedAt(canceledAt);
+        session.setDurationSeconds(null);
+        session.setEstimatedCalories(null);
+        session.setTotalVolume(null);
+        session.setStatus(WorkoutStatus.CANCELED);
+
+        WorkoutSession savedSession = workoutSessionRepository.save(session);
+
+        broadcastIfPublic(savedSession, SocialEvent.WORKOUT_CANCELED, canceledAt);
         return workoutSessionMapper.toDto(savedSession);
     }
 
@@ -358,7 +398,9 @@ public class WorkoutSessionService {
                 occurredAt,
                 workoutMuscleGroupMapper.toApi(session.getMuscleGroupsList()));
 
-        sseService.broadcast(new SocialEventDTO(eventType, presenceEvent));
+        List<User> friends = friendshipService.getFriends(user.getId()).orElseThrow();
+
+        sseService.broadcastToFriends(new SocialEventDTO<>(eventType, presenceEvent), friends);
     }
 
     private void validateUniqueExerciseOrders(List<FinishWorkoutExerciseDTO> requestedExercises) {

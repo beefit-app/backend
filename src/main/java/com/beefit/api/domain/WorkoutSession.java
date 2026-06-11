@@ -50,6 +50,13 @@ public class WorkoutSession {
     @Column(name = "muscle_groups", columnDefinition = "varchar[]")
     private List<MuscleGroups> muscleGroupsList;
 
+    @Column(name = "title")
+    private String title;
+
+    @NotNull
+    @Column(name = "should_post_workout", nullable = false)
+    private Boolean shouldPostWorkout = false;
+
     @NotNull
     @Column(name = "is_private", nullable = false)
     private Boolean isPrivate = false;

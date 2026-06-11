@@ -20,9 +20,7 @@ import jakarta.servlet.http.HttpServletRequest;
                       // interceptar as exceptions
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler({ EmailAlreadyInUse.class, UsernameAlreadyInUse.class }) // Essa anotação indica o tipo de
-                                                                               // exception que deve ser interceptada
-    // @ResponseStatus
+    @ExceptionHandler({ EmailAlreadyInUse.class, UsernameAlreadyInUse.class }) // Essa anotação indica o tipo de exception que deve ser interceptada
     @ResponseStatus(HttpStatus.CONFLICT)
     public ErrorResponse handleRegisterConflictExceptions(RuntimeException e, HttpServletRequest request) {
         return new ErrorResponse(
@@ -31,13 +29,11 @@ public class GlobalExceptionHandler {
                 "Dados inválidos",
                 e.getMessage(),
                 List.of(),
-                request.getRequestURI());
+                request.getRequestURI()
+        );
     }
 
-    @ExceptionHandler(MethodArgumentNotValidException.class) // Essa anotação indica
-                                                             // o tipo de exception
-                                                             // que deve ser
-                                                             // interceptada
+    @ExceptionHandler(MethodArgumentNotValidException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ErrorResponse handleValidationExceptions(MethodArgumentNotValidException e, HttpServletRequest request) {
 
@@ -53,23 +49,12 @@ public class GlobalExceptionHandler {
                 "Erro de validação",
                 "Campos enviados inválidos",
                 fields,
-                request.getRequestURI());
-    }
-
-    @ExceptionHandler(InvalidPasswordException.class)
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public ErrorResponse handlePasswordExceptions(InvalidPasswordException e, HttpServletRequest request) {
-        return new ErrorResponse(
-                LocalDateTime.now(),
-                HttpStatus.BAD_REQUEST.value(),
-                "Dados inválidos",
-                e.getMessage(),
-                List.of(),
-                request.getRequestURI());
+                request.getRequestURI()
+        );
     }
 
     @ExceptionHandler({ WorkoutSessionNotFoundException.class, WorkoutTemplateNotFoundException.class,
-            CatalogExerciseNotFound.class })
+            CatalogExerciseNotFound.class, PostNotFoundException.class })
     @ResponseStatus(HttpStatus.NOT_FOUND)
     public ErrorResponse handleWorkoutElementsNotFoundException(RuntimeException e,
             HttpServletRequest request) {
@@ -79,28 +64,71 @@ public class GlobalExceptionHandler {
                 "Elementos do treino não encontrado.",
                 e.getMessage(),
                 List.of(),
-                request.getRequestURI());
+                request.getRequestURI()
+        );
     }
 
     @ExceptionHandler(InvalidWorkoutSessionStateException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ErrorResponse handleInvalidStateExceptions(InvalidWorkoutSessionStateException e,
             HttpServletRequest request) {
-        return new ErrorResponse(LocalDateTime.now(),
+        return new ErrorResponse(
+                LocalDateTime.now(),
                 HttpStatus.BAD_REQUEST.value(),
                 "Estado da sessão de treino inválido",
                 e.getMessage(),
                 List.of(),
-                request.getRequestURI());
+                request.getRequestURI()
+        );
     }
 
     @ExceptionHandler(InvalidWorkoutSnapshotException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ErrorResponse handleInvalidWorkoutSnapshotException(InvalidWorkoutSnapshotException e,
             HttpServletRequest request) {
-        return new ErrorResponse(LocalDateTime.now(),
+        return new ErrorResponse(
+                LocalDateTime.now(),
                 HttpStatus.BAD_REQUEST.value(),
                 "Snapshot do treino inválido",
+                e.getMessage(),
+                List.of(),
+                request.getRequestURI()
+        );
+    }
+
+    @ExceptionHandler({SameUserException.class, FriendshipAlreadyExistException.class})
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleSendRequestException(RuntimeException e,
+                                                               HttpServletRequest request) {
+        return new ErrorResponse(LocalDateTime.now(),
+                HttpStatus.CONFLICT.value(),
+                "Solicitação de amizade inválida",
+                e.getMessage(),
+                List.of(),
+                request.getRequestURI());
+    }
+
+    @ExceptionHandler({FriendshipNotAcceptedException.class,
+            FriendshipNotPendingException.class,
+            FriendshipNotFound.class})
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleFriendshipException(RuntimeException e,
+                                                 HttpServletRequest request) {
+        return new ErrorResponse(LocalDateTime.now(),
+                HttpStatus.CONFLICT.value(),
+                "Não é possível essa ação para a solicitação de amizade",
+                e.getMessage(),
+                List.of(),
+                request.getRequestURI());
+    }
+
+    @ExceptionHandler(DifferentUserException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleDifferentUserException(DifferentUserException e,
+                                                 HttpServletRequest request) {
+        return new ErrorResponse(LocalDateTime.now(),
+                HttpStatus.CONFLICT.value(),
+                "Erro ao responder solicitação",
                 e.getMessage(),
                 List.of(),
                 request.getRequestURI());
@@ -110,36 +138,77 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.CONFLICT)
     public ErrorResponse handleWorkoutAlreadyInProgressException(WorkoutAlreadyInProgressException e,
             HttpServletRequest request) {
-        return new ErrorResponse(LocalDateTime.now(),
+        return new ErrorResponse(
+                LocalDateTime.now(),
                 HttpStatus.CONFLICT.value(),
                 "O usuário já possui um treino ativo",
                 e.getMessage(),
                 List.of(),
-                request.getRequestURI());
+                request.getRequestURI()
+        );
 
     }
 
-    @ExceptionHandler(InvalidMuscleGroupException.class)
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public ErrorResponse handleInvaidMuscleGroupException(InvalidMuscleGroupException e, HttpServletRequest request) {
-        return new ErrorResponse(LocalDateTime.now(),
-                HttpStatus.BAD_REQUEST.value(),
-                null,
-                e.getMessage(),
-                List.of(),
-                request.getRequestURI());
-
-    }
 
     @ExceptionHandler(DatabaseSeederFailException.class)
     @ResponseStatus(HttpStatus.CONFLICT)
     public ErrorResponse handleDatabaseSeederFailException(DatabaseSeederFailException e, HttpServletRequest request) {
-        return new ErrorResponse(LocalDateTime.now(),
+        return new ErrorResponse(
+                LocalDateTime.now(),
                 HttpStatus.CONFLICT.value(),
                 e.getCause().getMessage(),
                 e.getMessage(),
                 List.of(),
-                request.getRequestURI());
+                request.getRequestURI()
+        );
 
+    }
+
+    // Abaixo estão algumas funções "genéricas" para agrupar exceções de mesmo HttpStatus
+
+    // Trata erros de recurso não encontrado (Status 404)
+    @ExceptionHandler({HiveNotFoundException.class})
+    public ErrorResponse handleNotFound(RuntimeException e, HttpServletRequest request) {
+        return new ErrorResponse(
+                LocalDateTime.now(),
+                HttpStatus.NOT_FOUND.value(),
+                "Resource Not Found",
+                e.getMessage(),
+                List.of(),
+                request.getRequestURI()
+        );
+    }
+
+    // Trata erros de conflito (Status 409)
+    @ExceptionHandler({UserAlreadyInHiveException.class})
+    public ErrorResponse handleUserAlreadyInHiveException(RuntimeException e, HttpServletRequest request) {
+        return new ErrorResponse(
+                LocalDateTime.now(),
+                HttpStatus.CONFLICT.value(),
+                "Conflict",
+                e.getMessage(),
+                List.of(),
+                request.getRequestURI()
+        );
+
+    }
+
+    // Trata erros de regras de negocio violadas (Status 400)
+    @ExceptionHandler({
+            InvalidPasswordException.class,
+            InvalidMuscleGroupException.class,
+            InvalidTimePeriodException.class,
+            ExceededHiveLimitException.class,
+            PermissionException.class
+    })
+    public ErrorResponse handleBadRequestRules(RuntimeException e, HttpServletRequest request) {
+        return new ErrorResponse(
+                LocalDateTime.now(),
+                HttpStatus.BAD_REQUEST.value(),
+                "Business Rule Violation",
+                e.getMessage(),
+                List.of(),
+                request.getRequestURI()
+        );
     }
 }

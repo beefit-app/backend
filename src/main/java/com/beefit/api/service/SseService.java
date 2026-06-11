@@ -1,36 +1,56 @@
 package com.beefit.api.service;
 
+import com.beefit.api.domain.User;
 import com.beefit.api.dto.SocialEventDTO;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 @Service
 public class SseService {
 
-    private final List<SseEmitter> emitters = new CopyOnWriteArrayList<>();
+    private final Map<UUID, SseEmitter> emitters = new ConcurrentHashMap<>();
 
-    public void addEmitter(SseEmitter emitter){
-        emitters.add(emitter);
+    public void addEmitter(UUID userId, SseEmitter emitter){
+        emitters.put(userId,emitter);
 
-        emitter.onCompletion(() -> emitters.remove(emitter));
-        emitter.onTimeout(() -> emitters.remove(emitter));
-        emitter.onError((e) -> emitters.remove(emitter));
+        emitter.onCompletion(() -> emitters.remove(userId));
+        emitter.onTimeout(() -> emitters.remove(userId));
+        emitter.onError((e) -> emitters.remove(userId));
     }
 
-    public void broadcast(SocialEventDTO socialEventDTO){
-        List<SseEmitter> closedEmitters = new CopyOnWriteArrayList<>();
+    public void broadcastToFriend(SocialEventDTO<?> socialEventDTO, UUID userId){
+        SseEmitter emitter = emitters.get(userId);
 
-        for(SseEmitter emitter:emitters){
-            try {
-                emitter.send(SseEmitter.event().name(socialEventDTO.type().name()).data(socialEventDTO.workoutPresenceEvent()));
-            } catch (IOException e) {
-                closedEmitters.add(emitter);
-            }
+        if(emitter!=null){
+            sendEvent(socialEventDTO, emitter);
         }
-        emitters.removeAll(closedEmitters);
     }
+
+    public void broadcastToFriends(SocialEventDTO<?> socialEventDTO, List<User> friends){
+        for(User friend:friends){
+            SseEmitter emitter = emitters.get(friend.getId());
+
+            if(emitter==null){
+                continue;
+            }
+
+            sendEvent(socialEventDTO, emitter);
+        }
+    }
+
+    private void sendEvent(SocialEventDTO<?> socialEventDTO, SseEmitter emitter){
+        try {
+            emitter.send(SseEmitter.event().name(socialEventDTO.type().name()).data(socialEventDTO.dataSocialEvent()));
+        } catch (IOException e) {
+            emitter.complete();
+        }
+    }
+
 }

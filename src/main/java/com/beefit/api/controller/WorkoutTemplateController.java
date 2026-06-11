@@ -34,8 +34,6 @@ public class WorkoutTemplateController {
     public ResponseEntity<List<WorkoutTemplateResponseDTO>> getUserTemplates(@AuthenticationPrincipal User user) {
         List<WorkoutTemplateResponseDTO> workoutTemplates = WTService.getUserTemplates(user.getId());
 
-        if(workoutTemplates.isEmpty()) return ResponseEntity.noContent().build();
-
         return ResponseEntity.ok(workoutTemplates);
     }
 }
