@@ -13,6 +13,7 @@ import org.hibernate.type.SqlTypes;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Entity
@@ -47,4 +48,8 @@ public class WorkoutTemplate {
     @OneToOne
     @JoinColumn(name = "friend_source_id")
     private User friendSource;
+
+    public void setUser(User byId) {
+        this.user = user;
+    }
 }
