@@ -6,6 +6,7 @@ import java.util.stream.Collectors;
 
 import com.beefit.api.domain.*;
 import com.beefit.api.domain.enums.MuscleGroups;
+import com.beefit.api.exception.PostNotFoundException;
 import com.beefit.api.repository.PostRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
@@ -102,7 +103,7 @@ public class WorkoutTemplateService {
     public WorkoutTemplateResponseDTO importTemplateFromPost(UUID postId, UUID currentUserId) {
 
         Post post = postRepository.findById(postId)
-                .orElseThrow(() -> new EntityNotFoundException("Post not found."));
+                .orElseThrow(PostNotFoundException::new);
 
         WorkoutSession session = post.getWorkoutSession();
 
@@ -111,7 +112,7 @@ public class WorkoutTemplateService {
         WorkoutTemplate newTemplate = new WorkoutTemplate();
         newTemplate.setName("Imported from " + post.getUser().getFullName());
 
-        User user = userRepository.findById(currentUserId).orElseThrow(()-> new EntityNotFoundException("User not found"));
+        User user = userRepository.findById(currentUserId).orElseThrow(UserNotFoundException::new);
         newTemplate.setUser(user);
         newTemplate.setMuscleGroupsList(importedMuscleGroups);
 
