@@ -7,6 +7,7 @@ import com.beefit.api.dto.hive.HiveRankingDTO;
 import com.beefit.api.dto.hive.HiveResponseDTO;
 import com.beefit.api.mapper.HiveMapper;
 import com.beefit.api.service.HiveService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -18,14 +19,14 @@ import java.util.UUID;
 
 @RequiredArgsConstructor
 @RestController
-@RequestMapping("api/hives/")
+@RequestMapping("/api/hives/")
 public class HiveController {
 
     private final HiveService hiveService;
     private final HiveMapper hiveMapper;
 
     @PostMapping("")
-    public ResponseEntity<HiveResponseDTO> createNewHive(@AuthenticationPrincipal User user, @RequestBody HiveCreationDTO hiveCreationDTO){
+    public ResponseEntity<HiveResponseDTO> createNewHive(@AuthenticationPrincipal User user, @RequestBody @Valid HiveCreationDTO hiveCreationDTO){
 
         Hive hive = hiveService.createNewHive(user, hiveCreationDTO);
 

@@ -22,7 +22,7 @@ import com.beefit.api.dto.feed.PostLikeDTO;
 import com.beefit.api.service.PostService;
 
 @RestController
-@RequestMapping("api/posts/")
+@RequestMapping("/api/posts/")
 public class PostController {
     private final PostService postService;
 
