@@ -2,7 +2,7 @@ package com.beefit.api.infra.database;
 
 import com.beefit.api.domain.CatalogExercise;
 import com.beefit.api.domain.enums.MuscleGroups;
-import com.beefit.api.dto.ExerciseSeedDTO;
+import com.beefit.api.dto.seed.ExerciseSeedDTO;
 import com.beefit.api.exception.DatabaseSeederFailException;
 import com.beefit.api.repository.CatalogExerciseRepository;
 import com.fasterxml.jackson.core.type.TypeReference;

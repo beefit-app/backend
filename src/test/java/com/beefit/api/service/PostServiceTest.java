@@ -2,7 +2,7 @@ package com.beefit.api.service;
 
 import com.beefit.api.domain.Post;
 import com.beefit.api.domain.User;
-import com.beefit.api.dto.PostLikeDTO;
+import com.beefit.api.dto.feed.PostLikeDTO;
 import com.beefit.api.exception.PostNotFoundException;
 import com.beefit.api.exception.UserNotFoundException;
 import com.beefit.api.repository.LikeRepository;

@@ -2,8 +2,8 @@ package com.beefit.api.service;
 
 import com.beefit.api.domain.Hive;
 import com.beefit.api.domain.User;
-import com.beefit.api.dto.HiveCreationDTO;
-import com.beefit.api.dto.HiveRankingDTO;
+import com.beefit.api.dto.hive.HiveCreationDTO;
+import com.beefit.api.dto.hive.HiveRankingDTO;
 import com.beefit.api.exception.*;
 import com.beefit.api.mapper.HiveMapper;
 import com.beefit.api.repository.HiveRepository;
@@ -12,9 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.time.chrono.ChronoLocalDate;
 import java.util.List;
 import java.util.UUID;
 

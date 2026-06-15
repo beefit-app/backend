@@ -2,8 +2,8 @@ package com.beefit.api.service;
 
 import com.beefit.api.domain.User;
 import com.beefit.api.domain.enums.UserRole;
-import com.beefit.api.dto.LoginResponseDTO;
-import com.beefit.api.dto.UserResponseDTO;
+import com.beefit.api.dto.auth.LoginResponseDTO;
+import com.beefit.api.dto.auth.UserResponseDTO;
 import com.beefit.api.exception.EmailAlreadyInUse;
 import com.beefit.api.exception.UsernameAlreadyInUse;
 import com.beefit.api.mapper.UserResponseMapper;

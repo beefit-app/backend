@@ -18,11 +18,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import com.beefit.api.domain.User;
-import com.beefit.api.dto.ChangePasswordDTO;
-import com.beefit.api.dto.DeleteUserRequestDTO;
-import com.beefit.api.dto.UpdateAccountSettingsRequestDTO;
-import com.beefit.api.dto.UpdateProfileRequestDTO;
-import com.beefit.api.dto.UserProfileResponseDTO;
+import com.beefit.api.dto.user.ChangePasswordDTO;
+import com.beefit.api.dto.user.DeleteUserRequestDTO;
+import com.beefit.api.dto.user.UpdateAccountSettingsRequestDTO;
+import com.beefit.api.dto.user.UpdateProfileRequestDTO;
+import com.beefit.api.dto.user.UserProfileResponseDTO;
 import com.beefit.api.exception.InvalidPasswordException;
 import com.beefit.api.exception.UserNotFoundException;
 import com.beefit.api.repository.UserRepository;

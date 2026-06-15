@@ -3,7 +3,7 @@ package com.beefit.api.mapper;
 import org.mapstruct.Mapper;
 
 import com.beefit.api.domain.Set;
-import com.beefit.api.dto.SetResponseDTO;
+import com.beefit.api.dto.workout.SetResponseDTO;
 
 @Mapper(componentModel = "spring")
 public interface SetMapper {
