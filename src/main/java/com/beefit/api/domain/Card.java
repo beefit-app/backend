@@ -28,6 +28,11 @@ public class Card {
     @JoinColumn(name = "inventory_id", nullable = false)
     private Inventory inventory;
 
+    // Treino no qual a carta foi gerada
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "workoutSession_id", nullable = false)
+    private WorkoutSession workoutSession;
+
     // Não aparece para o usuário, mas existe pra posterioridades e para calculo da raridade
     @NotNull
     private Double attackPower;
