@@ -1,6 +1,8 @@
 package com.beefit.api.repository;
 
 import com.beefit.api.domain.User;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -22,4 +24,9 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     @Modifying
     @Query("UPDATE User u SET u.weeklyWorkoutsCount = 0")
     void resetAllWeeklyWorkoutsCount();
+
+    @Query("SELECT u FROM User u WHERE " +
+            "LOWER(u.nome) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+            "LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%'))")
+    Page<User> getAllBySearchAndPagination(@Param("search") String search, Pageable pageable);
 }
