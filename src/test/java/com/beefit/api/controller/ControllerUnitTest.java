@@ -27,6 +27,7 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 import com.beefit.api.domain.CatalogExercise;
+import com.beefit.api.domain.TemplateExercise;
 import com.beefit.api.domain.User;
 import com.beefit.api.domain.enums.MuscleGroups;
 import com.beefit.api.dto.AuthenticationDTO;
@@ -40,7 +41,6 @@ import com.beefit.api.dto.UserProfileResponseDTO;
 import com.beefit.api.dto.UserResponseDTO;
 import com.beefit.api.dto.WorkoutSessionResponseDTO;
 import com.beefit.api.dto.WorkoutTemplateExerciseRequestDTO;
-import com.beefit.api.dto.WorkoutTemplateExerciseResponseDTO;
 import com.beefit.api.dto.WorkoutTemplateRequestDTO;
 import com.beefit.api.dto.WorkoutTemplateResponseDTO;
 import com.beefit.api.mapper.RegisterMapper;
@@ -203,11 +203,17 @@ class ControllerUnitTest {
                 "Treino A",
                 List.of(MuscleGroups.CHEST),
                 List.of(new WorkoutTemplateExerciseRequestDTO(catalogExerciseId, 1)));
+        CatalogExercise catalogExercise = new CatalogExercise();
+        catalogExercise.setId(catalogExerciseId);
+        catalogExercise.setName("Supino");
+        TemplateExercise templateExercise = new TemplateExercise();
+        templateExercise.setCatalogExercise(catalogExercise);
+        templateExercise.setOrder(1);
         WorkoutTemplateResponseDTO dto = new WorkoutTemplateResponseDTO(
                 user.getId(),
                 "Treino A",
                 List.of(MuscleGroups.CHEST),
-                List.of(new WorkoutTemplateExerciseResponseDTO(catalogExerciseId, "Supino", 1)));
+                List.of(templateExercise));
 
         when(workoutTemplateService.createTemplate(request, user.getId())).thenReturn(dto);
 

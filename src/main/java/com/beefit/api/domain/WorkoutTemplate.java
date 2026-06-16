@@ -37,7 +37,7 @@ public class WorkoutTemplate {
 
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.ARRAY)
-    @Column(name = "muscle_groups", columnDefinition = "varchar[]")
+    @Column(name = "muscle_groups", columnDefinition = "varchar array")
     private List<MuscleGroups> muscleGroupsList;
 
     // Mudei de ManyToMany para OneToMany para montar na mão a tabela intermediária
@@ -49,7 +49,7 @@ public class WorkoutTemplate {
     @JoinColumn(name = "friend_source_id")
     private User friendSource;
 
-    public void setUser(User byId) {
+    public void setUser(User user) {
         this.user = user;
     }
 }

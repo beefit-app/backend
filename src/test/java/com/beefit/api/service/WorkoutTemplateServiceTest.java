@@ -83,9 +83,9 @@ class WorkoutTemplateServiceTest {
         assertEquals("Treino A", response.name());
         assertEquals(List.of(MuscleGroups.CHEST), response.muscleGroups());
         assertEquals(1, response.exercises().size());
-        assertEquals(catalogExerciseId, response.exercises().getFirst().catalogExerciseId());
-        assertEquals("Supino", response.exercises().getFirst().catalogExerciseName());
-        assertEquals(1, response.exercises().getFirst().order());
+        assertEquals(catalogExerciseId, response.exercises().getFirst().getCatalogExercise().getId());
+        assertEquals("Supino", response.exercises().getFirst().getCatalogExercise().getName());
+        assertEquals(1, response.exercises().getFirst().getOrder());
     }
 
     @Test
@@ -129,8 +129,8 @@ class WorkoutTemplateServiceTest {
         assertEquals("Treino A", dto.name());
         assertEquals(List.of(MuscleGroups.CHEST), dto.muscleGroups());
         assertEquals(1, dto.exercises().size());
-        assertEquals(catalogExerciseId, dto.exercises().getFirst().catalogExerciseId());
-        assertEquals("Supino", dto.exercises().getFirst().catalogExerciseName());
-        assertEquals(1, dto.exercises().getFirst().order());
+        assertEquals(catalogExerciseId, dto.exercises().getFirst().getCatalogExercise().getId());
+        assertEquals("Supino", dto.exercises().getFirst().getCatalogExercise().getName());
+        assertEquals(1, dto.exercises().getFirst().getOrder());
     }
 }

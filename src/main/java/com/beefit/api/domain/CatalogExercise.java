@@ -31,12 +31,12 @@ public class CatalogExercise {
     // Essa anotações fazem com que seja possível salvar uma lista de varchar diretamente no db postgres
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.ARRAY)
-    @Column(name = "primary_muscle_groups", columnDefinition = "varchar[]")
+    @Column(name = "primary_muscle_groups", columnDefinition = "varchar array")
     private List<MuscleGroups> primaryMuscleGroupsList;
 
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.ARRAY)
-    @Column(name = "secondary_muscle_groups", columnDefinition = "varchar[]")
+    @Column(name = "secondary_muscle_groups", columnDefinition = "varchar array")
     private List<MuscleGroups> secondaryMuscleGroupsList;
 
     @Column(length = 1000)
