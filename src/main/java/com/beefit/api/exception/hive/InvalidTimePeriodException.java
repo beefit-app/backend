@@ -1,4 +1,4 @@
-package com.beefit.api.exception;
+package com.beefit.api.exception.hive;
 
 public class InvalidTimePeriodException extends RuntimeException {
     public InvalidTimePeriodException() {

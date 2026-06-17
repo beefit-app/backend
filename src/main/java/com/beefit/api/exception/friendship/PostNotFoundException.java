@@ -1,4 +1,4 @@
-package com.beefit.api.exception;
+package com.beefit.api.exception.friendship;
 
 public class PostNotFoundException extends RuntimeException {
     public PostNotFoundException() {

@@ -1,4 +1,4 @@
-package com.beefit.api.exception;
+package com.beefit.api.exception.user;
 
 public class EmailAlreadyInUse extends RuntimeException {
     public EmailAlreadyInUse(String message) {

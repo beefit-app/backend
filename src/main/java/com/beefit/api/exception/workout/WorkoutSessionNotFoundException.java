@@ -1,4 +1,4 @@
-package com.beefit.api.exception;
+package com.beefit.api.exception.workout;
 
 public class WorkoutSessionNotFoundException extends RuntimeException {
     public WorkoutSessionNotFoundException() {

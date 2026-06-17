@@ -1,4 +1,4 @@
-package com.beefit.api.exception;
+package com.beefit.api.exception.friendship;
 
 public class FriendshipNotAcceptedException extends RuntimeException{
     public FriendshipNotAcceptedException(){
