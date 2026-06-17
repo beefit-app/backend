@@ -4,6 +4,15 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.beefit.api.exception.exercises.CatalogExerciseNotFound;
+import com.beefit.api.exception.exercises.DatabaseSeederFailException;
+import com.beefit.api.exception.friendship.*;
+import com.beefit.api.exception.hive.ExceededHiveLimitException;
+import com.beefit.api.exception.hive.HiveNotFoundException;
+import com.beefit.api.exception.hive.InvalidTimePeriodException;
+import com.beefit.api.exception.hive.UserAlreadyInHiveException;
+import com.beefit.api.exception.user.*;
+import com.beefit.api.exception.workout.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;

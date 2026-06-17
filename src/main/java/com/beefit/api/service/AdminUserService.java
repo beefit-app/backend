@@ -2,7 +2,7 @@ package com.beefit.api.service;
 
 import com.beefit.api.domain.User;
 import com.beefit.api.dto.user.BannedUserResponseDTO;
-import com.beefit.api.exception.UserNotFoundException;
+import com.beefit.api.exception.user.UserNotFoundException;
 import com.beefit.api.mapper.BanMapper;
 import com.beefit.api.repository.UserRepository;
 import jakarta.transaction.Transactional;
@@ -12,7 +12,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.util.Optional;
 import java.util.UUID;
 
 
