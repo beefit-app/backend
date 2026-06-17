@@ -23,8 +23,8 @@ import com.beefit.api.dto.user.DeleteUserRequestDTO;
 import com.beefit.api.dto.user.UpdateAccountSettingsRequestDTO;
 import com.beefit.api.dto.user.UpdateProfileRequestDTO;
 import com.beefit.api.dto.user.UserProfileResponseDTO;
-import com.beefit.api.exception.InvalidPasswordException;
-import com.beefit.api.exception.UserNotFoundException;
+import com.beefit.api.exception.user.InvalidPasswordException;
+import com.beefit.api.exception.user.UserNotFoundException;
 import com.beefit.api.repository.UserRepository;
 
 @ExtendWith(MockitoExtension.class)

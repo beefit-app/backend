@@ -24,7 +24,7 @@ import com.beefit.api.domain.enums.MuscleGroups;
 import com.beefit.api.dto.workout.WorkoutTemplateExerciseRequestDTO;
 import com.beefit.api.dto.workout.WorkoutTemplateRequestDTO;
 import com.beefit.api.dto.workout.WorkoutTemplateResponseDTO;
-import com.beefit.api.exception.UserNotFoundException;
+import com.beefit.api.exception.user.UserNotFoundException;
 import com.beefit.api.repository.CatalogExerciseRepository;
 import com.beefit.api.repository.UserRepository;
 import com.beefit.api.repository.WorkoutTemplateRepository;
