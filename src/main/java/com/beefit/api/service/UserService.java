@@ -24,31 +24,37 @@ public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
-    // Logica para Visualizar o Perfil (RF-003)
+    private UserProfileResponseDTO findUserDetails(User user){
+
+        // Retorna a estrutura com dados do banco e os contadores
+        return new UserProfileResponseDTO(
+                user.getFullName(),
+                user.getUsername(),
+                user.getBiography(),
+                user.getProfilePicture(),
+                user.getBodyWeight(),
+                user.getOffensiveHoneys(),
+                user.getCardsCount(),
+                user.getWorkoutsCount(),
+                user.getGhostMode());
+    }
+
+    // Logica para Visualizar o próprio Perfil (RF-003)
     public UserProfileResponseDTO getUserProfile(UUID userId) {
-        Optional<User> userOptional = userRepository.findById(userId);
+        User user = userRepository.findById(userId).orElseThrow(UserNotFoundException::new);
 
-        if (userOptional.isPresent()) {
-            User user = userOptional.get();
+        return findUserDetails(user);
+    }
 
-            // Atributos simulados enquanto os outros módulos da equipe não estão prontos
-            Integer mockCardsCount = 0;
-            Integer mockTotalWorkouts = 0;
+    // Visualizar perfil de outros
+    public UserProfileResponseDTO getUserProfileByUsername(String username){
+        User user = userRepository.findByUsername(username).orElseThrow(UserNotFoundException::new);
 
-            // Retorna a estrutura com dados do banco e os contadores
-            return new UserProfileResponseDTO(
-                    user.getFullName(),
-                    user.getUsername(),
-                    user.getBiography(),
-                    user.getProfilePicture(),
-                    user.getBodyWeight(),
-                    user.getOffensiveHoneys(),
-                    mockCardsCount,
-                    mockTotalWorkouts,
-                    user.getGhostMode());
-        } else {
+        if(user.getGhostMode()){
             throw new UserNotFoundException();
         }
+
+        return findUserDetails(user);
     }
 
     // Lógica para Editar o Perfil (RF-003)
