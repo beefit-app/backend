@@ -196,11 +196,13 @@ public class GlobalExceptionHandler {
     // Trata erros de regras de negocio violadas (Status 400)
     @ExceptionHandler({
             InvalidPasswordException.class,
+            InvalidCardRarityException.class,
             InvalidMuscleGroupException.class,
             InvalidTimePeriodException.class,
             ExceededHiveLimitException.class,
             PermissionException.class
     })
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ErrorResponse handleBadRequestRules(RuntimeException e, HttpServletRequest request) {
         return new ErrorResponse(
                 LocalDateTime.now(),
