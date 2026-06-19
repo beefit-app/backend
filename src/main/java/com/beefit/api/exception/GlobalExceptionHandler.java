@@ -220,4 +220,16 @@ public class GlobalExceptionHandler {
                 request.getRequestURI()
         );
     }
+
+    @ExceptionHandler(InventoryNotFoundException.class)
+    public ErrorResponse handleNotFoundInventory(RuntimeException e, HttpServletRequest request) {
+        return new ErrorResponse(
+                LocalDateTime.now(),
+                HttpStatus.NOT_FOUND.value(),
+                "Erro ao buscar inventário",
+                e.getMessage(),
+                List.of(),
+                request.getRequestURI()
+        );
+    }
 }

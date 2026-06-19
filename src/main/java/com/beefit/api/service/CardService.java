@@ -5,6 +5,7 @@ import com.beefit.api.domain.User;
 import com.beefit.api.domain.WorkoutSession;
 import com.beefit.api.domain.enums.CardRarity;
 import com.beefit.api.domain.enums.WorkoutStatus;
+import com.beefit.api.exception.workout.InventoryNotFoundException;
 import com.beefit.api.repository.InventoryRepository;
 import com.beefit.api.repository.WorkoutSessionRepository;
 import lombok.RequiredArgsConstructor;
@@ -26,7 +27,7 @@ public class CardService {
 
         boolean personalRecord = workout.getTotalVolume() > bestVolume;
 
-        Inventory inventory = inventoryRepository.findByUserIdWithCards(user.getId()).orElseThrow();
+        Inventory inventory = inventoryRepository.findByUserIdWithCards(user.getId()).orElseThrow(InventoryNotFoundException::new);
 
         double percentualPerformance = calculatePercentualPerformance(user, workout);
 
