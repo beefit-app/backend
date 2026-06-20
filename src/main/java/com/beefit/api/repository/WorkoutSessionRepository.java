@@ -35,4 +35,8 @@ public interface WorkoutSessionRepository extends JpaRepository<WorkoutSession, 
             @Param("startOfDay") LocalDateTime startOfDay,
             @Param("endOfDay") LocalDateTime endOfDay
     );
+
+    @Query("SELECT COUNT(w) FROM WorkoutSession w WHERE w.endTime >= :twentyFourHoursAgo AND w.status = 'FINISHED'")
+    Long countWorkoutsLast24Hours(@Param("twentyFourHoursAgo") LocalDateTime twentyFourHoursAgo);
+
 }
