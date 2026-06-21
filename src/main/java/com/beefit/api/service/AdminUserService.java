@@ -5,6 +5,7 @@ import com.beefit.api.dto.user.BannedUserResponseDTO;
 import com.beefit.api.exception.UserNotFoundException;
 import com.beefit.api.mapper.BanMapper;
 import com.beefit.api.repository.UserRepository;
+import com.beefit.api.utils.log.LogAudit;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -34,6 +35,7 @@ public class AdminUserService {
     }
 
     @Transactional
+    @LogAudit(action = "BAN_USER", description = "Banimento de usuário por violação de termos.")
     public BannedUserResponseDTO banUserForDays(UUID id, Integer banDays){
 
         User user = userRepository.findById(id).orElseThrow(UserNotFoundException::new);
@@ -49,6 +51,7 @@ public class AdminUserService {
     }
 
     @Transactional
+    @LogAudit(action = "UNBAN_USER", description = "Finaliza período de banimento do usuário.")
     public BannedUserResponseDTO unbanUser(UUID id){
 
         User user = userRepository.findById(id).orElseThrow(UserNotFoundException::new);
