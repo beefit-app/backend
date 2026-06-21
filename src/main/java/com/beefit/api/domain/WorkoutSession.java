@@ -48,7 +48,7 @@ public class WorkoutSession {
 
     @Enumerated(EnumType.STRING)
     @JdbcTypeCode(SqlTypes.ARRAY)
-    @Column(name = "muscle_groups", columnDefinition = "varchar[]")
+    @Column(name = "muscle_groups", columnDefinition = "varchar array")
     private List<MuscleGroups> muscleGroupsList;
 
     @Column(name = "title")

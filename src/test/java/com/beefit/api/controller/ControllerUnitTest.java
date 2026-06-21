@@ -1,6 +1,8 @@
 package com.beefit.api.controller;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
@@ -27,26 +29,31 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 import com.beefit.api.domain.CatalogExercise;
+import com.beefit.api.domain.TemplateExercise;
 import com.beefit.api.domain.User;
+import com.beefit.api.domain.enums.CardRarity;
 import com.beefit.api.domain.enums.MuscleGroups;
-import com.beefit.api.dto.auth.AuthenticationDTO;
-import com.beefit.api.dto.user.ChangePasswordDTO;
-import com.beefit.api.dto.user.DeleteUserRequestDTO;
-import com.beefit.api.dto.auth.LoginResponseDTO;
-import com.beefit.api.dto.workout.StartWorkoutRequestDTO;
-import com.beefit.api.dto.user.UpdateAccountSettingsRequestDTO;
-import com.beefit.api.dto.user.UpdateProfileRequestDTO;
-import com.beefit.api.dto.user.UserProfileResponseDTO;
-import com.beefit.api.dto.auth.UserResponseDTO;
-import com.beefit.api.dto.workout.WorkoutSessionResponseDTO;
-import com.beefit.api.dto.workout.WorkoutTemplateExerciseRequestDTO;
-import com.beefit.api.dto.workout.WorkoutTemplateExerciseResponseDTO;
-import com.beefit.api.dto.workout.WorkoutTemplateRequestDTO;
-import com.beefit.api.dto.workout.WorkoutTemplateResponseDTO;
+import com.beefit.api.dto.AuthenticationDTO;
+import com.beefit.api.dto.CardFilterDTO;
+import com.beefit.api.dto.ChangePasswordDTO;
+import com.beefit.api.dto.DeleteUserRequestDTO;
+import com.beefit.api.dto.InventoryCardResponseDTO;
+import com.beefit.api.dto.LoginResponseDTO;
+import com.beefit.api.dto.StartWorkoutRequestDTO;
+import com.beefit.api.dto.UpdateAccountSettingsRequestDTO;
+import com.beefit.api.dto.UpdateProfileRequestDTO;
+import com.beefit.api.dto.UserProfileResponseDTO;
+import com.beefit.api.dto.UserResponseDTO;
+import com.beefit.api.dto.WorkoutSessionResponseDTO;
+import com.beefit.api.dto.WorkoutTemplateExerciseRequestDTO;
+import com.beefit.api.dto.WorkoutTemplateRequestDTO;
+import com.beefit.api.dto.WorkoutTemplateResponseDTO;
+import com.beefit.api.exception.InvalidMuscleGroupException;
 import com.beefit.api.mapper.RegisterMapper;
 import com.beefit.api.mapper.UserResponseMapper;
 import com.beefit.api.repository.CatalogExerciseRepository;
 import com.beefit.api.service.AuthService;
+import com.beefit.api.service.InventoryService;
 import com.beefit.api.service.UserService;
 import com.beefit.api.service.WorkoutSessionService;
 import com.beefit.api.service.WorkoutTemplateService;
@@ -71,6 +78,9 @@ class ControllerUnitTest {
 
     @Mock
     private WorkoutTemplateService workoutTemplateService;
+
+    @Mock
+    private InventoryService inventoryService;
 
     @Mock
     private CatalogExerciseRepository catalogExerciseRepository;
@@ -203,11 +213,17 @@ class ControllerUnitTest {
                 "Treino A",
                 List.of(MuscleGroups.CHEST),
                 List.of(new WorkoutTemplateExerciseRequestDTO(catalogExerciseId, 1)));
+        CatalogExercise catalogExercise = new CatalogExercise();
+        catalogExercise.setId(catalogExerciseId);
+        catalogExercise.setName("Supino");
+        TemplateExercise templateExercise = new TemplateExercise();
+        templateExercise.setCatalogExercise(catalogExercise);
+        templateExercise.setOrder(1);
         WorkoutTemplateResponseDTO dto = new WorkoutTemplateResponseDTO(
                 user.getId(),
                 "Treino A",
                 List.of(MuscleGroups.CHEST),
-                List.of(new WorkoutTemplateExerciseResponseDTO(catalogExerciseId, "Supino", 1)));
+                List.of(templateExercise));
 
         when(workoutTemplateService.createTemplate(request, user.getId())).thenReturn(dto);
 
@@ -239,6 +255,57 @@ class ControllerUnitTest {
         assertEquals(page, listResponse.getBody());
         assertEquals(HttpStatus.OK, foundResponse.getStatusCode());
         assertEquals(HttpStatus.NOT_FOUND, missingResponse.getStatusCode());
+    }
+
+    @Test
+    void inventoryControllerListsCardsWithPortugueseFilters() {
+        InventoryController controller = new InventoryController(inventoryService);
+        User user = user();
+        PageRequest pageable = PageRequest.of(0, 20);
+        Page<InventoryCardResponseDTO> page = new PageImpl<>(List.of(), pageable, 0);
+
+        when(inventoryService.getUserCards(any(), any(), any())).thenReturn(page);
+
+        ResponseEntity<Page<InventoryCardResponseDTO>> response = controller.getUserCards(
+                user,
+                "LENDARIA",
+                "PEITO",
+                pageable);
+
+        ArgumentCaptor<UUID> userIdCaptor = ArgumentCaptor.forClass(UUID.class);
+        ArgumentCaptor<CardFilterDTO> filtersCaptor = ArgumentCaptor.forClass(CardFilterDTO.class);
+        verify(inventoryService).getUserCards(userIdCaptor.capture(), filtersCaptor.capture(), any());
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(page, response.getBody());
+        assertEquals(user.getId(), userIdCaptor.getValue());
+        assertEquals(CardRarity.LEGENDARY, filtersCaptor.getValue().rarity());
+        assertEquals(MuscleGroups.CHEST, filtersCaptor.getValue().muscleGroup());
+    }
+
+    @Test
+    void inventoryControllerAllowsMissingFilters() {
+        InventoryController controller = new InventoryController(inventoryService);
+        User user = user();
+        PageRequest pageable = PageRequest.of(0, 20);
+        Page<InventoryCardResponseDTO> page = new PageImpl<>(List.of(), pageable, 0);
+
+        when(inventoryService.getUserCards(any(), any(), any())).thenReturn(page);
+
+        controller.getUserCards(user, null, null, pageable);
+
+        ArgumentCaptor<CardFilterDTO> filtersCaptor = ArgumentCaptor.forClass(CardFilterDTO.class);
+        verify(inventoryService).getUserCards(any(), filtersCaptor.capture(), any());
+        assertNull(filtersCaptor.getValue().rarity());
+        assertNull(filtersCaptor.getValue().muscleGroup());
+    }
+
+    @Test
+    void inventoryControllerRejectsInvalidMuscleGroup() {
+        InventoryController controller = new InventoryController(inventoryService);
+
+        assertThrows(InvalidMuscleGroupException.class,
+                () -> controller.getUserCards(user(), "COMMON", "foo", PageRequest.of(0, 20)));
     }
 
     @Test

@@ -2,8 +2,6 @@ package com.beefit.api.domain.enums;
 
 import lombok.Getter;
 
-import javax.smartcardio.Card;
-
 @Getter
 public enum CardRarity {
 
@@ -14,6 +12,8 @@ public enum CardRarity {
 
     final String rarity;
 
-    CardRarity(String rarity) { this.rarity = rarity; }
+    CardRarity(String rarity) {
+        this.rarity = rarity;
+    }
 
 }
