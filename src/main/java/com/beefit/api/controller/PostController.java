@@ -7,6 +7,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 
 import org.springframework.http.ResponseEntity;
@@ -45,6 +46,7 @@ public class PostController {
         return ResponseEntity.ok(feed);
     }
 
+    @PreAuthorize("@securityChecker.isNotBanned()")
     @PostMapping("{postId}/like")
     public ResponseEntity<PostLikeDTO> toggleLike(@AuthenticationPrincipal User user, @PathVariable UUID postId) {
         PostLikeDTO postLikeDTO = postService.toggleLike(user.getId(), postId);

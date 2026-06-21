@@ -11,6 +11,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -25,6 +26,7 @@ public class HiveController {
     private final HiveService hiveService;
     private final HiveMapper hiveMapper;
 
+    @PreAuthorize("@securityChecker.isNotBanned()")
     @PostMapping("")
     public ResponseEntity<HiveResponseDTO> createNewHive(@AuthenticationPrincipal User user, @RequestBody @Valid HiveCreationDTO hiveCreationDTO){
 
@@ -43,6 +45,7 @@ public class HiveController {
         return ResponseEntity.noContent().build();
     }
 
+    @PreAuthorize("@securityChecker.isNotBanned()")
     @PostMapping("{hiveInvite}/join")
     public ResponseEntity<HiveResponseDTO> joinHive(@AuthenticationPrincipal User user, @PathVariable String hiveInvite){
 
