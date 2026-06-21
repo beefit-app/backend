@@ -41,8 +41,8 @@ public class AdminUserController {
         return ResponseEntity.ok(response);
     }
 
-    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<UserResponseDTO> showUser(@PathVariable UUID userId){
 
         User user = adminUserService.getUser(userId);

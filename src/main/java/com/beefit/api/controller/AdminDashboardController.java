@@ -2,6 +2,7 @@ package com.beefit.api.controller;
 
 import com.beefit.api.dto.AdminDashboardMetricsDTO;
 import com.beefit.api.service.AdminDashboardService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -11,10 +12,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/admin")
+@RequiredArgsConstructor
 public class AdminDashboardController {
 
-    @Autowired
-    private AdminDashboardService adminDashboardService;
+    private final AdminDashboardService adminDashboardService;
 
     @GetMapping("/dashboard")
     @PreAuthorize("hasRole('ADMIN')") // Garante que o Token JWT tenha o perfil (Role) de administrador

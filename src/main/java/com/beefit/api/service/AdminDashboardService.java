@@ -4,22 +4,21 @@ import com.beefit.api.dto.AdminDashboardMetricsDTO;
 import com.beefit.api.repository.SetRepository;
 import com.beefit.api.repository.UserRepository;
 import com.beefit.api.repository.WorkoutSessionRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 
 
 @Service
+@RequiredArgsConstructor
 public class AdminDashboardService {
 
-    @Autowired
-    private UserRepository userRepository;
+    private final UserRepository userRepository;
 
-    @Autowired
-    private WorkoutSessionRepository workoutSessionRepository;
+    private final WorkoutSessionRepository workoutSessionRepository;
 
-    @Autowired
-    private SetRepository setRepository;
+    private final SetRepository setRepository;
 
     public AdminDashboardMetricsDTO getConsolidatedMetrics() {
 
