@@ -4,7 +4,7 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
 import com.beefit.api.domain.WorkoutSession;
-import com.beefit.api.dto.WorkoutSessionResponseDTO;
+import com.beefit.api.dto.workout.WorkoutSessionResponseDTO;
 
 @Mapper(componentModel = "spring", uses = { WorkoutMuscleGroupMapper.class, SessionExerciseMapper.class })
 public interface WorkoutSessionMapper {

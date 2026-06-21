@@ -1,7 +1,7 @@
 package com.beefit.api.mapper;
 
 import com.beefit.api.domain.User;
-import com.beefit.api.dto.RegisterDTO;
+import com.beefit.api.dto.auth.RegisterDTO;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 

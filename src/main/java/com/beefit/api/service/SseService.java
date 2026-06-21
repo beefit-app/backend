@@ -1,7 +1,7 @@
 package com.beefit.api.service;
 
 import com.beefit.api.domain.User;
-import com.beefit.api.dto.SocialEventDTO;
+import com.beefit.api.dto.social.SocialEventDTO;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -10,7 +10,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 @Service
 public class SseService {

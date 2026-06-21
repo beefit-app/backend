@@ -1,10 +1,10 @@
 package com.beefit.api.controller;
 
 import com.beefit.api.domain.User;
-import com.beefit.api.dto.AuthenticationDTO;
-import com.beefit.api.dto.LoginResponseDTO;
-import com.beefit.api.dto.RegisterDTO;
-import com.beefit.api.dto.UserResponseDTO;
+import com.beefit.api.dto.auth.AuthenticationDTO;
+import com.beefit.api.dto.auth.LoginResponseDTO;
+import com.beefit.api.dto.auth.RegisterDTO;
+import com.beefit.api.dto.auth.UserResponseDTO;
 import com.beefit.api.mapper.RegisterMapper;
 import com.beefit.api.mapper.UserResponseMapper;
 import com.beefit.api.service.AuthService;

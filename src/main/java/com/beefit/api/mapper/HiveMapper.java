@@ -1,8 +1,8 @@
 package com.beefit.api.mapper;
 
 import com.beefit.api.domain.Hive;
-import com.beefit.api.dto.HiveCreationDTO;
-import com.beefit.api.dto.HiveResponseDTO;
+import com.beefit.api.dto.hive.HiveCreationDTO;
+import com.beefit.api.dto.hive.HiveResponseDTO;
 import org.mapstruct.Mapper;
 
 @Mapper(componentModel = "spring")

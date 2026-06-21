@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("api/social/friends")
+@RequestMapping("/api/social/friends")
 @RequiredArgsConstructor
 public class FriendshipController implements GenericController {
 

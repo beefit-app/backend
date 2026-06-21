@@ -1,12 +1,11 @@
 package com.beefit.api.controller;
 
 import com.beefit.api.domain.User;
-import com.beefit.api.dto.WorkoutTemplateRequestDTO;
-import com.beefit.api.dto.WorkoutTemplateResponseDTO;
+import com.beefit.api.dto.workout.WorkoutTemplateRequestDTO;
+import com.beefit.api.dto.workout.WorkoutTemplateResponseDTO;
 import com.beefit.api.service.WorkoutTemplateService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;

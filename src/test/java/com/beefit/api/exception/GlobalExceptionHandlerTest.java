@@ -4,6 +4,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.util.List;
 
+import com.beefit.api.exception.user.EmailAlreadyInUse;
+import com.beefit.api.exception.user.InvalidPasswordException;
+import com.beefit.api.exception.workout.InvalidMuscleGroupException;
+import com.beefit.api.exception.workout.WorkoutSessionNotFoundException;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 

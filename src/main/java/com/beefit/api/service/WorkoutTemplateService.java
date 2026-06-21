@@ -6,18 +6,17 @@ import java.util.stream.Collectors;
 
 import com.beefit.api.domain.*;
 import com.beefit.api.domain.enums.MuscleGroups;
-import com.beefit.api.exception.PostNotFoundException;
+import com.beefit.api.exception.friendship.PostNotFoundException;
 import com.beefit.api.repository.PostRepository;
-import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.beefit.api.dto.WorkoutTemplateRequestDTO;
-import com.beefit.api.dto.WorkoutTemplateExerciseRequestDTO;
-import com.beefit.api.dto.WorkoutTemplateExerciseResponseDTO;
-import com.beefit.api.dto.WorkoutTemplateResponseDTO;
-import com.beefit.api.exception.CatalogExerciseNotFound;
-import com.beefit.api.exception.UserNotFoundException;
+import com.beefit.api.dto.workout.WorkoutTemplateRequestDTO;
+import com.beefit.api.dto.workout.WorkoutTemplateExerciseRequestDTO;
+import com.beefit.api.dto.workout.WorkoutTemplateExerciseResponseDTO;
+import com.beefit.api.dto.workout.WorkoutTemplateResponseDTO;
+import com.beefit.api.exception.exercises.CatalogExerciseNotFound;
+import com.beefit.api.exception.user.UserNotFoundException;
 import com.beefit.api.repository.CatalogExerciseRepository;
 import com.beefit.api.repository.UserRepository;
 import com.beefit.api.repository.WorkoutTemplateRepository;

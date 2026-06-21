@@ -2,7 +2,7 @@ package com.beefit.api.repository;
 
 import com.beefit.api.domain.Hive;
 import com.beefit.api.domain.User;
-import com.beefit.api.dto.HiveRankingDTO;
+import com.beefit.api.dto.hive.HiveRankingDTO;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;

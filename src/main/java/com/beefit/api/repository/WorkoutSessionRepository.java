@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface WorkoutSessionRepository extends JpaRepository<WorkoutSession, UUID> {
@@ -22,6 +23,12 @@ public interface WorkoutSessionRepository extends JpaRepository<WorkoutSession, 
     // Esse metodo é capaz de selecionar só os treinos ativos ou finalizados de um certo usuário
     List<WorkoutSession> findByStatusAndUserId(WorkoutStatus status, UUID id);
 
+    @Query("""
+    SELECT MAX(w.totalVolume) FROM WorkoutSession w WHERE w.user.id = :userId AND w.status = :status
+    """)
+    Optional<Double> findMaxTotalVolumeByUserId(@Param("userId") UUID userId, @Param("status") WorkoutStatus status);
+
+    List<WorkoutSession> findTop10ByUserIdAndStatusOrderByFinishedAtDesc(UUID userId, WorkoutStatus status);
 
      // [RF-011] Validação de Dia Civil para a Ofensiva (Honey)
      // Esta query conta se o usuário já possui algum treino finalizado no intervalo de tempo fornecido.
