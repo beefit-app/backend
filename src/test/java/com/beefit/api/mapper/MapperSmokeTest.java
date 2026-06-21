@@ -16,10 +16,10 @@ import com.beefit.api.domain.User;
 import com.beefit.api.domain.WorkoutSession;
 import com.beefit.api.domain.enums.MuscleGroups;
 import com.beefit.api.domain.enums.WorkoutStatus;
-import com.beefit.api.dto.SessionExerciseResponseDTO;
-import com.beefit.api.dto.SetResponseDTO;
-import com.beefit.api.dto.UserResponseDTO;
-import com.beefit.api.dto.WorkoutSessionResponseDTO;
+import com.beefit.api.dto.workout.SessionExerciseResponseDTO;
+import com.beefit.api.dto.workout.SetResponseDTO;
+import com.beefit.api.dto.auth.UserResponseDTO;
+import com.beefit.api.dto.workout.WorkoutSessionResponseDTO;
 
 class MapperSmokeTest {
 

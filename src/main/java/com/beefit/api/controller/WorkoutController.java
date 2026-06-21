@@ -15,9 +15,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.beefit.api.domain.User;
-import com.beefit.api.dto.FinishWorkoutSnapshotRequestDTO;
-import com.beefit.api.dto.StartWorkoutRequestDTO;
-import com.beefit.api.dto.WorkoutSessionResponseDTO;
+import com.beefit.api.dto.workout.FinishWorkoutSnapshotRequestDTO;
+import com.beefit.api.dto.workout.StartWorkoutRequestDTO;
+import com.beefit.api.dto.workout.WorkoutSessionResponseDTO;
 import com.beefit.api.service.WorkoutSessionService;
 
 import jakarta.validation.Valid;

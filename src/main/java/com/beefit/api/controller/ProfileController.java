@@ -11,11 +11,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.beefit.api.domain.User;
-import com.beefit.api.dto.ChangePasswordDTO;
-import com.beefit.api.dto.DeleteUserRequestDTO;
-import com.beefit.api.dto.UpdateAccountSettingsRequestDTO;
-import com.beefit.api.dto.UpdateProfileRequestDTO;
-import com.beefit.api.dto.UserProfileResponseDTO;
+import com.beefit.api.dto.user.ChangePasswordDTO;
+import com.beefit.api.dto.user.DeleteUserRequestDTO;
+import com.beefit.api.dto.user.UpdateAccountSettingsRequestDTO;
+import com.beefit.api.dto.user.UpdateProfileRequestDTO;
+import com.beefit.api.dto.user.UserProfileResponseDTO;
 import com.beefit.api.service.UserService;
 
 import jakarta.validation.Valid;

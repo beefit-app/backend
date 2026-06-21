@@ -12,6 +12,7 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
@@ -88,6 +89,13 @@ public class User implements UserDetails {
     @Column(nullable = false)
     @Enumerated(EnumType.STRING)
     private UserRole role; // USER ou ADMIN
+
+    @Column(name = "banned_until")
+    private LocalDateTime bannedUntil;
+
+    public boolean isBanned() {
+        return this.bannedUntil != null && this.bannedUntil.isAfter(LocalDateTime.now());
+    }
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {

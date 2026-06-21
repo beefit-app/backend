@@ -5,6 +5,7 @@ import com.beefit.api.domain.enums.WorkoutStatus;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
+import org.hibernate.annotations.Fetch;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
@@ -60,6 +61,10 @@ public class WorkoutSession {
     @NotNull
     @Column(name = "is_private", nullable = false)
     private Boolean isPrivate = false;
+
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "card_id")
+    private Card card;
 
     @NotNull
     @Enumerated(EnumType.STRING)

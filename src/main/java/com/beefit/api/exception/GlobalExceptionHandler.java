@@ -4,6 +4,15 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.beefit.api.exception.exercises.CatalogExerciseNotFound;
+import com.beefit.api.exception.exercises.DatabaseSeederFailException;
+import com.beefit.api.exception.friendship.*;
+import com.beefit.api.exception.hive.ExceededHiveLimitException;
+import com.beefit.api.exception.hive.HiveNotFoundException;
+import com.beefit.api.exception.hive.InvalidTimePeriodException;
+import com.beefit.api.exception.hive.UserAlreadyInHiveException;
+import com.beefit.api.exception.user.*;
+import com.beefit.api.exception.workout.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -208,6 +217,18 @@ public class GlobalExceptionHandler {
                 LocalDateTime.now(),
                 HttpStatus.BAD_REQUEST.value(),
                 "Business Rule Violation",
+                e.getMessage(),
+                List.of(),
+                request.getRequestURI()
+        );
+    }
+
+    @ExceptionHandler(InventoryNotFoundException.class)
+    public ErrorResponse handleNotFoundInventory(RuntimeException e, HttpServletRequest request) {
+        return new ErrorResponse(
+                LocalDateTime.now(),
+                HttpStatus.NOT_FOUND.value(),
+                "Erro ao buscar inventário",
                 e.getMessage(),
                 List.of(),
                 request.getRequestURI()

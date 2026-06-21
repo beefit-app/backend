@@ -1,48 +1,28 @@
 package com.beefit.api.service;
 
-import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
-
 import com.beefit.api.domain.*;
-import org.hibernate.Hibernate;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import com.beefit.api.domain.enums.SocialEvent;
 import com.beefit.api.domain.enums.MuscleGroups;
+import com.beefit.api.domain.enums.SocialEvent;
 import com.beefit.api.domain.enums.WorkoutStatus;
-import com.beefit.api.dto.FinishWorkoutExerciseDTO;
-import com.beefit.api.dto.FinishWorkoutSetDTO;
-import com.beefit.api.dto.FinishWorkoutSnapshotRequestDTO;
-import com.beefit.api.dto.SocialEventDTO;
-import com.beefit.api.dto.StartWorkoutRequestDTO;
-import com.beefit.api.dto.WorkoutPresenceEventDTO;
-import com.beefit.api.dto.WorkoutSessionResponseDTO;
-import com.beefit.api.exception.CatalogExerciseNotFound;
-import com.beefit.api.exception.InvalidMuscleGroupException;
-import com.beefit.api.exception.InvalidWorkoutSessionStateException;
-import com.beefit.api.exception.InvalidWorkoutSnapshotException;
-import com.beefit.api.exception.UserNotFoundException;
-import com.beefit.api.exception.WorkoutAlreadyInProgressException;
-import com.beefit.api.exception.WorkoutSessionNotFoundException;
-import com.beefit.api.exception.WorkoutTemplateNotFoundException;
+import com.beefit.api.dto.social.SocialEventDTO;
+import com.beefit.api.dto.workout.*;
+import com.beefit.api.exception.exercises.CatalogExerciseNotFound;
+import com.beefit.api.exception.user.UserNotFoundException;
+import com.beefit.api.exception.workout.*;
 import com.beefit.api.mapper.WorkoutMuscleGroupMapper;
 import com.beefit.api.mapper.WorkoutSessionMapper;
 import com.beefit.api.repository.CatalogExerciseRepository;
 import com.beefit.api.repository.UserRepository;
 import com.beefit.api.repository.WorkoutSessionRepository;
 import com.beefit.api.repository.WorkoutTemplateRepository;
-
 import lombok.RequiredArgsConstructor;
+import org.hibernate.Hibernate;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.util.*;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -55,6 +35,7 @@ public class WorkoutSessionService {
     private final UserRepository userRepository;
     private final WorkoutSessionMapper workoutSessionMapper;
     private final WorkoutMuscleGroupMapper workoutMuscleGroupMapper;
+    private final CardService cardService;
     private final SseService sseService;
     private final com.beefit.api.repository.PostRepository postRepository;
     private final FriendshipService friendshipService;
@@ -129,7 +110,10 @@ public class WorkoutSessionService {
 
         session.setTotalVolume(calculateTotalVolume(session));
 
+        Card card = cardService.generateCard(user, session);
+
         session.setStatus(WorkoutStatus.FINISHED);
+        session.setCard(card);
 
         user.setWorkoutsCount(user.getWorkoutsCount() + 1);
         if (durationSeconds >= MIN_HONEY_WORKOUT_DURATION_SECONDS) {
@@ -437,30 +421,5 @@ public class WorkoutSessionService {
                 throw new InvalidWorkoutSnapshotException("O snapshot contém séries duplicadas.");
             }
         }
-    }
-
-    // [RN-001 / RNF-005] Lógica Isolada para a Fórmula de Epley com Teto de
-    // Repetições
-    // Varre todas as séries realizadas no treino para encontrar a de maior "Poder
-    // de Ataque".
-    // Fórmula: 1RM = Peso * (1 + Reps / 30)
-
-    private double calculatePeakAttackPower(WorkoutSession session) {
-        return session.getExercises().stream()
-                .flatMap(exercise -> exercise.getSets().stream())
-                .mapToDouble(set -> {
-                    if (set.getWeightKg() <= 0 || set.getReps() <= 0) {
-                        return 0.0;
-                    }
-
-                    // [RN-001] Aplica o teto limitador de 10 repetições exigido pela regra de
-                    // negócio
-                    int repsForEpley = Math.min(set.getReps(), 10);
-
-                    // Executa o cálculo da estimativa de uma repetição máxima (Poder de Ataque)
-                    return set.getWeightKg() * (1.0 + (repsForEpley / 30.0));
-                })
-                .max()
-                .orElse(0.0);
     }
 }

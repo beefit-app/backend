@@ -5,6 +5,7 @@ import com.beefit.api.domain.User;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -44,4 +45,12 @@ public interface PostRepository extends JpaRepository<Post, UUID> {
 
     // Lista paginada dos posts do usuário logado
     Page<Post> findAllByUserAndIsRemovedFalseOrderByPublishedAtDesc(User user, Pageable pageable);
+
+    // Busca todos os posts para inspeção do Admin, independente de remoção
+    Page<Post> findAllByOrderByPublishedAtDesc(Pageable pageable);
+
+    // Executa a exclusão lógica (Soft Delete) marcando o post como removido
+    @Modifying
+    @Query("UPDATE Post p SET p.isRemoved = true WHERE p.id = :postId")
+    void softDeletePost(@Param("postId") UUID postId);
 }

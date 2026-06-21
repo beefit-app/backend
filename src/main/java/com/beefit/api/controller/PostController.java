@@ -17,12 +17,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.beefit.api.domain.User;
-import com.beefit.api.dto.FeedPostResponseDTO;
-import com.beefit.api.dto.PostLikeDTO;
+import com.beefit.api.dto.feed.FeedPostResponseDTO;
+import com.beefit.api.dto.feed.PostLikeDTO;
 import com.beefit.api.service.PostService;
 
 @RestController
-@RequestMapping("api/posts/")
+@RequestMapping("/api/posts/")
 public class PostController {
     private final PostService postService;
 

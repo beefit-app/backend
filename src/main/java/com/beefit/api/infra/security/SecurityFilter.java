@@ -18,6 +18,7 @@ import java.io.IOException;
 
 @Component
 @RequiredArgsConstructor
+// A classe serve como a validação da request antes dela chegar no controller destino
 public class SecurityFilter extends OncePerRequestFilter {
 
     private static final String[] PUBLIC_PATHS = {
