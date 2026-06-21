@@ -24,6 +24,7 @@ public class TokenService {
             String token = JWT.create()
                     .withIssuer("auth-beefit")
                     .withSubject(user.getEmail())
+                    .withClaim("active", !user.isBanned())
                     .withExpiresAt(generateExpirationDate())
                     .sign(algorithm);
 

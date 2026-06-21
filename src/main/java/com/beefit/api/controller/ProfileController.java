@@ -3,12 +3,7 @@ package com.beefit.api.controller;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import com.beefit.api.domain.User;
 import com.beefit.api.dto.user.ChangePasswordDTO;
@@ -20,12 +15,20 @@ import com.beefit.api.service.UserService;
 
 import jakarta.validation.Valid;
 
+import java.util.UUID;
+
 @RestController
 @RequestMapping("/api/profile")
 public class ProfileController {
 
     @Autowired
     private UserService userService;
+
+    @GetMapping("/{username}")
+    public ResponseEntity<UserProfileResponseDTO> getOtherProfile(@PathVariable UUID userId) {
+        UserProfileResponseDTO response = userService.getUserProfile(userId);
+        return ResponseEntity.ok(response);
+    }
 
     // Rota para Visualizar o Perfil: GET http://localhost:8080/api/profile/{id}
     @GetMapping("/me")
