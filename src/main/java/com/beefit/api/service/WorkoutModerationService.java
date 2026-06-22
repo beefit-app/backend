@@ -2,7 +2,7 @@ package com.beefit.api.service;
 
 import com.beefit.api.domain.Post;
 import com.beefit.api.dto.UpdatePostMetadataDTO;
-import com.beefit.api.exception.PostNotFoundException;
+import com.beefit.api.exception.friendship.PostNotFoundException;
 import com.beefit.api.repository.PostRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
