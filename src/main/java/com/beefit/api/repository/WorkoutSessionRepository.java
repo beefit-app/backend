@@ -10,6 +10,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.time.LocalDate;
 
 public interface WorkoutSessionRepository extends JpaRepository<WorkoutSession, UUID> {
 
@@ -42,6 +43,11 @@ public interface WorkoutSessionRepository extends JpaRepository<WorkoutSession, 
             @Param("startOfDay") LocalDateTime startOfDay,
             @Param("endOfDay") LocalDateTime endOfDay
     );
+
+    @Query("SELECT DISTINCT FUNCTION('DATE', w.finishedAt) FROM WorkoutSession w WHERE w.user.id = :userId " +
+            "AND w.status = :status AND w.finishedAt >= :start AND w.finishedAt < :end")
+    List<LocalDate> findFinishedDaysByUserAndMonth(@Param("userId") UUID userId, @Param("status") WorkoutStatus status,
+            @Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
     @Query("SELECT COUNT(w) FROM WorkoutSession w WHERE w.endTime >= :twentyFourHoursAgo AND w.status = 'FINISHED'")
     Long countWorkoutsLast24Hours(@Param("twentyFourHoursAgo") LocalDateTime twentyFourHoursAgo);

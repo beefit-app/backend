@@ -49,6 +49,12 @@ public class PostService {
         return postsPage.map(post -> convertToFeedPostResponseDTO(post, currentUser));
     }
 
+    @Transactional
+    public Page<FeedPostResponseDTO> getOwnPosts(User user, Pageable pageable) {
+        return postRepository.findAllByUserAndIsRemovedFalseOrderByPublishedAtDesc(user, pageable)
+                .map(post -> convertToFeedPostResponseDTO(post, user));
+    }
+
 
      // Método auxiliar que converte a entidade Post e suas dependências no DTO do Feed.
 

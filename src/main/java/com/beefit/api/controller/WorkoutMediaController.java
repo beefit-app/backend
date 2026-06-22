@@ -32,6 +32,12 @@ public class WorkoutMediaController {
         return ResponseEntity.ok(workoutMediaService.upload(user, file));
     }
 
+    @PostMapping(value = "/profile-photo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<WorkoutMediaResponseDTO> uploadProfilePhoto(@AuthenticationPrincipal User user,
+            @RequestParam("file") MultipartFile file) throws IOException {
+        return ResponseEntity.ok(workoutMediaService.upload(user, file));
+    }
+
     @GetMapping("/{mediaId}")
     public ResponseEntity<ByteArrayResource> get(@PathVariable UUID mediaId) {
         WorkoutMedia media = workoutMediaService.get(mediaId);

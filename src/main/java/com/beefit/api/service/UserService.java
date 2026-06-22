@@ -16,6 +16,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 import java.util.UUID;
+import java.time.YearMonth;
+import java.time.LocalDate;
+import com.beefit.api.repository.WorkoutSessionRepository;
+import com.beefit.api.domain.enums.WorkoutStatus;
 
 @Service
 @RequiredArgsConstructor
@@ -23,6 +27,7 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final WorkoutSessionRepository workoutSessionRepository;
 
     private UserProfileResponseDTO findUserDetails(User user){
 
@@ -55,6 +60,11 @@ public class UserService {
         }
 
         return findUserDetails(user);
+    }
+
+    public java.util.List<LocalDate> getTrainingDays(UUID userId, YearMonth month) {
+        return workoutSessionRepository.findFinishedDaysByUserAndMonth(userId, WorkoutStatus.FINISHED,
+                month.atDay(1).atStartOfDay(), month.plusMonths(1).atDay(1).atStartOfDay());
     }
 
     // Lógica para Editar o Perfil (RF-003)
