@@ -1,6 +1,5 @@
 package com.beefit.api.dto.workout;
 
-import com.beefit.api.domain.enums.MuscleGroups;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
@@ -11,7 +10,7 @@ public record WorkoutTemplateRequestDTO(
         @NotBlank(message = "O nome do treino não pode estar vazio.")
         String name,
         @NotEmpty(message = "A lista de grupos musculares não pode ser vazia.")
-        List<MuscleGroups> muscleGroups,
+        List<String> muscleGroups,
         @NotEmpty(message = "A lista de exercícios não pode ser vazia.")
         @Valid
         List<WorkoutTemplateExerciseRequestDTO> exercises

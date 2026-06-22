@@ -92,6 +92,8 @@ public class PostService {
                 null, // Caso o time adicione link de foto de perfil no futuro, o gancho está aqui
                 post.getPublishedAt(),
                 post.getTotalLikes(),
+                post.getTitle(),
+                post.getPhotoMediaId() == null ? null : "/api/media/" + post.getPhotoMediaId(),
                 session.getDurationSeconds(),
                 session.getEstimatedCalories(),
                 bodyHeatMap,

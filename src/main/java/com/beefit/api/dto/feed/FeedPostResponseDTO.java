@@ -20,6 +20,8 @@ public record FeedPostResponseDTO(
         // Metadados do Post (Sociais)
         LocalDateTime publishedAt,
         Integer totalLikes,
+        String title,
+        String photoUrl,
 
         // Dados Agregados do Treino (Extraídos da WorkoutSession)
         Integer durationSeconds,       // Tempo total cronometrado do treino

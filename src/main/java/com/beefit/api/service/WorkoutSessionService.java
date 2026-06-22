@@ -39,6 +39,7 @@ public class WorkoutSessionService {
     private final SseService sseService;
     private final com.beefit.api.repository.PostRepository postRepository;
     private final FriendshipService friendshipService;
+    private final WorkoutMediaService workoutMediaService;
 
     @Transactional(readOnly = true)
     public Optional<WorkoutSessionResponseDTO> getActiveWorkout(UUID userId) {
@@ -64,7 +65,7 @@ public class WorkoutSessionService {
         session.setDurationSeconds(null);
         session.setEstimatedCalories(null);
         session.setTotalVolume(null);
-        session.setMuscleGroupsList(request.muscleGroups());
+        session.setMuscleGroupsList(workoutMuscleGroupMapper.toDomain(request.muscleGroups()));
         session.setTitle(null);
         session.setShouldPostWorkout(false);
         session.setIsPrivate(request.isPrivate());
@@ -94,7 +95,9 @@ public class WorkoutSessionService {
         validateWorkoutInProgress(session);
         validateFinishedAt(session, request.finishedAt());
 
-        session.setMuscleGroupsList(request.muscleGroups());
+        session.setMuscleGroupsList(workoutMuscleGroupMapper.toDomain(request.muscleGroups()));
+        session.setTitle(request.title());
+        session.setShouldPostWorkout(Boolean.TRUE.equals(request.shouldPostWorkout()));
         reconcileExercises(session, request.exercises());
 
         session.setFinishedAt(request.finishedAt());
@@ -123,12 +126,17 @@ public class WorkoutSessionService {
         userRepository.save(user);
         // Geracao de posts
         // Só publica se o treino NÃO for privado E se o usuário NÃO estiver em Modo Fantasma
-        if (!session.getIsPrivate() && !user.getGhostMode()) {
+        if (Boolean.TRUE.equals(session.getShouldPostWorkout()) && !session.getIsPrivate() && !user.getGhostMode()) {
             com.beefit.api.domain.Post autoPost = new com.beefit.api.domain.Post();
             autoPost.setUser(user);
             autoPost.setWorkoutSession(session);
             autoPost.setTotalLikes(0);
             autoPost.setIsRemoved(false);
+            autoPost.setTitle(request.title());
+            if (request.photoMediaId() != null) {
+                workoutMediaService.consume(request.photoMediaId(), userId);
+                autoPost.setPhotoMediaId(request.photoMediaId());
+            }
 
             postRepository.save(autoPost);
         }

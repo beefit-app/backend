@@ -20,6 +20,7 @@ import com.beefit.api.exception.user.UserNotFoundException;
 import com.beefit.api.repository.CatalogExerciseRepository;
 import com.beefit.api.repository.UserRepository;
 import com.beefit.api.repository.WorkoutTemplateRepository;
+import com.beefit.api.mapper.WorkoutMuscleGroupMapper;
 
 import lombok.RequiredArgsConstructor;
 
@@ -31,6 +32,7 @@ public class WorkoutTemplateService {
     private final UserRepository userRepository;
     private final CatalogExerciseRepository catalogExerciseRepository;
     private final PostRepository postRepository;
+    private final WorkoutMuscleGroupMapper workoutMuscleGroupMapper;
 
     @Transactional
     // Lembrar de implementar o id do amigo na parte do social
@@ -40,7 +42,7 @@ public class WorkoutTemplateService {
                                                                                                         */) {
         WorkoutTemplate template = new WorkoutTemplate();
         template.setName(requestDTO.name());
-        template.setMuscleGroupsList(requestDTO.muscleGroups());
+        template.setMuscleGroupsList(workoutMuscleGroupMapper.toDomain(requestDTO.muscleGroups()));
 
         User user = userRepository.findById(userID)
                 .orElseThrow(UserNotFoundException::new);
@@ -97,7 +99,7 @@ public class WorkoutTemplateService {
                 template.getId(),
                 template.getName(),
                 template.getMuscleGroupsList(),
-                template.getExerciseList());
+                exercises);
     }
     public WorkoutTemplateResponseDTO importTemplateFromPost(UUID postId, UUID currentUserId) {
 
@@ -135,7 +137,12 @@ public class WorkoutTemplateService {
                 savedTemplate.getId(),
                 savedTemplate.getName(),
                 savedTemplate.getMuscleGroupsList(),
-                savedTemplate.getExerciseList()
+                savedTemplate.getExerciseList().stream()
+                        .map(templateExercise -> new WorkoutTemplateExerciseResponseDTO(
+                                templateExercise.getCatalogExercise().getId(),
+                                templateExercise.getCatalogExercise().getName(),
+                                templateExercise.getOrder()))
+                        .toList()
         );
     }
 }

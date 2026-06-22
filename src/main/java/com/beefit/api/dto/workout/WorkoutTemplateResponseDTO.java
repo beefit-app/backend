@@ -1,6 +1,5 @@
 package com.beefit.api.dto.workout;
 
-import com.beefit.api.domain.TemplateExercise;
 import com.beefit.api.domain.enums.MuscleGroups;
 
 import java.util.List;
@@ -10,5 +9,5 @@ public record WorkoutTemplateResponseDTO(
         UUID id,
         String name,
         List<MuscleGroups> muscleGroups,
-        List<TemplateExercise> exercises
+        List<WorkoutTemplateExerciseResponseDTO> exercises
 ) {}
