@@ -55,7 +55,7 @@ class WorkoutTemplateServiceTest {
         catalogExercise.setName("Supino");
         WorkoutTemplateRequestDTO request = new WorkoutTemplateRequestDTO(
                 "Treino A",
-                List.of(MuscleGroups.CHEST),
+                List.of("peito"),
                 List.of(new WorkoutTemplateExerciseRequestDTO(catalogExerciseId, 1)));
 
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
@@ -83,9 +83,9 @@ class WorkoutTemplateServiceTest {
         assertEquals("Treino A", response.name());
         assertEquals(List.of(MuscleGroups.CHEST), response.muscleGroups());
         assertEquals(1, response.exercises().size());
-        assertEquals(catalogExerciseId, response.exercises().getFirst().getCatalogExercise().getId());
-        assertEquals("Supino", response.exercises().getFirst().getCatalogExercise().getName());
-        assertEquals(1, response.exercises().getFirst().getOrder());
+        assertEquals(catalogExerciseId, response.exercises().getFirst().catalogExerciseId());
+        assertEquals("Supino", response.exercises().getFirst().catalogExerciseName());
+        assertEquals(1, response.exercises().getFirst().order());
     }
 
     @Test
@@ -93,7 +93,7 @@ class WorkoutTemplateServiceTest {
         UUID userId = UUID.randomUUID();
         WorkoutTemplateRequestDTO request = new WorkoutTemplateRequestDTO(
                 "Treino A",
-                List.of(MuscleGroups.CHEST),
+                List.of("peito"),
                 List.of(new WorkoutTemplateExerciseRequestDTO(UUID.randomUUID(), 1)));
 
         when(userRepository.findById(userId)).thenReturn(Optional.empty());
@@ -129,8 +129,8 @@ class WorkoutTemplateServiceTest {
         assertEquals("Treino A", dto.name());
         assertEquals(List.of(MuscleGroups.CHEST), dto.muscleGroups());
         assertEquals(1, dto.exercises().size());
-        assertEquals(catalogExerciseId, dto.exercises().getFirst().getCatalogExercise().getId());
-        assertEquals("Supino", dto.exercises().getFirst().getCatalogExercise().getName());
-        assertEquals(1, dto.exercises().getFirst().getOrder());
+        assertEquals(catalogExerciseId, dto.exercises().getFirst().catalogExerciseId());
+        assertEquals("Supino", dto.exercises().getFirst().catalogExerciseName());
+        assertEquals(1, dto.exercises().getFirst().order());
     }
 }

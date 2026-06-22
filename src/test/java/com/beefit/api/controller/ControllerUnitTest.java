@@ -33,22 +33,22 @@ import com.beefit.api.domain.TemplateExercise;
 import com.beefit.api.domain.User;
 import com.beefit.api.domain.enums.CardRarity;
 import com.beefit.api.domain.enums.MuscleGroups;
-import com.beefit.api.dto.AuthenticationDTO;
 import com.beefit.api.dto.CardFilterDTO;
-import com.beefit.api.dto.ChangePasswordDTO;
-import com.beefit.api.dto.DeleteUserRequestDTO;
 import com.beefit.api.dto.InventoryCardResponseDTO;
-import com.beefit.api.dto.LoginResponseDTO;
-import com.beefit.api.dto.StartWorkoutRequestDTO;
-import com.beefit.api.dto.UpdateAccountSettingsRequestDTO;
-import com.beefit.api.dto.UpdateProfileRequestDTO;
-import com.beefit.api.dto.UserProfileResponseDTO;
-import com.beefit.api.dto.UserResponseDTO;
-import com.beefit.api.dto.WorkoutSessionResponseDTO;
-import com.beefit.api.dto.WorkoutTemplateExerciseRequestDTO;
-import com.beefit.api.dto.WorkoutTemplateRequestDTO;
-import com.beefit.api.dto.WorkoutTemplateResponseDTO;
-import com.beefit.api.exception.InvalidMuscleGroupException;
+import com.beefit.api.dto.auth.AuthenticationDTO;
+import com.beefit.api.dto.auth.LoginResponseDTO;
+import com.beefit.api.dto.auth.UserResponseDTO;
+import com.beefit.api.dto.user.ChangePasswordDTO;
+import com.beefit.api.dto.user.DeleteUserRequestDTO;
+import com.beefit.api.dto.user.UpdateAccountSettingsRequestDTO;
+import com.beefit.api.dto.user.UpdateProfileRequestDTO;
+import com.beefit.api.dto.user.UserProfileResponseDTO;
+import com.beefit.api.exception.workout.InvalidMuscleGroupException;
+import com.beefit.api.dto.workout.StartWorkoutRequestDTO;
+import com.beefit.api.dto.workout.WorkoutSessionResponseDTO;
+import com.beefit.api.dto.workout.WorkoutTemplateExerciseRequestDTO;
+import com.beefit.api.dto.workout.WorkoutTemplateRequestDTO;
+import com.beefit.api.dto.workout.WorkoutTemplateResponseDTO;
 import com.beefit.api.mapper.RegisterMapper;
 import com.beefit.api.mapper.UserResponseMapper;
 import com.beefit.api.repository.CatalogExerciseRepository;
@@ -169,7 +169,7 @@ class ControllerUnitTest {
         WorkoutController controller = new WorkoutController(workoutSessionService);
         User user = user();
         UUID workoutId = UUID.randomUUID();
-        StartWorkoutRequestDTO request = new StartWorkoutRequestDTO(List.of(MuscleGroups.CHEST), Boolean.TRUE, null, List.of());
+        StartWorkoutRequestDTO request = new StartWorkoutRequestDTO(List.of("peito"), Boolean.TRUE, null, List.of());
         WorkoutSessionResponseDTO dto = new WorkoutSessionResponseDTO(
                 workoutId,
                 "in_progress",
@@ -180,7 +180,8 @@ class ControllerUnitTest {
                 null,
                 List.of("peito"),
                 true,
-                List.of());
+                List.of(),
+                null);
 
         when(workoutSessionService.startWorkout(user.getId(), request)).thenReturn(dto);
 
@@ -211,19 +212,16 @@ class ControllerUnitTest {
         UUID catalogExerciseId = UUID.randomUUID();
         WorkoutTemplateRequestDTO request = new WorkoutTemplateRequestDTO(
                 "Treino A",
-                List.of(MuscleGroups.CHEST),
+                List.of("peito"),
                 List.of(new WorkoutTemplateExerciseRequestDTO(catalogExerciseId, 1)));
         CatalogExercise catalogExercise = new CatalogExercise();
         catalogExercise.setId(catalogExerciseId);
         catalogExercise.setName("Supino");
-        TemplateExercise templateExercise = new TemplateExercise();
-        templateExercise.setCatalogExercise(catalogExercise);
-        templateExercise.setOrder(1);
         WorkoutTemplateResponseDTO dto = new WorkoutTemplateResponseDTO(
                 user.getId(),
                 "Treino A",
                 List.of(MuscleGroups.CHEST),
-                List.of(templateExercise));
+                List.of(new com.beefit.api.dto.workout.WorkoutTemplateExerciseResponseDTO(catalogExerciseId, "Supino", 1)));
 
         when(workoutTemplateService.createTemplate(request, user.getId())).thenReturn(dto);
 

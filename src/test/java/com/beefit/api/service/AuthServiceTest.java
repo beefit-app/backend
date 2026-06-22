@@ -7,6 +7,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.UUID;
+import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -100,7 +101,7 @@ class AuthServiceTest {
         User user = user();
         user.setPasswordHash("plain");
 
-        when(userRepository.findByUsername(user.getUsername())).thenReturn(null);
+        when(userRepository.findByUsername(user.getUsername())).thenReturn(Optional.empty());
         when(userRepository.findByEmail(user.getEmail())).thenReturn(null);
         when(passwordEncoder.encode("plain")).thenReturn("hashed");
 
@@ -114,7 +115,7 @@ class AuthServiceTest {
     @Test
     void registerThrowsWhenUsernameAlreadyExists() {
         User user = user();
-        when(userRepository.findByUsername(user.getUsername())).thenReturn(user);
+        when(userRepository.findByUsername(user.getUsername())).thenReturn(Optional.of(user));
 
         assertThrows(UsernameAlreadyInUse.class, () -> authService.register(user));
     }
@@ -122,7 +123,7 @@ class AuthServiceTest {
     @Test
     void registerThrowsWhenEmailAlreadyExists() {
         User user = user();
-        when(userRepository.findByUsername(user.getUsername())).thenReturn(null);
+        when(userRepository.findByUsername(user.getUsername())).thenReturn(Optional.empty());
         when(userRepository.findByEmail(user.getEmail())).thenReturn(user);
 
         assertThrows(EmailAlreadyInUse.class, () -> authService.register(user));

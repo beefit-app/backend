@@ -86,7 +86,7 @@ class WorkoutSessionServiceTest {
     @Test
     void startWorkoutWithoutTemplateCreatesEmptySession() {
         StartWorkoutRequestDTO request = new StartWorkoutRequestDTO(
-                List.of(MuscleGroups.CHEST),
+                List.of("peito"),
                 Boolean.TRUE,
                 null,
                 List.of());
@@ -125,7 +125,7 @@ class WorkoutSessionServiceTest {
                 templateExercise(secondCatalogExercise, 2)));
 
         StartWorkoutRequestDTO request = new StartWorkoutRequestDTO(
-                List.of(MuscleGroups.BACK),
+                List.of("costas"),
                 Boolean.TRUE,
                 templateId,
                 null);
@@ -157,7 +157,7 @@ class WorkoutSessionServiceTest {
         template.setUser(user(UUID.randomUUID()));
 
         StartWorkoutRequestDTO request = new StartWorkoutRequestDTO(
-                List.of(MuscleGroups.LEGS),
+                List.of("pernas"),
                 Boolean.TRUE,
                 templateId,
                 null);
@@ -173,7 +173,7 @@ class WorkoutSessionServiceTest {
     @Test
     void startWorkoutWhenWorkoutAlreadyInProgressThrows() {
         StartWorkoutRequestDTO request = new StartWorkoutRequestDTO(
-                List.of(MuscleGroups.CORE),
+                List.of("core"),
                 Boolean.FALSE,
                 null,
                 null);
@@ -207,7 +207,7 @@ class WorkoutSessionServiceTest {
 
         FinishWorkoutSnapshotRequestDTO request = new FinishWorkoutSnapshotRequestDTO(
                 LocalDateTime.of(2026, 5, 26, 10, 45),
-                List.of(MuscleGroups.CHEST, MuscleGroups.LEGS),
+                List.of("peito", "pernas"),
                 List.of(
                         new FinishWorkoutExerciseDTO(
                                 null,
@@ -220,7 +220,10 @@ class WorkoutSessionServiceTest {
                                 2,
                                 List.of(
                                         new FinishWorkoutSetDTO(existingSetId, 1, 45.0, 8),
-                                        new FinishWorkoutSetDTO(null, 2, 42.5, 10)))));
+                                        new FinishWorkoutSetDTO(null, 2, 42.5, 10)))),
+                null,
+                false,
+                null);
 
         when(workoutSessionRepository.findById(workoutId)).thenReturn(Optional.of(session));
         when(catalogExerciseRepository.findById(newCatalogExercise.getId())).thenReturn(Optional.of(newCatalogExercise));
@@ -258,8 +261,11 @@ class WorkoutSessionServiceTest {
 
         FinishWorkoutSnapshotRequestDTO request = new FinishWorkoutSnapshotRequestDTO(
                 LocalDateTime.now(),
-                List.of(MuscleGroups.CHEST),
-                List.of());
+                List.of("peito"),
+                List.of(),
+                null,
+                false,
+                null);
 
         assertThrows(WorkoutSessionNotFoundException.class,
                 () -> workoutSessionService.finishWorkout(userId, workoutId, request));
@@ -275,8 +281,11 @@ class WorkoutSessionServiceTest {
 
         FinishWorkoutSnapshotRequestDTO request = new FinishWorkoutSnapshotRequestDTO(
                 LocalDateTime.now(),
-                List.of(MuscleGroups.CHEST),
-                List.of());
+                List.of("peito"),
+                List.of(),
+                null,
+                false,
+                null);
 
         assertThrows(InvalidWorkoutSessionStateException.class,
                 () -> workoutSessionService.finishWorkout(userId, workoutId, request));
@@ -378,6 +387,7 @@ class WorkoutSessionServiceTest {
                 null,
                 List.of("peito"),
                 Boolean.TRUE,
-                List.of());
+                List.of(),
+                null);
     }
 }
