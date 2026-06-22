@@ -57,11 +57,27 @@ public class HiveController {
     }
 
     @GetMapping("{hiveId}/getData")
-    public ResponseEntity<List<HiveRankingDTO>> getHiveData(@PathVariable UUID hive){
-
-        List<HiveRankingDTO> response = hiveService.getHiveRanking(hive);
+    public ResponseEntity<List<HiveRankingDTO>> getHiveData(@AuthenticationPrincipal User user, @PathVariable UUID hiveId){
+        hiveService.getHive(user, hiveId);
+        List<HiveRankingDTO> response = hiveService.getHiveRanking(hiveId);
 
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("mine")
+    public ResponseEntity<List<HiveResponseDTO>> getMyHives(@AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(hiveService.getMyHives(user).stream().map(hiveMapper::toDto).toList());
+    }
+
+    @GetMapping("{hiveId}")
+    public ResponseEntity<HiveResponseDTO> getHive(@AuthenticationPrincipal User user, @PathVariable UUID hiveId) {
+        return ResponseEntity.ok(hiveMapper.toDto(hiveService.getHive(user, hiveId)));
+    }
+
+    @DeleteMapping("{hiveId}/membership")
+    public ResponseEntity<Void> leaveHive(@AuthenticationPrincipal User user, @PathVariable UUID hiveId) {
+        hiveService.leaveHive(user, hiveId);
+        return ResponseEntity.noContent().build();
     }
 
 }

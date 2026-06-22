@@ -31,7 +31,7 @@ public interface HiveRepository extends JpaRepository<Hive, UUID> {
 
     // Conferir essa query para posterior otimização
     // Agrupa os membros da colmeia e conta quantos treinos válidos eles têm dentro do período de disputa.
-    @Query("SELECT new com.beefit.api.dto.HiveRankingDTO(m, COUNT(ws)) " +
+    @Query("SELECT new com.beefit.api.dto.hive.HiveRankingDTO(m.id, m.fullName, m.username, m.profilePicture, COUNT(ws)) " +
             "FROM Hive h " +
             "JOIN h.members m " +
             "LEFT JOIN WorkoutSession ws ON ws.user = m " +

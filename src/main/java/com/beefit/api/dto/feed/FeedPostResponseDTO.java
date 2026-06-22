@@ -20,6 +20,7 @@ public record FeedPostResponseDTO(
         // Metadados do Post (Sociais)
         LocalDateTime publishedAt,
         Integer totalLikes,
+        Boolean likedByCurrentUser,
         String title,
         String photoUrl,
 

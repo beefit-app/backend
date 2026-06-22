@@ -73,6 +73,27 @@ public class HiveService {
         return hiveRepository.getRankingForHive(hiveId);
     }
 
+    @Transactional
+    public void leaveHive(User user, UUID hiveId) {
+        Hive hive = hiveRepository.findById(hiveId).orElseThrow(HiveNotFoundException::new);
+        if (hive.getCreator().getId().equals(user.getId())) {
+            throw new PermissionException();
+        }
+        if (!hive.getMembers().remove(user)) {
+            throw new PermissionException();
+        }
+    }
+
+    public List<Hive> getMyHives(User user) {
+        return hiveRepository.findAllByMembersContaining(user);
+    }
+
+    public Hive getHive(User user, UUID hiveId) {
+        Hive hive = hiveRepository.findById(hiveId).orElseThrow(HiveNotFoundException::new);
+        if (!hive.getMembers().contains(user)) throw new PermissionException();
+        return hive;
+    }
+
     // Funções Auxiliares
     private void validateUserNotAlreadyInHive(User user, Hive hive){
 
@@ -83,7 +104,7 @@ public class HiveService {
 
     private void validateHiveOwnership(User user, Hive hive){
 
-        if(hive.getCreator() != user){
+        if(!hive.getCreator().getId().equals(user.getId())){
             throw new PermissionException();
         }
     }

@@ -23,6 +23,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import com.beefit.api.dto.friendship.FriendshipResponseDTO;
+import com.beefit.api.dto.social.SocialUserResponseDTO;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 @Service
 @RequiredArgsConstructor
@@ -33,7 +37,7 @@ public class FriendshipService {
     private final SseService sseService;
 
     @Transactional
-    public void createFriendship(User requester, UUID addresseeId){
+    public FriendshipResponseDTO createFriendship(User requester, UUID addresseeId){
         if(addresseeId.equals(requester.getId())){
             throw new SameUserException();
         }
@@ -52,10 +56,10 @@ public class FriendshipService {
         friendship.setAddressee(addressee);
         friendship.setStatus(FriendshipStatus.PENDING);
 
-        friendshipRepository.save(friendship);
+        Friendship saved = friendshipRepository.save(friendship);
 
         FriendRequestEventDTO friendRequestEventDTO = new FriendRequestEventDTO(
-                friendship.getId(),
+                saved.getId(),
                 requester.getId(),
                 requester.getUsername(),
                 friendship.getSentAt()
@@ -63,10 +67,11 @@ public class FriendshipService {
 
         sseService.broadcastToFriend(new SocialEventDTO<>(SocialEvent.FRIEND_REQUEST_PENDING, friendRequestEventDTO)
                 , friendship.getAddressee().getId());
+        return toResponse(saved, requester);
     }
 
     @Transactional
-    public void acceptRequest(User addressee, UUID friendshipId){
+    public FriendshipResponseDTO acceptRequest(User addressee, UUID friendshipId){
         Friendship friendship = friendshipRepository.findById(friendshipId).orElseThrow(FriendshipNotFound::new);
 
         if(!addressee.getId().equals(friendship.getAddressee().getId())){
@@ -88,6 +93,7 @@ public class FriendshipService {
 
         sseService.broadcastToFriend(new SocialEventDTO<>(SocialEvent.FRIEND_REQUEST_ACCEPTED, friendAcceptedEventDTO)
                                     , friendship.getRequester().getId());
+        return toResponse(friendship, addressee);
     }
 
     @Transactional
@@ -133,6 +139,30 @@ public class FriendshipService {
                 friendship.getRequester()).toList();
 
         return Optional.of(friends);
+    }
+
+    @Transactional(readOnly = true)
+    public List<FriendshipResponseDTO> getFriendships(User user, FriendshipStatus status, String direction) {
+        return friendshipRepository.findAllByUserAndStatus(user, status).stream()
+                .filter(friendship -> direction == null || (direction.equals("incoming") && friendship.getAddressee().equals(user))
+                        || (direction.equals("outgoing") && friendship.getRequester().equals(user)))
+                .map(friendship -> toResponse(friendship, user)).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public Page<SocialUserResponseDTO> searchUsers(User user, String query, Pageable pageable) {
+        return userRepository.searchSocialUsers(user.getId(), query == null ? "" : query.trim(), pageable)
+                .map(this::toSocialUser);
+    }
+
+    private FriendshipResponseDTO toResponse(Friendship friendship, User viewer) {
+        boolean requester = friendship.getRequester().equals(viewer);
+        return new FriendshipResponseDTO(friendship.getId(), toSocialUser(requester ? friendship.getAddressee() : friendship.getRequester()),
+                friendship.getStatus().name(), requester ? "outgoing" : "incoming", friendship.getSentAt());
+    }
+
+    private SocialUserResponseDTO toSocialUser(User user) {
+        return new SocialUserResponseDTO(user.getId(), user.getFullName(), user.getUsername(), user.getProfilePicture());
     }
 
 }
