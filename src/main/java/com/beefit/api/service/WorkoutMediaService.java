@@ -7,6 +7,7 @@ import com.beefit.api.repository.WorkoutMediaRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.scheduling.annotation.Scheduled;
 
 import java.io.IOException;
 import java.util.UUID;
@@ -39,6 +40,22 @@ public class WorkoutMediaService {
         }
         media.setConsumed(true);
         return repository.save(media);
+    }
+
+    public void consumeForProfile(UUID mediaId, UUID userId) {
+        WorkoutMedia media = repository.findByIdAndOwnerId(mediaId, userId)
+                .orElseThrow(() -> new IllegalArgumentException("Foto de perfil não encontrada."));
+        media.setConsumed(true);
+        repository.save(media);
+    }
+
+    public void delete(UUID mediaId) { repository.deleteById(mediaId); }
+
+    public void deleteAllForOwner(UUID userId) { repository.deleteByOwnerId(userId); }
+
+    @Scheduled(fixedDelay = 3_600_000)
+    public void cleanupOrphanedMedia() {
+        repository.deleteAll(repository.findByConsumedFalseAndCreatedAtBefore(java.time.LocalDateTime.now().minusHours(24)));
     }
 
     public WorkoutMedia get(UUID mediaId) {

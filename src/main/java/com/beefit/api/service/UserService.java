@@ -28,6 +28,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final WorkoutSessionRepository workoutSessionRepository;
+    private final WorkoutMediaService workoutMediaService;
 
     private UserProfileResponseDTO findUserDetails(User user){
 
@@ -79,12 +80,19 @@ public class UserService {
             user.setFullName(request.fullName());
             user.setBiography(request.biography());
             user.setProfilePicture(request.profilePicture());
+            consumeProfileMedia(request.profilePicture(), user.getId());
             user.setBodyWeight(request.bodyWeight());
             // O Spring Data JPA salva automaticamente no final do metodo devido ao
             // @Transactional
         } else {
             throw new UserNotFoundException();
         }
+    }
+
+    private void consumeProfileMedia(String value, UUID userId) {
+        if (value == null || !value.startsWith("/api/media/")) return;
+        try { workoutMediaService.consumeForProfile(UUID.fromString(value.substring(value.lastIndexOf('/') + 1)), userId); }
+        catch (IllegalArgumentException ignored) { /* URLs externas permanecem compatíveis */ }
     }
 
     @Transactional
@@ -118,6 +126,7 @@ public class UserService {
             throw new InvalidPasswordException("Senha incorreta.");
         }
 
+        workoutMediaService.deleteAllForOwner(userId);
         userRepository.delete(user);
     }
 }

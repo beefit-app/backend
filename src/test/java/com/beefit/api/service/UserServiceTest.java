@@ -36,6 +36,9 @@ class UserServiceTest {
     @Mock
     private PasswordEncoder passwordEncoder;
 
+    @Mock
+    private WorkoutMediaService workoutMediaService;
+
     @InjectMocks
     private UserService userService;
 
@@ -121,6 +124,7 @@ class UserServiceTest {
 
         userService.deleteAccount(userId, new DeleteUserRequestDTO("current"));
 
+        verify(workoutMediaService).deleteAllForOwner(userId);
         verify(userRepository).delete(user);
     }
 
