@@ -54,7 +54,7 @@ public class AuthService implements UserDetailsService {
 
     public void register(User registered) throws UsernameAlreadyInUse, EmailAlreadyInUse {
 
-        if(userRepository.findByUsername(registered.getUsername()) != null){
+        if(userRepository.findByUsername(registered.getUsername()).isPresent()){
             throw new UsernameAlreadyInUse("Esse nome de usuário já está em uso.");
         };
 

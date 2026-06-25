@@ -23,20 +23,24 @@ public interface PostRepository extends JpaRepository<Post, UUID> {
             "JOIN FETCH p.user " +
             "JOIN FETCH p.workoutSession " +
             "WHERE p.isRemoved = false " +
-            "  AND (p.user = :currentUser OR p.user IN (" +
-            "      SELECT CASE WHEN f.requester = :currentUser THEN f.addressee ELSE f.requester END " +
+            "  AND (p.user = :currentUser OR EXISTS (" +
+            "      SELECT f.id " +
             "      FROM Friendship f " +
             "      WHERE (f.requester = :currentUser OR f.addressee = :currentUser) " +
-            "        AND f.status = 'ACCEPTED'" +
+            "        AND f.status = 'ACCEPTED' " +
+            "        AND ((f.requester = :currentUser AND f.addressee = p.user) " +
+            "          OR (f.addressee = :currentUser AND f.requester = p.user))" +
             "  ))",
             // É obrigatório fornecer a countQuery quando usamos JOIN FETCH com paginação
             countQuery = "SELECT count(p) FROM Post p " +
                     "WHERE p.isRemoved = false " +
-                    "  AND (p.user = :currentUser OR p.user IN (" +
-                    "      SELECT CASE WHEN f.requester = :currentUser THEN f.addressee ELSE f.requester END " +
+                    "  AND (p.user = :currentUser OR EXISTS (" +
+                    "      SELECT f.id " +
                     "      FROM Friendship f " +
                     "      WHERE (f.requester = :currentUser OR f.addressee = :currentUser) " +
-                    "        AND f.status = 'ACCEPTED'" +
+                    "        AND f.status = 'ACCEPTED' " +
+                    "        AND ((f.requester = :currentUser AND f.addressee = p.user) " +
+                    "          OR (f.addressee = :currentUser AND f.requester = p.user))" +
                     "  ))")
     Page<Post> findFriendsFeed(@Param("currentUser") User currentUser, Pageable pageable);
 
