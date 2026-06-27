@@ -79,7 +79,8 @@ public class HiveService {
         if (hive.getCreator().getId().equals(user.getId())) {
             throw new PermissionException();
         }
-        if (!hive.getMembers().remove(user)) {
+        boolean removed = hive.getMembers().removeIf(member -> member.getId() != null && member.getId().equals(user.getId()));
+        if (!removed) {
             throw new PermissionException();
         }
     }
@@ -90,7 +91,9 @@ public class HiveService {
 
     public Hive getHive(User user, UUID hiveId) {
         Hive hive = hiveRepository.findById(hiveId).orElseThrow(HiveNotFoundException::new);
-        if (!hive.getMembers().contains(user)) throw new PermissionException();
+        boolean member = hive.getMembers().stream()
+                .anyMatch(current -> current.getId() != null && current.getId().equals(user.getId()));
+        if (!member) throw new PermissionException();
         return hive;
     }
 
