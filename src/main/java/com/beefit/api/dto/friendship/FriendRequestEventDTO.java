@@ -6,6 +6,8 @@ import java.util.UUID;
 public record FriendRequestEventDTO(
         UUID friendshipId,
         UUID requesterId,
+        String requesterFullName,
         String requesterUsername,
+        String requesterProfilePicture,
         LocalDateTime sentAt){
 }
