@@ -2,6 +2,8 @@ package com.beefit.api.controller;
 
 import com.beefit.api.domain.User;
 import com.beefit.api.service.SseService;
+import com.beefit.api.service.WorkoutSessionService;
+import com.beefit.api.dto.workout.WorkoutPresenceEventDTO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -16,6 +18,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 public class SseController {
 
     private final SseService sseService;
+    private final WorkoutSessionService workoutSessionService;
 
     @GetMapping(value = "/feed", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter subscribe(@AuthenticationPrincipal User user){
@@ -24,6 +27,11 @@ public class SseController {
         sseService.addEmitter(user.getId(), emitter);
 
         return emitter;
+    }
+
+    @GetMapping("/live")
+    public java.util.List<WorkoutPresenceEventDTO> getLiveWorkouts(@AuthenticationPrincipal User user) {
+        return workoutSessionService.getPublicActiveWorkouts(user.getId());
     }
 
 //    @PostMapping("/test")

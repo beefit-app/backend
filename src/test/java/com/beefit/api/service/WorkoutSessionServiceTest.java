@@ -43,6 +43,7 @@ import com.beefit.api.exception.workout.WorkoutTemplateNotFoundException;
 import com.beefit.api.mapper.WorkoutMuscleGroupMapper;
 import com.beefit.api.mapper.WorkoutSessionMapper;
 import com.beefit.api.repository.CatalogExerciseRepository;
+import com.beefit.api.repository.PostRepository;
 import com.beefit.api.repository.UserRepository;
 import com.beefit.api.repository.WorkoutSessionRepository;
 import com.beefit.api.repository.WorkoutTemplateRepository;
@@ -71,6 +72,18 @@ class WorkoutSessionServiceTest {
     @Mock
     private SseService sseService;
 
+    @Mock
+    private CardService cardService;
+
+    @Mock
+    private PostRepository postRepository;
+
+    @Mock
+    private FriendshipService friendshipService;
+
+    @Mock
+    private WorkoutMediaService workoutMediaService;
+
     @InjectMocks
     private WorkoutSessionService workoutSessionService;
 
@@ -93,6 +106,7 @@ class WorkoutSessionServiceTest {
 
         when(workoutSessionRepository.findByStatusAndUserId(WorkoutStatus.IN_PROGRESS, userId)).thenReturn(List.of());
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(workoutMuscleGroupMapper.toDomain(List.of("peito"))).thenReturn(List.of(MuscleGroups.CHEST));
         when(workoutSessionRepository.save(any(WorkoutSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(workoutSessionMapper.toDto(any(WorkoutSession.class))).thenReturn(responseDto(WorkoutStatus.IN_PROGRESS));
 
@@ -133,6 +147,7 @@ class WorkoutSessionServiceTest {
         when(workoutSessionRepository.findByStatusAndUserId(WorkoutStatus.IN_PROGRESS, userId)).thenReturn(List.of());
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
         when(workoutTemplateRepository.findById(templateId)).thenReturn(Optional.of(template));
+        when(workoutMuscleGroupMapper.toDomain(List.of("costas"))).thenReturn(List.of(MuscleGroups.BACK));
         when(workoutSessionRepository.save(any(WorkoutSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(workoutSessionMapper.toDto(any(WorkoutSession.class))).thenReturn(responseDto(WorkoutStatus.IN_PROGRESS));
 
@@ -205,18 +220,21 @@ class WorkoutSessionServiceTest {
         session.addExercise(existingExercise);
         session.addExercise(removableExercise);
 
+        String finishedAt = "2026-05-26T10:45:00-03:00";
         FinishWorkoutSnapshotRequestDTO request = new FinishWorkoutSnapshotRequestDTO(
-                LocalDateTime.of(2026, 5, 26, 10, 45),
+                finishedAt,
                 List.of("peito", "pernas"),
                 List.of(
                         new FinishWorkoutExerciseDTO(
                                 null,
-                                newCatalogExercise.getId(),
+                                newCatalogExercise.getId().toString(),
+                                newCatalogExercise.getName(),
                                 1,
                                 List.of(new FinishWorkoutSetDTO(null, 1, 80.0, 5))),
                         new FinishWorkoutExerciseDTO(
                                 existingExercise.getId(),
-                                existingCatalogExercise.getId(),
+                                existingCatalogExercise.getId().toString(),
+                                existingCatalogExercise.getName(),
                                 2,
                                 List.of(
                                         new FinishWorkoutSetDTO(existingSetId, 1, 45.0, 8),
@@ -228,6 +246,8 @@ class WorkoutSessionServiceTest {
         when(workoutSessionRepository.findById(workoutId)).thenReturn(Optional.of(session));
         when(catalogExerciseRepository.findById(newCatalogExercise.getId())).thenReturn(Optional.of(newCatalogExercise));
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(workoutMuscleGroupMapper.toDomain(List.of("peito", "pernas"))).thenReturn(List.of(MuscleGroups.CHEST, MuscleGroups.LEGS));
+        when(cardService.generateCard(user, session)).thenReturn(null);
         when(workoutSessionRepository.save(any(WorkoutSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(workoutSessionMapper.toDto(any(WorkoutSession.class))).thenReturn(responseDto(WorkoutStatus.FINISHED));
 
@@ -239,7 +259,7 @@ class WorkoutSessionServiceTest {
 
         WorkoutSession savedSession = sessionCaptor.getValue();
         assertEquals(WorkoutStatus.FINISHED, savedSession.getStatus());
-        assertEquals(request.finishedAt(), savedSession.getFinishedAt());
+        assertEquals(LocalDateTime.of(2026, 5, 26, 10, 45), savedSession.getFinishedAt());
         assertEquals(2700, savedSession.getDurationSeconds());
         assertEquals(1, user.getOffensiveHoneys());
         assertEquals(1, user.getWorkoutsCount());
@@ -260,7 +280,7 @@ class WorkoutSessionServiceTest {
         when(workoutSessionRepository.findById(workoutId)).thenReturn(Optional.of(session));
 
         FinishWorkoutSnapshotRequestDTO request = new FinishWorkoutSnapshotRequestDTO(
-                LocalDateTime.now(),
+                LocalDateTime.now().toString(),
                 List.of("peito"),
                 List.of(),
                 null,
@@ -280,7 +300,7 @@ class WorkoutSessionServiceTest {
         when(workoutSessionRepository.findById(workoutId)).thenReturn(Optional.of(session));
 
         FinishWorkoutSnapshotRequestDTO request = new FinishWorkoutSnapshotRequestDTO(
-                LocalDateTime.now(),
+                LocalDateTime.now().toString(),
                 List.of("peito"),
                 List.of(),
                 null,

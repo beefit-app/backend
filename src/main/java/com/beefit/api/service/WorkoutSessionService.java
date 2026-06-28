@@ -1,28 +1,58 @@
 package com.beefit.api.service;
 
-import com.beefit.api.domain.*;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+
+import org.hibernate.Hibernate;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.beefit.api.domain.Card;
+import com.beefit.api.domain.CatalogExercise;
+import com.beefit.api.domain.SessionExercise;
+import com.beefit.api.domain.TemplateExercise;
+import com.beefit.api.domain.User;
+import com.beefit.api.domain.WorkoutSession;
+import com.beefit.api.domain.WorkoutTemplate;
 import com.beefit.api.domain.enums.MuscleGroups;
 import com.beefit.api.domain.enums.SocialEvent;
 import com.beefit.api.domain.enums.WorkoutStatus;
 import com.beefit.api.dto.social.SocialEventDTO;
-import com.beefit.api.dto.workout.*;
+import com.beefit.api.dto.workout.FinishWorkoutExerciseDTO;
+import com.beefit.api.dto.workout.FinishWorkoutSetDTO;
+import com.beefit.api.dto.workout.FinishWorkoutSnapshotRequestDTO;
+import com.beefit.api.dto.workout.StartWorkoutRequestDTO;
+import com.beefit.api.dto.workout.WorkoutPresenceEventDTO;
+import com.beefit.api.dto.workout.WorkoutSessionResponseDTO;
 import com.beefit.api.exception.exercises.CatalogExerciseNotFound;
 import com.beefit.api.exception.user.UserNotFoundException;
-import com.beefit.api.exception.workout.*;
+import com.beefit.api.exception.workout.InvalidMuscleGroupException;
+import com.beefit.api.exception.workout.InvalidWorkoutSessionStateException;
+import com.beefit.api.exception.workout.InvalidWorkoutSnapshotException;
+import com.beefit.api.exception.workout.WorkoutAlreadyInProgressException;
+import com.beefit.api.exception.workout.WorkoutSessionNotFoundException;
+import com.beefit.api.exception.workout.WorkoutTemplateNotFoundException;
 import com.beefit.api.mapper.WorkoutMuscleGroupMapper;
 import com.beefit.api.mapper.WorkoutSessionMapper;
 import com.beefit.api.repository.CatalogExerciseRepository;
 import com.beefit.api.repository.UserRepository;
 import com.beefit.api.repository.WorkoutSessionRepository;
 import com.beefit.api.repository.WorkoutTemplateRepository;
-import lombok.RequiredArgsConstructor;
-import org.hibernate.Hibernate;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import com.beefit.api.repository.PostRepository;
 
-import java.time.LocalDateTime;
-import java.util.*;
-import java.util.Set;
+import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
@@ -37,7 +67,7 @@ public class WorkoutSessionService {
     private final WorkoutMuscleGroupMapper workoutMuscleGroupMapper;
     private final CardService cardService;
     private final SseService sseService;
-    private final com.beefit.api.repository.PostRepository postRepository;
+    private final PostRepository postRepository;
     private final FriendshipService friendshipService;
     private final WorkoutMediaService workoutMediaService;
 
@@ -50,6 +80,22 @@ public class WorkoutSessionService {
                     initializeWorkoutGraph(session);
                     return workoutSessionMapper.toDto(session);
                 });
+    }
+
+    @Transactional(readOnly = true)
+    public List<WorkoutPresenceEventDTO> getPublicActiveWorkouts(UUID currentUserId) {
+        return workoutSessionRepository.findAllPublicByStatusExcludingUser(WorkoutStatus.IN_PROGRESS, currentUserId)
+                .stream()
+                .map(session -> new WorkoutPresenceEventDTO(
+                        SocialEvent.WORKOUT_STARTED.name(),
+                        session.getId(),
+                        session.getUser().getId(),
+                        session.getUser().getUsername(),
+                        session.getUser().getFullName(),
+                        session.getStatus().getStatus(),
+                        session.getStartedAt(),
+                        workoutMuscleGroupMapper.toApi(session.getMuscleGroupsList())))
+                .toList();
     }
 
     @Transactional
@@ -90,18 +136,19 @@ public class WorkoutSessionService {
         WorkoutSession session = workoutSessionRepository.findById(workoutId)
                 .orElseThrow(WorkoutSessionNotFoundException::new);
         initializeWorkoutGraph(session);
+        LocalDateTime finishedAt = parseFinishedAt(request.finishedAt());
 
         validateWorkoutOwnership(userId, session);
         validateWorkoutInProgress(session);
-        validateFinishedAt(session, request.finishedAt());
+        validateFinishedAt(session, finishedAt);
 
         session.setMuscleGroupsList(workoutMuscleGroupMapper.toDomain(request.muscleGroups()));
         session.setTitle(request.title());
         session.setShouldPostWorkout(Boolean.TRUE.equals(request.shouldPostWorkout()));
         reconcileExercises(session, request.exercises());
 
-        session.setFinishedAt(request.finishedAt());
-        int durationSeconds = calculateDurationSeconds(session.getStartedAt(), request.finishedAt());
+        session.setFinishedAt(finishedAt);
+        int durationSeconds = calculateDurationSeconds(session.getStartedAt(), finishedAt);
         session.setDurationSeconds(durationSeconds);
 
         User user = userRepository.findById(userId).orElseThrow(UserNotFoundException::new);
@@ -143,8 +190,36 @@ public class WorkoutSessionService {
         }
         WorkoutSession savedSession = workoutSessionRepository.save(session);
 
-        broadcastIfPublic(savedSession, SocialEvent.WORKOUT_FINISHED, request.finishedAt());
+        broadcastIfPublic(savedSession, SocialEvent.WORKOUT_FINISHED, finishedAt);
         return workoutSessionMapper.toDto(savedSession);
+    }
+
+    private LocalDateTime parseFinishedAt(String finishedAtValue) {
+        if (finishedAtValue == null || finishedAtValue.isBlank()) {
+            throw new InvalidWorkoutSnapshotException("A data de finalização é obrigatória.");
+        }
+
+        try {
+            return OffsetDateTime.parse(finishedAtValue)
+                    .atZoneSameInstant(ZoneId.systemDefault())
+                    .toLocalDateTime();
+        } catch (RuntimeException ignored) {
+            // Tenta formatos sem offset para compatibilidade transitória.
+        }
+
+        try {
+            return Instant.parse(finishedAtValue)
+                    .atZone(ZoneId.systemDefault())
+                    .toLocalDateTime();
+        } catch (RuntimeException ignored) {
+            // Tenta formato local como último fallback.
+        }
+
+        try {
+            return LocalDateTime.parse(finishedAtValue);
+        } catch (RuntimeException ignored) {
+            throw new InvalidWorkoutSnapshotException("Formato inválido para a data de finalização do treino.");
+        }
     }
 
     @Transactional
@@ -289,8 +364,7 @@ public class WorkoutSessionService {
             FinishWorkoutExerciseDTO requestedExercise,
             Map<UUID, SessionExercise> existingExercisesById) {
         if (requestedExercise.sessionExerciseId() == null) {
-            CatalogExercise catalogExercise = catalogExerciseRepository.findById(requestedExercise.catalogExerciseId())
-                    .orElseThrow(CatalogExerciseNotFound::new);
+            CatalogExercise catalogExercise = resolveCatalogExercise(requestedExercise);
             SessionExercise sessionExercise = new SessionExercise();
             sessionExercise.setExercise(catalogExercise);
             sessionExercise.setOrder(requestedExercise.order());
@@ -303,11 +377,38 @@ public class WorkoutSessionService {
             throw new InvalidWorkoutSnapshotException("O exercício informado não pertence à sessão de treino.");
         }
 
-        if (!Objects.equals(sessionExercise.getExercise().getId(), requestedExercise.catalogExerciseId())) {
+        UUID requestedCatalogExerciseId = tryParseUuid(requestedExercise.catalogExerciseId());
+        if (requestedCatalogExerciseId != null
+                && !Objects.equals(sessionExercise.getExercise().getId(), requestedCatalogExerciseId)) {
             throw new InvalidWorkoutSnapshotException("Não é permitido trocar o exercício de um item já existente.");
         }
 
         return sessionExercise;
+    }
+
+    private CatalogExercise resolveCatalogExercise(FinishWorkoutExerciseDTO requestedExercise) {
+        UUID catalogExerciseId = tryParseUuid(requestedExercise.catalogExerciseId());
+        if (catalogExerciseId != null) {
+            return catalogExerciseRepository.findById(catalogExerciseId)
+                    .orElseThrow(CatalogExerciseNotFound::new);
+        }
+
+        if (requestedExercise.catalogExerciseName() != null && !requestedExercise.catalogExerciseName().isBlank()) {
+            return catalogExerciseRepository.findFirstByNameIgnoreCase(requestedExercise.catalogExerciseName().trim())
+                    .orElseThrow(() -> new InvalidWorkoutSnapshotException(
+                            "Não foi possível identificar o exercício informado para finalizar o treino."));
+        }
+
+        throw new InvalidWorkoutSnapshotException(
+                "O identificador do exercício é inválido e não foi possível resolver o exercício pelo nome.");
+    }
+
+    private UUID tryParseUuid(String value) {
+        try {
+            return UUID.fromString(value);
+        } catch (RuntimeException ignored) {
+            return null;
+        }
     }
 
     private void reconcileSets(SessionExercise sessionExercise, List<FinishWorkoutSetDTO> requestedSets) {

@@ -33,11 +33,13 @@ public class Inventory {
 
     public void addCard(Card card) {
         this.cards.add(card);
+        card.setInventory(this);
         this.totalCards += 1;
     }
 
     public void removeCard(Card card) {
         this.cards.remove(card);
+        card.setInventory(null);
         this.totalCards -= 1;
     }
 }

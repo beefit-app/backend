@@ -16,32 +16,17 @@ import java.util.UUID;
 @Repository
 public interface PostRepository extends JpaRepository<Post, UUID> {
 
-    // Montagem do Feed Social (Amigos + Próprio Usuário)
-    // Busca as publicações dos amigos com status ACCEPTED e do próprio usuário logado.
+    // Montagem do Feed Social global (colmeia)
+    // Busca todas as publicações públicas não removidas.
     // Utiliza JOIN FETCH para carregar o dono do post e a sessão de treino de uma vez.
     @Query(value = "SELECT p FROM Post p " +
             "JOIN FETCH p.user " +
             "JOIN FETCH p.workoutSession " +
             "WHERE p.isRemoved = false " +
-            "  AND (p.user = :currentUser OR EXISTS (" +
-            "      SELECT f.id " +
-            "      FROM Friendship f " +
-            "      WHERE (f.requester = :currentUser OR f.addressee = :currentUser) " +
-            "        AND f.status = 'ACCEPTED' " +
-            "        AND ((f.requester = :currentUser AND f.addressee = p.user) " +
-            "          OR (f.addressee = :currentUser AND f.requester = p.user))" +
-            "  ))",
+            "ORDER BY p.publishedAt DESC",
             // É obrigatório fornecer a countQuery quando usamos JOIN FETCH com paginação
             countQuery = "SELECT count(p) FROM Post p " +
-                    "WHERE p.isRemoved = false " +
-                    "  AND (p.user = :currentUser OR EXISTS (" +
-                    "      SELECT f.id " +
-                    "      FROM Friendship f " +
-                    "      WHERE (f.requester = :currentUser OR f.addressee = :currentUser) " +
-                    "        AND f.status = 'ACCEPTED' " +
-                    "        AND ((f.requester = :currentUser AND f.addressee = p.user) " +
-                    "          OR (f.addressee = :currentUser AND f.requester = p.user))" +
-                    "  ))")
+                    "WHERE p.isRemoved = false")
     Page<Post> findFriendsFeed(@Param("currentUser") User currentUser, Pageable pageable);
 
     // Traz o post pelo ID, mas já filtrando para garantir que não foi removido pela moderação

@@ -4,8 +4,9 @@ import com.beefit.api.domain.Inventory;
 import com.beefit.api.domain.User;
 import com.beefit.api.domain.WorkoutSession;
 import com.beefit.api.domain.enums.CardRarity;
+import com.beefit.api.domain.enums.MuscleGroups;
 import com.beefit.api.domain.enums.WorkoutStatus;
-import com.beefit.api.exception.workout.InventoryNotFoundException;
+import com.beefit.api.repository.CardRepository;
 import com.beefit.api.repository.InventoryRepository;
 import com.beefit.api.repository.WorkoutSessionRepository;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +20,7 @@ import java.util.concurrent.ThreadLocalRandom;
 public class CardService {
 
     private final InventoryRepository inventoryRepository;
+    private final CardRepository cardRepository;
     private final WorkoutSessionRepository workoutSessionRepository;
 
     public Card generateCard(User user, WorkoutSession workout){
@@ -27,7 +29,8 @@ public class CardService {
 
         boolean personalRecord = workout.getTotalVolume() > bestVolume;
 
-        Inventory inventory = inventoryRepository.findByUserIdWithCards(user.getId()).orElseThrow(InventoryNotFoundException::new);
+        Inventory inventory = inventoryRepository.findByUserIdWithCards(user.getId())
+                .orElseGet(() -> createInventory(user));
 
         double percentualPerformance = calculatePercentualPerformance(user, workout);
 
@@ -39,15 +42,21 @@ public class CardService {
         card.setAttackPower(attackPower);
         card.setBodyWeightAtGeneration(Double.valueOf(user.getBodyWeight()));
         card.setIsPersonalRecord(personalRecord);
-        card.setInventory(inventory);
         card.setWorkoutSession(workout);
         card.setCardRarity(selectedCardRarity);
+        card.setMuscleGroup(resolveCardMuscleGroup(workout));
 
         inventory.addCard(card);
+        user.setCardsCount((user.getCardsCount() == null ? 0 : user.getCardsCount()) + 1);
 
-        inventoryRepository.save(inventory);
+        return cardRepository.save(card);
+    }
 
-        return card;
+    private Inventory createInventory(User user) {
+        Inventory inventory = new Inventory();
+        inventory.setUser(user);
+        inventory.setTotalCards(0);
+        return inventoryRepository.save(inventory);
     }
 
     private double calculatePercentualPerformance(User user, WorkoutSession workout){
@@ -101,5 +110,13 @@ public class CardService {
         if(randomNumber<40) return CardRarity.RARE;
         if(randomNumber<85) return CardRarity.EPIC;
         return CardRarity.LEGENDARY;
+    }
+
+    private MuscleGroups resolveCardMuscleGroup(WorkoutSession workout) {
+        if (workout.getMuscleGroupsList() != null && !workout.getMuscleGroupsList().isEmpty()) {
+            return workout.getMuscleGroupsList().getFirst();
+        }
+
+        return MuscleGroups.CORE;
     }
 }

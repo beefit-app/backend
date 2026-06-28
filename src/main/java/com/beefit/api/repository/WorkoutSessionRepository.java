@@ -25,6 +25,19 @@ public interface WorkoutSessionRepository extends JpaRepository<WorkoutSession, 
     List<WorkoutSession> findByStatusAndUserId(WorkoutStatus status, UUID id);
 
     @Query("""
+    SELECT w FROM WorkoutSession w
+    JOIN FETCH w.user
+    WHERE w.status = :status
+      AND w.isPrivate = false
+      AND w.user.id <> :currentUserId
+    ORDER BY w.startedAt DESC
+    """)
+    List<WorkoutSession> findAllPublicByStatusExcludingUser(
+            @Param("status") WorkoutStatus status,
+            @Param("currentUserId") UUID currentUserId
+    );
+
+    @Query("""
     SELECT MAX(w.totalVolume) FROM WorkoutSession w WHERE w.user.id = :userId AND w.status = :status
     """)
     Optional<Double> findMaxTotalVolumeByUserId(@Param("userId") UUID userId, @Param("status") WorkoutStatus status);
