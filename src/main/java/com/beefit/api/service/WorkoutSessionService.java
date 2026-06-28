@@ -125,7 +125,8 @@ public class WorkoutSessionService {
         }
         userRepository.save(user);
         // Geracao de posts
-        // Só publica se o treino NÃO for privado E se o usuário NÃO estiver em Modo Fantasma
+        // Só publica se o treino NÃO for privado E se o usuário NÃO estiver em Modo
+        // Fantasma
         if (Boolean.TRUE.equals(session.getShouldPostWorkout()) && !session.getIsPrivate() && !user.getGhostMode()) {
             com.beefit.api.domain.Post autoPost = new com.beefit.api.domain.Post();
             autoPost.setUser(user);
@@ -157,15 +158,13 @@ public class WorkoutSessionService {
 
         LocalDateTime canceledAt = LocalDateTime.now();
         session.setFinishedAt(canceledAt);
-        session.setDurationSeconds(null);
-        session.setEstimatedCalories(null);
-        session.setTotalVolume(null);
         session.setStatus(WorkoutStatus.CANCELED);
 
-        WorkoutSession savedSession = workoutSessionRepository.save(session);
+        broadcastIfPublic(session, SocialEvent.WORKOUT_CANCELED, canceledAt);
 
-        broadcastIfPublic(savedSession, SocialEvent.WORKOUT_CANCELED, canceledAt);
-        return workoutSessionMapper.toDto(savedSession);
+        workoutSessionRepository.delete(session);
+
+        return workoutSessionMapper.toDto(session);
     }
 
     @Transactional
