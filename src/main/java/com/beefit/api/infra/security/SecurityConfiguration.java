@@ -1,5 +1,6 @@
 package com.beefit.api.infra.security;
 
+import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -47,6 +48,18 @@ public class SecurityConfiguration {
                                                                                                               // Stateless
                 .exceptionHandling(exception -> exception
                         .authenticationEntryPoint((request, response, authException) -> {
+                            String authFailure = (String) request.getAttribute(SecurityFilter.AUTH_FAILURE_REASON_ATTRIBUTE);
+                            String errorCode = "AUTH_REQUIRED";
+                            if ("EXPIRED".equals(authFailure)) {
+                                errorCode = "TOKEN_EXPIRED";
+                            } else if ("INVALID".equals(authFailure)) {
+                                errorCode = "TOKEN_INVALID";
+                            }
+                            String message = switch (errorCode) {
+                                case "TOKEN_EXPIRED" -> "Sua sessão expirou.";
+                                case "TOKEN_INVALID" -> "Sua sessão é inválida.";
+                                default -> "Autenticação obrigatória.";
+                            };
 
                             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                             response.setContentType("application/json");
@@ -54,18 +67,21 @@ public class SecurityConfiguration {
                             response.getWriter().write("""
                                       {
                                           "status": 401,
-                                          "error": "Unauthorized",
-                                          "message": "Credenciais inválidas."
+                                          "error": "%s",
+                                          "message": "%s"
                                       }
-                                    """);
+                                    """.formatted(errorCode, message));
                         }))
 
                 .authorizeHttpRequests(authorize -> authorize
                         // .requestMatchers(HttpMethod.POST, "/dashboard").hasRole("ADMIN")
                         // Rotas exclusivas de admin ou de autenticação devem ser adicionadas aqui
+                        .dispatcherTypeMatchers(DispatcherType.ASYNC).permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/login").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/register").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/auth/refresh").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/auth/logout").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/media/**").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated())

@@ -21,9 +21,13 @@ import java.io.IOException;
 // A classe serve como a validação da request antes dela chegar no controller destino
 public class SecurityFilter extends OncePerRequestFilter {
 
+    public static final String AUTH_FAILURE_REASON_ATTRIBUTE = "beefit.auth.failure";
+
     private static final String[] PUBLIC_PATHS = {
             "/auth/login",
-            "/auth/register"
+            "/auth/register",
+            "/auth/refresh",
+            "/auth/logout"
     };
 
     private final TokenService tokenService;
@@ -45,10 +49,19 @@ public class SecurityFilter extends OncePerRequestFilter {
         var token = this.recoverToken(request);
 
         if(token != null){
-            var login = tokenService.validateToken(token);
-            UserDetails user = userRepository.findByEmail(login);
+            var validation = tokenService.validateToken(token);
+
+            if (validation.status() != TokenService.TokenValidationStatus.VALID) {
+                request.setAttribute(AUTH_FAILURE_REASON_ATTRIBUTE, validation.status().name());
+                SecurityContextHolder.clearContext();
+                filterChain.doFilter(request, response);
+                return;
+            }
+
+            UserDetails user = userRepository.findByEmail(validation.subject());
 
             if(user==null){
+                request.setAttribute(AUTH_FAILURE_REASON_ATTRIBUTE, TokenService.TokenValidationStatus.INVALID.name());
                 SecurityContextHolder.clearContext();
 
                 filterChain.doFilter(request, response);

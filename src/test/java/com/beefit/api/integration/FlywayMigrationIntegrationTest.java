@@ -26,7 +26,7 @@ class FlywayMigrationIntegrationTest {
                 .locations("classpath:db/migration")
                 .load();
 
-        assertEquals(1, flyway.migrate().migrationsExecuted);
+        assertEquals(2, flyway.migrate().migrationsExecuted);
 
         try (var connection = DriverManager.getConnection(
                 POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());

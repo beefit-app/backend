@@ -13,5 +13,6 @@ public record RegisterDTO(@NotBlank String fullName,
                           @NotBlank
                           String password,
                           @NotNull @Positive Float bodyWeight,
-                          @NotNull @Min(1) @Max(7) Integer weeklyGoal) {
+                          @NotNull @Min(1) @Max(7) Integer weeklyGoal,
+                          @NotBlank String deviceId) {
 }

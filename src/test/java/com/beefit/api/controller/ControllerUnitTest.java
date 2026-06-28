@@ -37,6 +37,9 @@ import com.beefit.api.dto.CardFilterDTO;
 import com.beefit.api.dto.InventoryCardResponseDTO;
 import com.beefit.api.dto.auth.AuthenticationDTO;
 import com.beefit.api.dto.auth.LoginResponseDTO;
+import com.beefit.api.dto.auth.LogoutRequestDTO;
+import com.beefit.api.dto.auth.RefreshTokenRequestDTO;
+import com.beefit.api.dto.auth.RefreshTokenResponseDTO;
 import com.beefit.api.dto.auth.UserResponseDTO;
 import com.beefit.api.dto.user.ChangePasswordDTO;
 import com.beefit.api.dto.user.DeleteUserRequestDTO;
@@ -95,14 +98,39 @@ class ControllerUnitTest {
         AuthController controller = new AuthController(authService, registerMapper, userResponseMapper);
         LoginResponseDTO loginResponse = new LoginResponseDTO(
                 "token",
+                "refresh-token",
                 new UserResponseDTO(UUID.randomUUID(), "Test User", "testuser", "test@example.com", 80.0f, 4));
 
-        when(authService.login("test@example.com", "secret")).thenReturn(loginResponse);
+        when(authService.login("test@example.com", "secret", "device-1")).thenReturn(loginResponse);
 
-        ResponseEntity<LoginResponseDTO> response = controller.login(new AuthenticationDTO("test@example.com", "secret"));
+        ResponseEntity<LoginResponseDTO> response = controller.login(new AuthenticationDTO("test@example.com", "secret", "device-1"));
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(loginResponse, response.getBody());
+    }
+
+    @Test
+    void authRefreshReturnsNewTokens() {
+        AuthController controller = new AuthController(authService, registerMapper, userResponseMapper);
+        RefreshTokenResponseDTO refreshResponse = new RefreshTokenResponseDTO("new-access", "new-refresh");
+
+        when(authService.refreshSession("refresh-token", "device-1")).thenReturn(refreshResponse);
+
+        ResponseEntity<RefreshTokenResponseDTO> response = controller.refresh(
+                new RefreshTokenRequestDTO("refresh-token", "device-1"));
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(refreshResponse, response.getBody());
+    }
+
+    @Test
+    void authLogoutReturnsNoContent() {
+        AuthController controller = new AuthController(authService, registerMapper, userResponseMapper);
+
+        ResponseEntity<Void> response = controller.logout(new LogoutRequestDTO("refresh-token", "device-1"));
+
+        assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
+        verify(authService).logout("refresh-token", "device-1");
     }
 
     @Test
