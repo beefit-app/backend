@@ -8,24 +8,21 @@ import org.springframework.web.bind.annotation.*;
 import com.beefit.api.domain.User;
 import com.beefit.api.dto.user.ChangePasswordDTO;
 import com.beefit.api.dto.user.DeleteUserRequestDTO;
+import com.beefit.api.dto.user.PublicUserProfileResponseDTO;
 import com.beefit.api.dto.user.UpdateAccountSettingsRequestDTO;
 import com.beefit.api.dto.user.UpdateProfileRequestDTO;
 import com.beefit.api.dto.user.UserProfileResponseDTO;
 import com.beefit.api.service.UserService;
 import com.beefit.api.service.PostService;
 import com.beefit.api.dto.feed.FeedPostResponseDTO;
-import com.beefit.api.domain.enums.WorkoutStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.List;
 
 import jakarta.validation.Valid;
-
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/profile")
@@ -37,10 +34,25 @@ public class ProfileController {
     @Autowired
     private PostService postService;
 
+    @GetMapping("/{username}/posts")
+    public ResponseEntity<Page<FeedPostResponseDTO>> getUserPosts(@AuthenticationPrincipal User user,
+            @PathVariable String username,
+            @PageableDefault(size = 10) Pageable pageable) {
+        return ResponseEntity.ok(postService.getPostsByUsername(user, username, pageable));
+    }
+
+    @GetMapping("/{username}/training-days")
+    public ResponseEntity<List<Integer>> getUserTrainingDays(@PathVariable String username,
+            @RequestParam String month) {
+        YearMonth target = YearMonth.parse(month);
+        List<Integer> days = userService.getPublicTrainingDays(username, target).stream().map(LocalDate::getDayOfMonth).toList();
+        return ResponseEntity.ok(days);
+    }
+
     @GetMapping("/{username}")
-    public ResponseEntity<UserProfileResponseDTO> getOtherProfile(@PathVariable String username) {
-        UserProfileResponseDTO response = userService.getUserProfileByUsername(username);
-        return ResponseEntity.ok(response);
+    public ResponseEntity<PublicUserProfileResponseDTO> getOtherProfile(@AuthenticationPrincipal User user,
+            @PathVariable String username) {
+        return ResponseEntity.ok(userService.getPublicUserProfile(user, username));
     }
 
     @GetMapping("/me/posts")

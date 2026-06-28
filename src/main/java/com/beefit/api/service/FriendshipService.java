@@ -183,6 +183,26 @@ public class FriendshipService {
                 .map(this::toSocialUser);
     }
 
+    @Transactional(readOnly = true)
+    public FriendshipRelation getRelationship(User viewer, User target) {
+        if (isSameUser(viewer, target)) {
+            return new FriendshipRelation("SELF", null);
+        }
+
+        return friendshipRepository.findFriendshipBetween(viewer, target)
+                .map(friendship -> {
+                    if (FriendshipStatus.ACCEPTED.equals(friendship.getStatus())) {
+                        return new FriendshipRelation("FRIEND", friendship.getId());
+                    }
+                    if (FriendshipStatus.PENDING.equals(friendship.getStatus())) {
+                        String status = isSameUser(friendship.getRequester(), viewer) ? "REQUEST_SENT" : "REQUEST_RECEIVED";
+                        return new FriendshipRelation(status, friendship.getId());
+                    }
+                    return new FriendshipRelation("NONE", null);
+                })
+                .orElseGet(() -> new FriendshipRelation("NONE", null));
+    }
+
     private FriendshipResponseDTO toResponse(Friendship friendship, User viewer) {
         boolean requester = isSameUser(friendship.getRequester(), viewer);
         return new FriendshipResponseDTO(friendship.getId(), toSocialUser(requester ? friendship.getAddressee() : friendship.getRequester()),
@@ -198,6 +218,9 @@ public class FriendshipService {
 
     private SocialUserResponseDTO toSocialUser(User user) {
         return new SocialUserResponseDTO(user.getId(), user.getFullName(), user.getUsername(), user.getProfilePicture());
+    }
+
+    public record FriendshipRelation(String status, UUID friendshipId) {
     }
 
 }

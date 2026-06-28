@@ -3,6 +3,7 @@ package com.beefit.api.service;
 import com.beefit.api.domain.User;
 import com.beefit.api.dto.user.ChangePasswordDTO;
 import com.beefit.api.dto.user.DeleteUserRequestDTO;
+import com.beefit.api.dto.user.PublicUserProfileResponseDTO;
 import com.beefit.api.dto.user.UpdateAccountSettingsRequestDTO;
 import com.beefit.api.dto.user.UpdateProfileRequestDTO;
 import com.beefit.api.dto.user.UserProfileResponseDTO;
@@ -29,6 +30,7 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
     private final WorkoutSessionRepository workoutSessionRepository;
     private final WorkoutMediaService workoutMediaService;
+    private final FriendshipService friendshipService;
 
     private UserProfileResponseDTO findUserDetails(User user){
 
@@ -54,18 +56,47 @@ public class UserService {
 
     // Visualizar perfil de outros
     public UserProfileResponseDTO getUserProfileByUsername(String username){
-        User user = userRepository.findByUsername(username).orElseThrow(UserNotFoundException::new);
-
-        if(user.getGhostMode()){
-            throw new UserNotFoundException();
-        }
-
+        User user = findVisibleUserByUsername(username);
         return findUserDetails(user);
+    }
+
+    @Transactional(readOnly = true)
+    public PublicUserProfileResponseDTO getPublicUserProfile(User viewer, String username) {
+        User user = findVisibleUserByUsername(username);
+        var relationship = friendshipService.getRelationship(viewer, user);
+
+        return new PublicUserProfileResponseDTO(
+                user.getId(),
+                user.getFullName(),
+                user.getUsername(),
+                user.getBiography(),
+                user.getProfilePicture(),
+                user.getBodyWeight(),
+                user.getOffensiveHoneys(),
+                user.getCardsCount(),
+                user.getWorkoutsCount(),
+                relationship.status(),
+                relationship.friendshipId());
     }
 
     public java.util.List<LocalDate> getTrainingDays(UUID userId, YearMonth month) {
         return workoutSessionRepository.findFinishedDaysByUserAndMonth(userId, WorkoutStatus.FINISHED,
                 month.atDay(1).atStartOfDay(), month.plusMonths(1).atDay(1).atStartOfDay());
+    }
+
+    public java.util.List<LocalDate> getPublicTrainingDays(String username, YearMonth month) {
+        User user = findVisibleUserByUsername(username);
+        return getTrainingDays(user.getId(), month);
+    }
+
+    private User findVisibleUserByUsername(String username) {
+        User user = userRepository.findByUsername(username).orElseThrow(UserNotFoundException::new);
+
+        if (user.getGhostMode()) {
+            throw new UserNotFoundException();
+        }
+
+        return user;
     }
 
     // Lógica para Editar o Perfil (RF-003)

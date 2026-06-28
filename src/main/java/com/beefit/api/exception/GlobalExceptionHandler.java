@@ -97,7 +97,7 @@ public class GlobalExceptionHandler {
         return new ErrorResponse(
                 LocalDateTime.now(),
                 HttpStatus.NOT_FOUND.value(),
-                "Elementos do treino não encontrado.",
+                "Elementos do treino não encontrados.",
                 e.getMessage(),
                 List.of(),
                 request.getRequestURI()
@@ -111,7 +111,7 @@ public class GlobalExceptionHandler {
         return new ErrorResponse(
                 LocalDateTime.now(),
                 HttpStatus.BAD_REQUEST.value(),
-                "Estado da sessão de treino inválido",
+                "Estado da sessão de treino inválido.",
                 e.getMessage(),
                 List.of(),
                 request.getRequestURI()

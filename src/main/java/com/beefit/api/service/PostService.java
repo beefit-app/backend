@@ -55,6 +55,17 @@ public class PostService {
                 .map(post -> convertToFeedPostResponseDTO(post, user));
     }
 
+    @Transactional
+    public Page<FeedPostResponseDTO> getPostsByUsername(User currentUser, String username, Pageable pageable) {
+        User target = userRepository.findByUsername(username).orElseThrow(UserNotFoundException::new);
+        if (target.getGhostMode()) {
+            throw new UserNotFoundException();
+        }
+
+        return postRepository.findAllByUserAndIsRemovedFalseOrderByPublishedAtDesc(target, pageable)
+                .map(post -> convertToFeedPostResponseDTO(post, currentUser));
+    }
+
 
      // Método auxiliar que converte a entidade Post e suas dependências no DTO do Feed.
 

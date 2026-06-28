@@ -33,6 +33,7 @@ import com.beefit.api.exception.user.InvalidSessionException;
 import com.beefit.api.exception.user.UsernameAlreadyInUse;
 import com.beefit.api.mapper.UserResponseMapper;
 import com.beefit.api.repository.AuthSessionRepository;
+import com.beefit.api.repository.InventoryRepository;
 import com.beefit.api.repository.UserRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -49,6 +50,9 @@ class AuthServiceTest {
 
     @Mock
     private AuthSessionRepository authSessionRepository;
+
+    @Mock
+    private InventoryRepository inventoryRepository;
 
     @Mock
     private TokenService tokenService;
