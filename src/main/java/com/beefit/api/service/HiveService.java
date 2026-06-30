@@ -76,12 +76,37 @@ public class HiveService {
     @Transactional
     public void leaveHive(User user, UUID hiveId) {
         Hive hive = hiveRepository.findById(hiveId).orElseThrow(HiveNotFoundException::new);
-        if (hive.getCreator().getId().equals(user.getId())) {
+        
+        boolean isMember = hive.getMembers().stream()
+                .anyMatch(member -> member.getId().equals(user.getId()));
+        if (!isMember) {
             throw new PermissionException();
         }
-        boolean removed = hive.getMembers().removeIf(member -> member.getId() != null && member.getId().equals(user.getId()));
-        if (!removed) {
-            throw new PermissionException();
+
+        if (hive.getCreator().getId().equals(user.getId())) {
+            if (hive.getMembers().size() <= 1) {
+                hiveRepository.delete(hive);
+            } else {
+                List<HiveRankingDTO> ranking = hiveRepository.getRankingForHive(hiveId);
+                
+                UUID newCreatorId = ranking.stream()
+                        .map(HiveRankingDTO::userId)
+                        .filter(id -> !id.equals(user.getId()))
+                        .findFirst()
+                        .orElseThrow(() -> new IllegalStateException("Nenhum outro membro encontrado para assumir a colmeia"));
+                
+                User newCreator = hive.getMembers().stream()
+                        .filter(m -> m.getId().equals(newCreatorId))
+                        .findFirst()
+                        .orElseThrow(() -> new IllegalStateException("Membro sucessor não encontrado no grupo"));
+                
+                hive.setCreator(newCreator);
+                hive.getMembers().removeIf(m -> m.getId().equals(user.getId()));
+                hiveRepository.save(hive);
+            }
+        } else {
+            hive.getMembers().removeIf(member -> member.getId().equals(user.getId()));
+            hiveRepository.save(hive);
         }
     }
 
