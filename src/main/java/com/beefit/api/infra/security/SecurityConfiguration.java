@@ -63,6 +63,7 @@ public class SecurityConfiguration {
 
                             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                             response.setContentType("application/json");
+                            response.setCharacterEncoding("UTF-8");
 
                             response.getWriter().write("""
                                       {
