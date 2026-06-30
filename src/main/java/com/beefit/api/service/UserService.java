@@ -79,12 +79,12 @@ public class UserService {
                 relationship.friendshipId());
     }
 
-    public java.util.List<LocalDate> getTrainingDays(UUID userId, YearMonth month) {
+    public java.util.List<java.time.LocalDateTime> getTrainingDays(UUID userId, YearMonth month) {
         return workoutSessionRepository.findFinishedDaysByUserAndMonth(userId, WorkoutStatus.FINISHED,
                 month.atDay(1).atStartOfDay(), month.plusMonths(1).atDay(1).atStartOfDay());
     }
 
-    public java.util.List<LocalDate> getPublicTrainingDays(String username, YearMonth month) {
+    public java.util.List<java.time.LocalDateTime> getPublicTrainingDays(String username, YearMonth month) {
         User user = findVisibleUserByUsername(username);
         return getTrainingDays(user.getId(), month);
     }

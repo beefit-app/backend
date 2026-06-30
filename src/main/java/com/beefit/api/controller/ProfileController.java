@@ -45,7 +45,12 @@ public class ProfileController {
     public ResponseEntity<List<Integer>> getUserTrainingDays(@PathVariable String username,
             @RequestParam String month) {
         YearMonth target = YearMonth.parse(month);
-        List<Integer> days = userService.getPublicTrainingDays(username, target).stream().map(LocalDate::getDayOfMonth).toList();
+        List<java.time.LocalDateTime> rawDays = userService.getPublicTrainingDays(username, target);
+        List<Integer> days = rawDays.stream()
+                .map(ldt -> ldt.toLocalDate().getDayOfMonth())
+                .distinct()
+                .sorted()
+                .toList();
         return ResponseEntity.ok(days);
     }
 
@@ -65,7 +70,13 @@ public class ProfileController {
     public ResponseEntity<List<Integer>> getTrainingDays(@AuthenticationPrincipal User user,
             @RequestParam String month) {
         YearMonth target = YearMonth.parse(month);
-        List<Integer> days = userService.getTrainingDays(user.getId(), target).stream().map(LocalDate::getDayOfMonth).toList();
+        List<java.time.LocalDateTime> rawDays = userService.getTrainingDays(user.getId(), target);
+        List<Integer> days = rawDays.stream()
+                .map(ldt -> ldt.toLocalDate().getDayOfMonth())
+                .distinct()
+                .sorted()
+                .toList();
+        System.out.println(">>> getTrainingDays returning days for " + user.getUsername() + ": " + days);
         return ResponseEntity.ok(days);
     }
 

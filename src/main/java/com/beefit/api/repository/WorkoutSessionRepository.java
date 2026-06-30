@@ -57,9 +57,9 @@ public interface WorkoutSessionRepository extends JpaRepository<WorkoutSession, 
             @Param("endOfDay") LocalDateTime endOfDay
     );
 
-    @Query("SELECT DISTINCT FUNCTION('DATE', w.finishedAt) FROM WorkoutSession w WHERE w.user.id = :userId " +
+    @Query("SELECT DISTINCT w.finishedAt FROM WorkoutSession w WHERE w.user.id = :userId " +
             "AND w.status = :status AND w.finishedAt >= :start AND w.finishedAt < :end")
-    List<LocalDate> findFinishedDaysByUserAndMonth(@Param("userId") UUID userId, @Param("status") WorkoutStatus status,
+    List<LocalDateTime> findFinishedDaysByUserAndMonth(@Param("userId") UUID userId, @Param("status") WorkoutStatus status,
             @Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 
     @Query("SELECT COUNT(w) FROM WorkoutSession w WHERE w.finishedAt >= :twentyFourHoursAgo AND w.status = 'FINISHED'")
