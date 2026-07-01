@@ -137,7 +137,7 @@ public class WorkoutTemplateService {
         }
     }
 
-    public WorkoutTemplateResponseDTO importTemplateFromPost(UUID postId, UUID currentUserId) {
+    public WorkoutTemplateResponseDTO importTemplateFromPost(UUID postId, String name, UUID currentUserId) {
 
         Post post = postRepository.findById(postId)
                 .orElseThrow(PostNotFoundException::new);
@@ -147,7 +147,7 @@ public class WorkoutTemplateService {
         List<MuscleGroups> importedMuscleGroups = session.getMuscleGroupsList();
 
         WorkoutTemplate newTemplate = new WorkoutTemplate();
-        newTemplate.setName("Imported from " + post.getUser().getFullName());
+        newTemplate.setName(name != null && !name.isBlank() ? name.trim() : "Imported from " + post.getUser().getFullName());
 
         User user = userRepository.findById(currentUserId).orElseThrow(UserNotFoundException::new);
         newTemplate.setUser(user);

@@ -61,10 +61,12 @@ public class WorkoutTemplateController {
     @PostMapping("/import/{postId}")
     public ResponseEntity<WorkoutTemplateResponseDTO> importTemplateFromPost(
             @PathVariable UUID postId,
+            @RequestParam(required = false) String name,
             @AuthenticationPrincipal User usuarioAutenticado
     ) {
         WorkoutTemplateResponseDTO responseDTO = WTService.importTemplateFromPost(
                 postId,
+                name,
                 usuarioAutenticado.getId()
         );
 
