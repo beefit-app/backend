@@ -3,6 +3,7 @@ package com.beefit.api.service;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.ArrayList;
 
 import com.beefit.api.domain.*;
 import com.beefit.api.domain.enums.MuscleGroups;
@@ -17,6 +18,7 @@ import com.beefit.api.dto.workout.WorkoutTemplateExerciseResponseDTO;
 import com.beefit.api.dto.workout.WorkoutTemplateResponseDTO;
 import com.beefit.api.exception.exercises.CatalogExerciseNotFound;
 import com.beefit.api.exception.user.UserNotFoundException;
+import com.beefit.api.exception.workout.WorkoutTemplateNotFoundException;
 import com.beefit.api.repository.CatalogExerciseRepository;
 import com.beefit.api.repository.UserRepository;
 import com.beefit.api.repository.WorkoutTemplateRepository;
@@ -69,6 +71,32 @@ public class WorkoutTemplateService {
         return templates.stream().map(this::toResponse).toList();
     }
 
+    @Transactional
+    public WorkoutTemplateResponseDTO updateTemplate(UUID templateId, WorkoutTemplateRequestDTO requestDTO, UUID userID) {
+        WorkoutTemplate template = WTRepository.findById(templateId)
+                .orElseThrow(WorkoutTemplateNotFoundException::new);
+        validateTemplateAccess(template, userID);
+
+        template.setName(requestDTO.name());
+        template.setMuscleGroupsList(workoutMuscleGroupMapper.toDomain(requestDTO.muscleGroups()));
+        if (template.getExerciseList() == null) {
+            template.setExerciseList(new ArrayList<>());
+        }
+        template.getExerciseList().clear();
+        template.getExerciseList().addAll(buildTemplateExercises(requestDTO.exercises(), template));
+
+        return toResponse(WTRepository.save(template));
+    }
+
+    @Transactional
+    public void deleteTemplate(UUID templateId, UUID userID) {
+        WorkoutTemplate template = WTRepository.findById(templateId)
+                .orElseThrow(WorkoutTemplateNotFoundException::new);
+        validateTemplateAccess(template, userID);
+
+        WTRepository.delete(template);
+    }
+
     private List<TemplateExercise> buildTemplateExercises(
             List<WorkoutTemplateExerciseRequestDTO> requestedExercises,
             WorkoutTemplate template) {
@@ -101,6 +129,14 @@ public class WorkoutTemplateService {
                 template.getMuscleGroupsList(),
                 exercises);
     }
+
+    private void validateTemplateAccess(WorkoutTemplate template, UUID userID) {
+        if (template.getUser() == null || template.getUser().getId() == null
+                || !template.getUser().getId().equals(userID)) {
+            throw new WorkoutTemplateNotFoundException();
+        }
+    }
+
     public WorkoutTemplateResponseDTO importTemplateFromPost(UUID postId, UUID currentUserId) {
 
         Post post = postRepository.findById(postId)
