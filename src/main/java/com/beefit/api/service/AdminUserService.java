@@ -38,15 +38,16 @@ public class AdminUserService {
     public BannedUserResponseDTO banUserForDays(UUID id, Integer banDays){
 
         User user = userRepository.findById(id).orElseThrow(UserNotFoundException::new);
+        int days = banDays == null || banDays < 1 ? 7 : banDays;
 
         // Pra garantir que ele não tente somar dias em um valor que era nulo
         LocalDateTime baseDate = (user.getBannedUntil() != null && user.getBannedUntil().isAfter(LocalDateTime.now()))
                 ? user.getBannedUntil()
                 : LocalDateTime.now();
 
-        user.setBannedUntil(baseDate.plusDays(banDays));
+        user.setBannedUntil(baseDate.plusDays(days));
 
-        return banMapper.toResponseDTO(user, banDays);
+        return banMapper.toResponseDTO(user, days);
     }
 
     @Transactional

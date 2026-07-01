@@ -30,6 +30,7 @@ import com.beefit.api.domain.enums.MuscleGroups;
 import com.beefit.api.domain.enums.SocialEvent;
 import com.beefit.api.domain.enums.WorkoutStatus;
 import com.beefit.api.dto.social.SocialEventDTO;
+import com.beefit.api.dto.workout.CardGeneratedEventDTO;
 import com.beefit.api.dto.workout.FinishWorkoutExerciseDTO;
 import com.beefit.api.dto.workout.FinishWorkoutSetDTO;
 import com.beefit.api.dto.workout.FinishWorkoutSnapshotRequestDTO;
@@ -190,8 +191,28 @@ public class WorkoutSessionService {
         }
         WorkoutSession savedSession = workoutSessionRepository.save(session);
 
+        broadcastCardGenerated(userId, savedSession, card);
         broadcastIfPublic(savedSession, SocialEvent.WORKOUT_FINISHED, finishedAt);
         return workoutSessionMapper.toDto(savedSession);
+    }
+
+    private void broadcastCardGenerated(UUID userId, WorkoutSession session, Card card) {
+        if (card == null) return;
+
+        sseService.broadcastToFriend(
+                new SocialEventDTO<>(
+                        SocialEvent.CARD_GENERATED,
+                        new CardGeneratedEventDTO(
+                                session.getId(),
+                                card.getId(),
+                                card.getAttackPower(),
+                                card.getCardRarity().name(),
+                                workoutMuscleGroupMapper.toApi(card.getMuscleGroup()),
+                                card.getIsPersonalRecord()
+                        )
+                ),
+                userId
+        );
     }
 
     private LocalDateTime parseFinishedAt(String finishedAtValue) {

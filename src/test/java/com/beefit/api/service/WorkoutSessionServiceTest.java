@@ -23,13 +23,18 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.beefit.api.domain.CatalogExercise;
+import com.beefit.api.domain.Card;
 import com.beefit.api.domain.SessionExercise;
 import com.beefit.api.domain.TemplateExercise;
 import com.beefit.api.domain.User;
 import com.beefit.api.domain.WorkoutSession;
 import com.beefit.api.domain.WorkoutTemplate;
+import com.beefit.api.domain.enums.CardRarity;
 import com.beefit.api.domain.enums.MuscleGroups;
+import com.beefit.api.domain.enums.SocialEvent;
 import com.beefit.api.domain.enums.WorkoutStatus;
+import com.beefit.api.dto.social.SocialEventDTO;
+import com.beefit.api.dto.workout.CardGeneratedEventDTO;
 import com.beefit.api.dto.workout.FinishWorkoutExerciseDTO;
 import com.beefit.api.dto.workout.FinishWorkoutSetDTO;
 import com.beefit.api.dto.workout.FinishWorkoutSnapshotRequestDTO;
@@ -247,7 +252,15 @@ class WorkoutSessionServiceTest {
         when(catalogExerciseRepository.findById(newCatalogExercise.getId())).thenReturn(Optional.of(newCatalogExercise));
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
         when(workoutMuscleGroupMapper.toDomain(List.of("peito", "pernas"))).thenReturn(List.of(MuscleGroups.CHEST, MuscleGroups.LEGS));
-        when(cardService.generateCard(user, session)).thenReturn(null);
+        Card generatedCard = new Card();
+        generatedCard.setId(UUID.randomUUID());
+        generatedCard.setAttackPower(250.0);
+        generatedCard.setCardRarity(CardRarity.RARE);
+        generatedCard.setMuscleGroup(MuscleGroups.CHEST);
+        generatedCard.setIsPersonalRecord(Boolean.TRUE);
+
+        when(cardService.generateCard(user, session)).thenReturn(generatedCard);
+        when(workoutMuscleGroupMapper.toApi(MuscleGroups.CHEST)).thenReturn("peito");
         when(workoutSessionRepository.save(any(WorkoutSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(workoutSessionMapper.toDto(any(WorkoutSession.class))).thenReturn(responseDto(WorkoutStatus.FINISHED));
 
@@ -269,6 +282,15 @@ class WorkoutSessionServiceTest {
         assertEquals(existingCatalogExercise, savedSession.getExercises().get(1).getExercise());
         assertEquals(80.0 * 5 + 45.0 * 8 + 42.5 * 10, savedSession.getTotalVolume());
         assertEquals("finished", response.status());
+
+        ArgumentCaptor<SocialEventDTO> eventCaptor = ArgumentCaptor.forClass(SocialEventDTO.class);
+        verify(sseService).broadcastToFriend(eventCaptor.capture(), org.mockito.ArgumentMatchers.eq(userId));
+        assertEquals(SocialEvent.CARD_GENERATED, eventCaptor.getValue().type());
+        CardGeneratedEventDTO event = (CardGeneratedEventDTO) eventCaptor.getValue().dataSocialEvent();
+        assertEquals(workoutId, event.workoutId());
+        assertEquals(generatedCard.getId(), event.cardId());
+        assertEquals("RARE", event.rarity());
+        assertEquals("peito", event.muscleGroup());
     }
 
     @Test
