@@ -20,13 +20,29 @@ public interface PostRepository extends JpaRepository<Post, UUID> {
     // Busca todas as publicações públicas não removidas.
     // Utiliza JOIN FETCH para carregar o dono do post e a sessão de treino de uma vez.
     @Query(value = "SELECT p FROM Post p " +
-            "JOIN FETCH p.user " +
+            "JOIN FETCH p.user u " +
             "JOIN FETCH p.workoutSession " +
-            "WHERE p.isRemoved = false " +
+            "WHERE p.isRemoved = false AND (" +
+            "  u = :currentUser OR " +
+            "  EXISTS (SELECT 1 FROM Friendship f WHERE " +
+            "    f.status = com.beefit.api.domain.enums.FriendshipStatus.ACCEPTED AND (" +
+            "      (f.requester = :currentUser AND f.addressee = u) OR " +
+            "      (f.addressee = :currentUser AND f.requester = u)" +
+            "    )" +
+            "  )" +
+            ") " +
             "ORDER BY p.publishedAt DESC",
             // É obrigatório fornecer a countQuery quando usamos JOIN FETCH com paginação
             countQuery = "SELECT count(p) FROM Post p " +
-                    "WHERE p.isRemoved = false")
+                    "WHERE p.isRemoved = false AND (" +
+                    "  p.user = :currentUser OR " +
+                    "  EXISTS (SELECT 1 FROM Friendship f WHERE " +
+                    "    f.status = com.beefit.api.domain.enums.FriendshipStatus.ACCEPTED AND (" +
+                    "      (f.requester = :currentUser AND f.addressee = p.user) OR " +
+                    "      (f.addressee = :currentUser AND f.requester = p.user)" +
+                    "    )" +
+                    "  )" +
+                    ")")
     Page<Post> findFriendsFeed(@Param("currentUser") User currentUser, Pageable pageable);
 
     // Traz o post pelo ID, mas já filtrando para garantir que não foi removido pela moderação
