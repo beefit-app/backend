@@ -23,6 +23,8 @@ import com.beefit.api.repository.CatalogExerciseRepository;
 import com.beefit.api.repository.UserRepository;
 import com.beefit.api.repository.WorkoutTemplateRepository;
 import com.beefit.api.mapper.WorkoutMuscleGroupMapper;
+import com.beefit.api.domain.enums.SocialEvent;
+import com.beefit.api.dto.social.SocialEventDTO;
 
 import lombok.RequiredArgsConstructor;
 
@@ -35,6 +37,7 @@ public class WorkoutTemplateService {
     private final CatalogExerciseRepository catalogExerciseRepository;
     private final PostRepository postRepository;
     private final WorkoutMuscleGroupMapper workoutMuscleGroupMapper;
+    private final SseService sseService;
 
     @Transactional
     // Lembrar de implementar o id do amigo na parte do social
@@ -170,7 +173,7 @@ public class WorkoutTemplateService {
 
         WorkoutTemplate savedTemplate = WTRepository.save(newTemplate);
 
-        return new WorkoutTemplateResponseDTO(
+        WorkoutTemplateResponseDTO responseDTO = new WorkoutTemplateResponseDTO(
                 savedTemplate.getId(),
                 savedTemplate.getName(),
                 savedTemplate.getMuscleGroupsList(),
@@ -181,5 +184,9 @@ public class WorkoutTemplateService {
                                 templateExercise.getOrder()))
                         .toList()
         );
+
+        sseService.broadcastToFriend(new SocialEventDTO<>(SocialEvent.TEMPLATE_IMPORTED, responseDTO), currentUserId);
+
+        return responseDTO;
     }
 }
