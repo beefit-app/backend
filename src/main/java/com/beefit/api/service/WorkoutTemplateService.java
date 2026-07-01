@@ -147,7 +147,7 @@ public class WorkoutTemplateService {
         List<MuscleGroups> importedMuscleGroups = session.getMuscleGroupsList();
 
         WorkoutTemplate newTemplate = new WorkoutTemplate();
-        newTemplate.setName(name != null && !name.isBlank() ? name.trim() : "Imported from " + post.getUser().getFullName());
+        newTemplate.setName(name != null && !name.isBlank() ? name.trim() : (post.getTitle() != null && !post.getTitle().isBlank() ? post.getTitle().trim() : "Imported from " + post.getUser().getFullName()));
 
         User user = userRepository.findById(currentUserId).orElseThrow(UserNotFoundException::new);
         newTemplate.setUser(user);
@@ -160,6 +160,7 @@ public class WorkoutTemplateService {
                     templateEx.setCatalogExercise(sessionExercise.getExercise());
 
                     templateEx.setWorkoutTemplate(newTemplate);
+                    templateEx.setOrder(sessionExercise.getOrder());
 
                     return templateEx;
                 })
