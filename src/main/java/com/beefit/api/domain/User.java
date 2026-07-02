@@ -12,6 +12,7 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
@@ -44,10 +45,11 @@ public class User implements UserDetails {
 
     @NotNull
     @Positive
+    @Max(300)
     @Column(name = "body_weight", nullable = false)
     private Float bodyWeight;
 
-    @Column(name = "profile_picture",nullable = true)
+    @Column(name = "profile_picture")
     private String profilePicture;
 
     @Column(nullable = true, length = 500)
@@ -67,6 +69,18 @@ public class User implements UserDetails {
     @Column(name = "weekly_goal", nullable = false)
     private Integer weeklyGoal;
 
+    @PositiveOrZero
+    @Column(name = "workouts_count", nullable = false)
+    private Integer workoutsCount = 0;
+
+    @PositiveOrZero
+    @Column(name = "weekly_workouts_count", nullable = false)
+    private Integer weeklyWorkoutsCount = 0;
+
+    @PositiveOrZero
+    @Column(name = "cards_count", nullable = false)
+    private Integer cardsCount = 0;
+
     @NotNull
     @Min(0)
     @Column(name = "offensive_honeys", nullable = false)
@@ -76,6 +90,13 @@ public class User implements UserDetails {
     @Column(nullable = false)
     @Enumerated(EnumType.STRING)
     private UserRole role; // USER ou ADMIN
+
+    @Column(name = "banned_until")
+    private LocalDateTime bannedUntil;
+
+    public boolean isBanned() {
+        return this.bannedUntil != null && this.bannedUntil.isAfter(LocalDateTime.now());
+    }
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
@@ -105,6 +126,7 @@ public class User implements UserDetails {
 
     @Override
     public boolean isEnabled() {
-        return true;
+        return !this.isBanned();
     }
+
 }
