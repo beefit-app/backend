@@ -21,6 +21,7 @@ import java.time.YearMonth;
 import java.time.LocalDate;
 import com.beefit.api.repository.WorkoutSessionRepository;
 import com.beefit.api.domain.enums.WorkoutStatus;
+import jakarta.persistence.EntityManager;
 
 @Service
 @RequiredArgsConstructor
@@ -31,6 +32,7 @@ public class UserService {
     private final WorkoutSessionRepository workoutSessionRepository;
     private final WorkoutMediaService workoutMediaService;
     private final FriendshipService friendshipService;
+    private final EntityManager entityManager;
 
     private UserProfileResponseDTO findUserDetails(User user){
 
@@ -157,7 +159,68 @@ public class UserService {
             throw new InvalidPasswordException("Senha incorreta.");
         }
 
+        // 1. Apagar arquivos de mídia
         workoutMediaService.deleteAllForOwner(userId);
+
+        // 2. Limpar sessões de autenticação do usuário
+        entityManager.createNativeQuery("DELETE FROM auth_sessions WHERE user_id = :userId")
+                .setParameter("userId", userId).executeUpdate();
+
+        // 3. Remover amizades / convites pendentes do usuário
+        entityManager.createNativeQuery("DELETE FROM friendship WHERE requester_id = :userId OR addressee_id = :userId")
+                .setParameter("userId", userId).executeUpdate();
+
+        // 4. Remover curtidas dadas pelo usuário ou nos posts do usuário
+        entityManager.createNativeQuery("DELETE FROM post_likes WHERE user_id = :userId OR post_id IN (SELECT id FROM posts WHERE user_id = :userId)")
+                .setParameter("userId", userId).executeUpdate();
+
+        // 5. Apagar postagens do usuário
+        entityManager.createNativeQuery("DELETE FROM posts WHERE user_id = :userId")
+                .setParameter("userId", userId).executeUpdate();
+
+        // 6. Remover inscrições do usuário em colmeias, ou todos os membros de colmeias criadas por ele
+        entityManager.createNativeQuery("DELETE FROM hive_members WHERE user_id = :userId OR hive_id IN (SELECT id FROM hives WHERE creator_id = :userId)")
+                .setParameter("userId", userId).executeUpdate();
+
+        // 7. Apagar colmeias criadas pelo usuário
+        entityManager.createNativeQuery("DELETE FROM hives WHERE creator_id = :userId")
+                .setParameter("userId", userId).executeUpdate();
+
+        // 8. Desassociar templates clonados
+        entityManager.createNativeQuery("UPDATE workout_templates SET friend_source_id = null WHERE friend_source_id = :userId")
+                .setParameter("userId", userId).executeUpdate();
+
+        // 9. Apagar exercícios de templates criados pelo usuário
+        entityManager.createNativeQuery("DELETE FROM workout_template_exercises WHERE workout_template_id IN (SELECT id FROM workout_templates WHERE user_id = :userId)")
+                .setParameter("userId", userId).executeUpdate();
+
+        // 10. Apagar templates de treinos criados pelo usuário
+        entityManager.createNativeQuery("DELETE FROM workout_templates WHERE user_id = :userId")
+                .setParameter("userId", userId).executeUpdate();
+
+        // 11. Desassociar cartas geradas das sessões de treino para evitar dependência circular
+        entityManager.createNativeQuery("UPDATE workout_sessions SET card_id = null WHERE user_id = :userId")
+                .setParameter("userId", userId).executeUpdate();
+
+        // 12. Apagar cartas no inventário do usuário
+        entityManager.createNativeQuery("DELETE FROM card WHERE inventory_id IN (SELECT id FROM inventory WHERE user_id = :userId)")
+                .setParameter("userId", userId).executeUpdate();
+
+        // 13. Apagar inventário do usuário
+        entityManager.createNativeQuery("DELETE FROM inventory WHERE user_id = :userId")
+                .setParameter("userId", userId).executeUpdate();
+
+        // 14. Apagar séries, exercícios e treinos do usuário
+        entityManager.createNativeQuery("DELETE FROM sets WHERE exercise_id IN (SELECT id FROM session_exercises WHERE workout_id IN (SELECT id FROM workout_sessions WHERE user_id = :userId))")
+                .setParameter("userId", userId).executeUpdate();
+
+        entityManager.createNativeQuery("DELETE FROM session_exercises WHERE workout_id IN (SELECT id FROM workout_sessions WHERE user_id = :userId)")
+                .setParameter("userId", userId).executeUpdate();
+
+        entityManager.createNativeQuery("DELETE FROM workout_sessions WHERE user_id = :userId")
+                .setParameter("userId", userId).executeUpdate();
+
+        // 15. Por fim, apagar o registro do usuário
         userRepository.delete(user);
     }
 }

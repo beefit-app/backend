@@ -39,6 +39,9 @@ class UserServiceTest {
     @Mock
     private WorkoutMediaService workoutMediaService;
 
+    @Mock(answer = org.mockito.Answers.RETURNS_DEEP_STUBS)
+    private jakarta.persistence.EntityManager entityManager;
+
     @InjectMocks
     private UserService userService;
 
