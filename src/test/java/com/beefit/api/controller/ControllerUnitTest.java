@@ -176,7 +176,7 @@ class ControllerUnitTest {
                 new UpdateAccountSettingsRequestDTO(Boolean.TRUE));
         ResponseEntity<Void> deleteResponse = controller.deleteAccount(
                 user,
-                new DeleteUserRequestDTO("current"));
+                "current");
 
         assertEquals(HttpStatus.NO_CONTENT, updateResponse.getStatusCode());
         assertEquals(HttpStatus.NO_CONTENT, passwordResponse.getStatusCode());
