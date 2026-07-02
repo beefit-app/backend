@@ -23,13 +23,18 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.beefit.api.domain.CatalogExercise;
+import com.beefit.api.domain.Card;
 import com.beefit.api.domain.SessionExercise;
 import com.beefit.api.domain.TemplateExercise;
 import com.beefit.api.domain.User;
 import com.beefit.api.domain.WorkoutSession;
 import com.beefit.api.domain.WorkoutTemplate;
+import com.beefit.api.domain.enums.CardRarity;
 import com.beefit.api.domain.enums.MuscleGroups;
+import com.beefit.api.domain.enums.SocialEvent;
 import com.beefit.api.domain.enums.WorkoutStatus;
+import com.beefit.api.dto.social.SocialEventDTO;
+import com.beefit.api.dto.workout.CardGeneratedEventDTO;
 import com.beefit.api.dto.workout.FinishWorkoutExerciseDTO;
 import com.beefit.api.dto.workout.FinishWorkoutSetDTO;
 import com.beefit.api.dto.workout.FinishWorkoutSnapshotRequestDTO;
@@ -43,6 +48,7 @@ import com.beefit.api.exception.workout.WorkoutTemplateNotFoundException;
 import com.beefit.api.mapper.WorkoutMuscleGroupMapper;
 import com.beefit.api.mapper.WorkoutSessionMapper;
 import com.beefit.api.repository.CatalogExerciseRepository;
+import com.beefit.api.repository.PostRepository;
 import com.beefit.api.repository.UserRepository;
 import com.beefit.api.repository.WorkoutSessionRepository;
 import com.beefit.api.repository.WorkoutTemplateRepository;
@@ -71,6 +77,18 @@ class WorkoutSessionServiceTest {
     @Mock
     private SseService sseService;
 
+    @Mock
+    private CardService cardService;
+
+    @Mock
+    private PostRepository postRepository;
+
+    @Mock
+    private FriendshipService friendshipService;
+
+    @Mock
+    private WorkoutMediaService workoutMediaService;
+
     @InjectMocks
     private WorkoutSessionService workoutSessionService;
 
@@ -86,13 +104,14 @@ class WorkoutSessionServiceTest {
     @Test
     void startWorkoutWithoutTemplateCreatesEmptySession() {
         StartWorkoutRequestDTO request = new StartWorkoutRequestDTO(
-                List.of(MuscleGroups.CHEST),
+                List.of("peito"),
                 Boolean.TRUE,
                 null,
                 List.of());
 
         when(workoutSessionRepository.findByStatusAndUserId(WorkoutStatus.IN_PROGRESS, userId)).thenReturn(List.of());
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(workoutMuscleGroupMapper.toDomain(List.of("peito"))).thenReturn(List.of(MuscleGroups.CHEST));
         when(workoutSessionRepository.save(any(WorkoutSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(workoutSessionMapper.toDto(any(WorkoutSession.class))).thenReturn(responseDto(WorkoutStatus.IN_PROGRESS));
 
@@ -125,7 +144,7 @@ class WorkoutSessionServiceTest {
                 templateExercise(secondCatalogExercise, 2)));
 
         StartWorkoutRequestDTO request = new StartWorkoutRequestDTO(
-                List.of(MuscleGroups.BACK),
+                List.of("costas"),
                 Boolean.TRUE,
                 templateId,
                 null);
@@ -133,6 +152,7 @@ class WorkoutSessionServiceTest {
         when(workoutSessionRepository.findByStatusAndUserId(WorkoutStatus.IN_PROGRESS, userId)).thenReturn(List.of());
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
         when(workoutTemplateRepository.findById(templateId)).thenReturn(Optional.of(template));
+        when(workoutMuscleGroupMapper.toDomain(List.of("costas"))).thenReturn(List.of(MuscleGroups.BACK));
         when(workoutSessionRepository.save(any(WorkoutSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(workoutSessionMapper.toDto(any(WorkoutSession.class))).thenReturn(responseDto(WorkoutStatus.IN_PROGRESS));
 
@@ -157,7 +177,7 @@ class WorkoutSessionServiceTest {
         template.setUser(user(UUID.randomUUID()));
 
         StartWorkoutRequestDTO request = new StartWorkoutRequestDTO(
-                List.of(MuscleGroups.LEGS),
+                List.of("pernas"),
                 Boolean.TRUE,
                 templateId,
                 null);
@@ -173,7 +193,7 @@ class WorkoutSessionServiceTest {
     @Test
     void startWorkoutWhenWorkoutAlreadyInProgressThrows() {
         StartWorkoutRequestDTO request = new StartWorkoutRequestDTO(
-                List.of(MuscleGroups.CORE),
+                List.of("core"),
                 Boolean.FALSE,
                 null,
                 null);
@@ -205,26 +225,42 @@ class WorkoutSessionServiceTest {
         session.addExercise(existingExercise);
         session.addExercise(removableExercise);
 
+        String finishedAt = "2026-05-26T10:45:00-03:00";
         FinishWorkoutSnapshotRequestDTO request = new FinishWorkoutSnapshotRequestDTO(
-                LocalDateTime.of(2026, 5, 26, 10, 45),
-                List.of(MuscleGroups.CHEST, MuscleGroups.LEGS),
+                finishedAt,
+                List.of("peito", "pernas"),
                 List.of(
                         new FinishWorkoutExerciseDTO(
                                 null,
-                                newCatalogExercise.getId(),
+                                newCatalogExercise.getId().toString(),
+                                newCatalogExercise.getName(),
                                 1,
                                 List.of(new FinishWorkoutSetDTO(null, 1, 80.0, 5))),
                         new FinishWorkoutExerciseDTO(
                                 existingExercise.getId(),
-                                existingCatalogExercise.getId(),
+                                existingCatalogExercise.getId().toString(),
+                                existingCatalogExercise.getName(),
                                 2,
                                 List.of(
                                         new FinishWorkoutSetDTO(existingSetId, 1, 45.0, 8),
-                                        new FinishWorkoutSetDTO(null, 2, 42.5, 10)))));
+                                        new FinishWorkoutSetDTO(null, 2, 42.5, 10)))),
+                null,
+                false,
+                null);
 
         when(workoutSessionRepository.findById(workoutId)).thenReturn(Optional.of(session));
         when(catalogExerciseRepository.findById(newCatalogExercise.getId())).thenReturn(Optional.of(newCatalogExercise));
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(workoutMuscleGroupMapper.toDomain(List.of("peito", "pernas"))).thenReturn(List.of(MuscleGroups.CHEST, MuscleGroups.LEGS));
+        Card generatedCard = new Card();
+        generatedCard.setId(UUID.randomUUID());
+        generatedCard.setAttackPower(250.0);
+        generatedCard.setCardRarity(CardRarity.RARE);
+        generatedCard.setMuscleGroup(MuscleGroups.CHEST);
+        generatedCard.setIsPersonalRecord(Boolean.TRUE);
+
+        when(cardService.generateCard(user, session)).thenReturn(generatedCard);
+        when(workoutMuscleGroupMapper.toApi(MuscleGroups.CHEST)).thenReturn("peito");
         when(workoutSessionRepository.save(any(WorkoutSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(workoutSessionMapper.toDto(any(WorkoutSession.class))).thenReturn(responseDto(WorkoutStatus.FINISHED));
 
@@ -236,7 +272,7 @@ class WorkoutSessionServiceTest {
 
         WorkoutSession savedSession = sessionCaptor.getValue();
         assertEquals(WorkoutStatus.FINISHED, savedSession.getStatus());
-        assertEquals(request.finishedAt(), savedSession.getFinishedAt());
+        assertEquals(LocalDateTime.of(2026, 5, 26, 10, 45), savedSession.getFinishedAt());
         assertEquals(2700, savedSession.getDurationSeconds());
         assertEquals(1, user.getOffensiveHoneys());
         assertEquals(1, user.getWorkoutsCount());
@@ -246,6 +282,15 @@ class WorkoutSessionServiceTest {
         assertEquals(existingCatalogExercise, savedSession.getExercises().get(1).getExercise());
         assertEquals(80.0 * 5 + 45.0 * 8 + 42.5 * 10, savedSession.getTotalVolume());
         assertEquals("finished", response.status());
+
+        ArgumentCaptor<SocialEventDTO> eventCaptor = ArgumentCaptor.forClass(SocialEventDTO.class);
+        verify(sseService).broadcastToFriend(eventCaptor.capture(), org.mockito.ArgumentMatchers.eq(userId));
+        assertEquals(SocialEvent.CARD_GENERATED, eventCaptor.getValue().type());
+        CardGeneratedEventDTO event = (CardGeneratedEventDTO) eventCaptor.getValue().dataSocialEvent();
+        assertEquals(workoutId, event.workoutId());
+        assertEquals(generatedCard.getId(), event.cardId());
+        assertEquals("RARE", event.rarity());
+        assertEquals("peito", event.muscleGroup());
     }
 
     @Test
@@ -257,9 +302,12 @@ class WorkoutSessionServiceTest {
         when(workoutSessionRepository.findById(workoutId)).thenReturn(Optional.of(session));
 
         FinishWorkoutSnapshotRequestDTO request = new FinishWorkoutSnapshotRequestDTO(
-                LocalDateTime.now(),
-                List.of(MuscleGroups.CHEST),
-                List.of());
+                LocalDateTime.now().toString(),
+                List.of("peito"),
+                List.of(),
+                null,
+                false,
+                null);
 
         assertThrows(WorkoutSessionNotFoundException.class,
                 () -> workoutSessionService.finishWorkout(userId, workoutId, request));
@@ -274,9 +322,12 @@ class WorkoutSessionServiceTest {
         when(workoutSessionRepository.findById(workoutId)).thenReturn(Optional.of(session));
 
         FinishWorkoutSnapshotRequestDTO request = new FinishWorkoutSnapshotRequestDTO(
-                LocalDateTime.now(),
-                List.of(MuscleGroups.CHEST),
-                List.of());
+                LocalDateTime.now().toString(),
+                List.of("peito"),
+                List.of(),
+                null,
+                false,
+                null);
 
         assertThrows(InvalidWorkoutSessionStateException.class,
                 () -> workoutSessionService.finishWorkout(userId, workoutId, request));
@@ -378,6 +429,7 @@ class WorkoutSessionServiceTest {
                 null,
                 List.of("peito"),
                 Boolean.TRUE,
-                List.of());
+                List.of(),
+                null);
     }
 }

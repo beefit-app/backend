@@ -33,28 +33,37 @@ import com.beefit.api.domain.TemplateExercise;
 import com.beefit.api.domain.User;
 import com.beefit.api.domain.enums.CardRarity;
 import com.beefit.api.domain.enums.MuscleGroups;
-import com.beefit.api.dto.AuthenticationDTO;
 import com.beefit.api.dto.CardFilterDTO;
-import com.beefit.api.dto.ChangePasswordDTO;
-import com.beefit.api.dto.DeleteUserRequestDTO;
 import com.beefit.api.dto.InventoryCardResponseDTO;
-import com.beefit.api.dto.LoginResponseDTO;
-import com.beefit.api.dto.StartWorkoutRequestDTO;
-import com.beefit.api.dto.UpdateAccountSettingsRequestDTO;
-import com.beefit.api.dto.UpdateProfileRequestDTO;
-import com.beefit.api.dto.UserProfileResponseDTO;
-import com.beefit.api.dto.UserResponseDTO;
-import com.beefit.api.dto.WorkoutSessionResponseDTO;
-import com.beefit.api.dto.WorkoutTemplateExerciseRequestDTO;
-import com.beefit.api.dto.WorkoutTemplateRequestDTO;
-import com.beefit.api.dto.WorkoutTemplateResponseDTO;
-import com.beefit.api.exception.InvalidMuscleGroupException;
+import com.beefit.api.dto.AdminPostResponseDTO;
+import com.beefit.api.dto.AdminUserResponseDTO;
+import com.beefit.api.dto.UpdatePostMetadataDTO;
+import com.beefit.api.dto.auth.AuthenticationDTO;
+import com.beefit.api.dto.auth.LoginResponseDTO;
+import com.beefit.api.dto.auth.LogoutRequestDTO;
+import com.beefit.api.dto.auth.RefreshTokenRequestDTO;
+import com.beefit.api.dto.auth.RefreshTokenResponseDTO;
+import com.beefit.api.dto.auth.UserResponseDTO;
+import com.beefit.api.dto.user.ChangePasswordDTO;
+import com.beefit.api.dto.user.BannedUserResponseDTO;
+import com.beefit.api.dto.user.DeleteUserRequestDTO;
+import com.beefit.api.dto.user.UpdateAccountSettingsRequestDTO;
+import com.beefit.api.dto.user.UpdateProfileRequestDTO;
+import com.beefit.api.dto.user.UserProfileResponseDTO;
+import com.beefit.api.exception.workout.InvalidMuscleGroupException;
+import com.beefit.api.dto.workout.StartWorkoutRequestDTO;
+import com.beefit.api.dto.workout.WorkoutSessionResponseDTO;
+import com.beefit.api.dto.workout.WorkoutTemplateExerciseRequestDTO;
+import com.beefit.api.dto.workout.WorkoutTemplateRequestDTO;
+import com.beefit.api.dto.workout.WorkoutTemplateResponseDTO;
 import com.beefit.api.mapper.RegisterMapper;
 import com.beefit.api.mapper.UserResponseMapper;
 import com.beefit.api.repository.CatalogExerciseRepository;
+import com.beefit.api.service.AdminUserService;
 import com.beefit.api.service.AuthService;
 import com.beefit.api.service.InventoryService;
 import com.beefit.api.service.UserService;
+import com.beefit.api.service.WorkoutModerationService;
 import com.beefit.api.service.WorkoutSessionService;
 import com.beefit.api.service.WorkoutTemplateService;
 
@@ -72,6 +81,12 @@ class ControllerUnitTest {
 
     @Mock
     private UserService userService;
+
+    @Mock
+    private AdminUserService adminUserService;
+
+    @Mock
+    private WorkoutModerationService workoutModerationService;
 
     @Mock
     private WorkoutSessionService workoutSessionService;
@@ -95,14 +110,39 @@ class ControllerUnitTest {
         AuthController controller = new AuthController(authService, registerMapper, userResponseMapper);
         LoginResponseDTO loginResponse = new LoginResponseDTO(
                 "token",
+                "refresh-token",
                 new UserResponseDTO(UUID.randomUUID(), "Test User", "testuser", "test@example.com", 80.0f, 4));
 
-        when(authService.login("test@example.com", "secret")).thenReturn(loginResponse);
+        when(authService.login("test@example.com", "secret", "device-1")).thenReturn(loginResponse);
 
-        ResponseEntity<LoginResponseDTO> response = controller.login(new AuthenticationDTO("test@example.com", "secret"));
+        ResponseEntity<LoginResponseDTO> response = controller.login(new AuthenticationDTO("test@example.com", "secret", "device-1"));
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(loginResponse, response.getBody());
+    }
+
+    @Test
+    void authRefreshReturnsNewTokens() {
+        AuthController controller = new AuthController(authService, registerMapper, userResponseMapper);
+        RefreshTokenResponseDTO refreshResponse = new RefreshTokenResponseDTO("new-access", "new-refresh");
+
+        when(authService.refreshSession("refresh-token", "device-1")).thenReturn(refreshResponse);
+
+        ResponseEntity<RefreshTokenResponseDTO> response = controller.refresh(
+                new RefreshTokenRequestDTO("refresh-token", "device-1"));
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(refreshResponse, response.getBody());
+    }
+
+    @Test
+    void authLogoutReturnsNoContent() {
+        AuthController controller = new AuthController(authService, registerMapper, userResponseMapper);
+
+        ResponseEntity<Void> response = controller.logout(new LogoutRequestDTO("refresh-token", "device-1"));
+
+        assertEquals(HttpStatus.NO_CONTENT, response.getStatusCode());
+        verify(authService).logout("refresh-token", "device-1");
     }
 
     @Test
@@ -136,7 +176,7 @@ class ControllerUnitTest {
                 new UpdateAccountSettingsRequestDTO(Boolean.TRUE));
         ResponseEntity<Void> deleteResponse = controller.deleteAccount(
                 user,
-                new DeleteUserRequestDTO("current"));
+                "current");
 
         assertEquals(HttpStatus.NO_CONTENT, updateResponse.getStatusCode());
         assertEquals(HttpStatus.NO_CONTENT, passwordResponse.getStatusCode());
@@ -169,7 +209,7 @@ class ControllerUnitTest {
         WorkoutController controller = new WorkoutController(workoutSessionService);
         User user = user();
         UUID workoutId = UUID.randomUUID();
-        StartWorkoutRequestDTO request = new StartWorkoutRequestDTO(List.of(MuscleGroups.CHEST), Boolean.TRUE, null, List.of());
+        StartWorkoutRequestDTO request = new StartWorkoutRequestDTO(List.of("peito"), Boolean.TRUE, null, List.of());
         WorkoutSessionResponseDTO dto = new WorkoutSessionResponseDTO(
                 workoutId,
                 "in_progress",
@@ -180,7 +220,8 @@ class ControllerUnitTest {
                 null,
                 List.of("peito"),
                 true,
-                List.of());
+                List.of(),
+                null);
 
         when(workoutSessionService.startWorkout(user.getId(), request)).thenReturn(dto);
 
@@ -211,19 +252,16 @@ class ControllerUnitTest {
         UUID catalogExerciseId = UUID.randomUUID();
         WorkoutTemplateRequestDTO request = new WorkoutTemplateRequestDTO(
                 "Treino A",
-                List.of(MuscleGroups.CHEST),
+                List.of("peito"),
                 List.of(new WorkoutTemplateExerciseRequestDTO(catalogExerciseId, 1)));
         CatalogExercise catalogExercise = new CatalogExercise();
         catalogExercise.setId(catalogExerciseId);
         catalogExercise.setName("Supino");
-        TemplateExercise templateExercise = new TemplateExercise();
-        templateExercise.setCatalogExercise(catalogExercise);
-        templateExercise.setOrder(1);
         WorkoutTemplateResponseDTO dto = new WorkoutTemplateResponseDTO(
                 user.getId(),
                 "Treino A",
                 List.of(MuscleGroups.CHEST),
-                List.of(templateExercise));
+                List.of(new com.beefit.api.dto.workout.WorkoutTemplateExerciseResponseDTO(catalogExerciseId, "Supino", 1)));
 
         when(workoutTemplateService.createTemplate(request, user.getId())).thenReturn(dto);
 
@@ -320,6 +358,71 @@ class ControllerUnitTest {
         ArgumentCaptor<UUID> userIdCaptor = ArgumentCaptor.forClass(UUID.class);
         verify(userService).updateUserProfile(userIdCaptor.capture(), any());
         assertEquals(user.getId(), userIdCaptor.getValue());
+    }
+
+    @Test
+    void adminUserControllerDelegatesSearchAndActions() {
+        AdminUserController controller = new AdminUserController(adminUserService, userResponseMapper);
+        User user = user();
+        AdminUserResponseDTO userDto = new AdminUserResponseDTO(
+                user.getId(),
+                user.getFullName(),
+                user.getUsername(),
+                user.getEmail(),
+                user.getBodyWeight(),
+                user.getWeeklyGoal(),
+                false,
+                null);
+        BannedUserResponseDTO bannedDto = new BannedUserResponseDTO(user.getId(), user.getUsername(), true, 7, null);
+        BannedUserResponseDTO unbannedDto = new BannedUserResponseDTO(user.getId(), user.getUsername(), false, 0, null);
+        PageRequest pageable = PageRequest.of(0, 10);
+        Page<User> users = new PageImpl<>(List.of(user), pageable, 1);
+
+        when(adminUserService.searchUsers("test", pageable)).thenReturn(users);
+        when(adminUserService.banUserForDays(user.getId(), 7)).thenReturn(bannedDto);
+        when(adminUserService.unbanUser(user.getId())).thenReturn(unbannedDto);
+
+        ResponseEntity<Page<AdminUserResponseDTO>> searchResponse = controller.searchUsers("test", pageable);
+        ResponseEntity<BannedUserResponseDTO> banResponse = controller.banUser(user.getId(), 7);
+        ResponseEntity<BannedUserResponseDTO> unbanResponse = controller.unbanUser(user.getId());
+
+        assertEquals(HttpStatus.OK, searchResponse.getStatusCode());
+        assertEquals(List.of(userDto), searchResponse.getBody().getContent());
+        assertEquals(bannedDto, banResponse.getBody());
+        assertEquals(unbannedDto, unbanResponse.getBody());
+    }
+
+    @Test
+    void adminWorkoutControllerDelegatesModerationOperations() {
+        AdminWorkoutController controller = new AdminWorkoutController(workoutModerationService);
+        UUID postId = UUID.randomUUID();
+        PageRequest pageable = PageRequest.of(0, 10);
+        AdminPostResponseDTO postDto = new AdminPostResponseDTO(
+                postId,
+                UUID.randomUUID(),
+                "testuser",
+                "Test User",
+                "Treino",
+                null,
+                3,
+                false,
+                1800,
+                1200.0);
+        Page<AdminPostResponseDTO> posts = new PageImpl<>(List.of(postDto), pageable, 1);
+        UpdatePostMetadataDTO update = new UpdatePostMetadataDTO("Novo titulo", null);
+
+        when(workoutModerationService.listAllPosts(pageable)).thenReturn(posts);
+
+        ResponseEntity<Page<AdminPostResponseDTO>> listResponse = controller.listAllPosts(pageable);
+        ResponseEntity<Void> editResponse = controller.editPost(postId, update);
+        ResponseEntity<Void> deleteResponse = controller.deletePost(postId);
+
+        assertEquals(HttpStatus.OK, listResponse.getStatusCode());
+        assertEquals(posts, listResponse.getBody());
+        assertEquals(HttpStatus.NO_CONTENT, editResponse.getStatusCode());
+        assertEquals(HttpStatus.NO_CONTENT, deleteResponse.getStatusCode());
+        verify(workoutModerationService).editPostMetadata(postId, update);
+        verify(workoutModerationService).removeInappropriatePost(postId);
     }
 
     private void bindRequest(String uri) {

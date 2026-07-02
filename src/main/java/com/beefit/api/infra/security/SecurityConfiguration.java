@@ -1,5 +1,6 @@
 package com.beefit.api.infra.security;
 
+import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -9,6 +10,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -25,6 +27,7 @@ import java.util.List;
 @Configuration
 @EnableWebSecurity // Habilitar configuração do Web Security dentro dessa classe para nós
                    // conseguirmos mexer nela
+@EnableMethodSecurity
 @RequiredArgsConstructor
 public class SecurityConfiguration {
 
@@ -45,25 +48,42 @@ public class SecurityConfiguration {
                                                                                                               // Stateless
                 .exceptionHandling(exception -> exception
                         .authenticationEntryPoint((request, response, authException) -> {
+                            String authFailure = (String) request.getAttribute(SecurityFilter.AUTH_FAILURE_REASON_ATTRIBUTE);
+                            String errorCode = "AUTH_REQUIRED";
+                            if ("EXPIRED".equals(authFailure)) {
+                                errorCode = "TOKEN_EXPIRED";
+                            } else if ("INVALID".equals(authFailure)) {
+                                errorCode = "TOKEN_INVALID";
+                            }
+                            String message = switch (errorCode) {
+                                case "TOKEN_EXPIRED" -> "Sua sessão expirou.";
+                                case "TOKEN_INVALID" -> "Sua sessão é inválida.";
+                                default -> "Autenticação obrigatória.";
+                            };
 
                             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                             response.setContentType("application/json");
+                            response.setCharacterEncoding("UTF-8");
 
                             response.getWriter().write("""
                                       {
                                           "status": 401,
-                                          "error": "Unauthorized",
-                                          "message": "Credenciais inválidas."
+                                          "error": "%s",
+                                          "message": "%s"
                                       }
-                                    """);
+                                    """.formatted(errorCode, message));
                         }))
 
                 .authorizeHttpRequests(authorize -> authorize
                         // .requestMatchers(HttpMethod.POST, "/dashboard").hasRole("ADMIN")
                         // Rotas exclusivas de admin ou de autenticação devem ser adicionadas aqui
+                        .dispatcherTypeMatchers(DispatcherType.ASYNC).permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/login").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/register").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/auth/refresh").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/auth/logout").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/media/**").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .addFilterBefore(securityFilter, UsernamePasswordAuthenticationFilter.class)
@@ -73,7 +93,7 @@ public class SecurityConfiguration {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of(allowedOrigins));
+        configuration.setAllowedOriginPatterns(List.of(allowedOrigins));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);

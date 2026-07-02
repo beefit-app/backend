@@ -20,7 +20,7 @@ import com.beefit.api.domain.enums.MuscleGroups;
 import com.beefit.api.dto.CardFilterDTO;
 import com.beefit.api.dto.InventoryCardResponseDTO;
 import com.beefit.api.exception.InvalidCardRarityException;
-import com.beefit.api.exception.InvalidMuscleGroupException;
+import com.beefit.api.exception.workout.InvalidMuscleGroupException;
 import com.beefit.api.service.InventoryService;
 
 import lombok.RequiredArgsConstructor;

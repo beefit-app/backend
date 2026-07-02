@@ -19,9 +19,11 @@ public class WorkoutMuscleGroupMapper {
             case "peito" -> MuscleGroups.CHEST;
             case "costas" -> MuscleGroups.BACK;
             case "pernas" -> MuscleGroups.LEGS;
+            case "gluteos" -> MuscleGroups.GLUTES;
             case "ombros" -> MuscleGroups.SHOULDERS;
             case "bracos" -> MuscleGroups.ARMS;
             case "core" -> MuscleGroups.CORE;
+            case "trapezio" -> MuscleGroups.TRAPS;
             default -> throw new IllegalArgumentException("Grupo muscular inválido: " + value);
         };
     }

@@ -4,9 +4,11 @@ import com.beefit.api.domain.User;
 import com.beefit.api.dto.social.SocialEventDTO;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import org.springframework.scheduling.annotation.Scheduled;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Set;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -14,34 +16,32 @@ import java.util.concurrent.ConcurrentHashMap;
 @Service
 public class SseService {
 
-    private final Map<UUID, SseEmitter> emitters = new ConcurrentHashMap<>();
+    private final Map<UUID, Set<SseEmitter>> emitters = new ConcurrentHashMap<>();
 
     public void addEmitter(UUID userId, SseEmitter emitter){
-        emitters.put(userId,emitter);
+        emitters.computeIfAbsent(userId, ignored -> ConcurrentHashMap.newKeySet()).add(emitter);
 
-        emitter.onCompletion(() -> emitters.remove(userId));
-        emitter.onTimeout(() -> emitters.remove(userId));
-        emitter.onError((e) -> emitters.remove(userId));
+        emitter.onCompletion(() -> removeEmitter(userId, emitter));
+        emitter.onTimeout(() -> removeEmitter(userId, emitter));
+        emitter.onError((e) -> removeEmitter(userId, emitter));
     }
 
     public void broadcastToFriend(SocialEventDTO<?> socialEventDTO, UUID userId){
-        SseEmitter emitter = emitters.get(userId);
-
-        if(emitter!=null){
-            sendEvent(socialEventDTO, emitter);
-        }
+        emitters.getOrDefault(userId, Set.of()).forEach(emitter -> sendEvent(socialEventDTO, emitter));
     }
 
     public void broadcastToFriends(SocialEventDTO<?> socialEventDTO, List<User> friends){
         for(User friend:friends){
-            SseEmitter emitter = emitters.get(friend.getId());
-
-            if(emitter==null){
-                continue;
-            }
-
-            sendEvent(socialEventDTO, emitter);
+            emitters.getOrDefault(friend.getId(), Set.of()).forEach(emitter -> sendEvent(socialEventDTO, emitter));
         }
+    }
+
+    @Scheduled(fixedRate = 25000)
+    public void heartbeat() {
+        emitters.forEach((userId, userEmitters) -> userEmitters.forEach(emitter -> {
+            try { emitter.send(SseEmitter.event().name("heartbeat").data("{}")); }
+            catch (IOException exception) { removeEmitter(userId, emitter); emitter.complete(); }
+        }));
     }
 
     private void sendEvent(SocialEventDTO<?> socialEventDTO, SseEmitter emitter){
@@ -50,6 +50,13 @@ public class SseService {
         } catch (IOException e) {
             emitter.complete();
         }
+    }
+
+    private void removeEmitter(UUID userId, SseEmitter emitter) {
+        Set<SseEmitter> userEmitters = emitters.get(userId);
+        if (userEmitters == null) return;
+        userEmitters.remove(emitter);
+        if (userEmitters.isEmpty()) emitters.remove(userId, userEmitters);
     }
 
 }

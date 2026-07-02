@@ -32,9 +32,9 @@ public interface FriendshipRepository extends JpaRepository<Friendship, UUID> {
 
     // Busca todas as amizades ou convites de um usuário
     @Query("SELECT f FROM Friendship f " +
-            "WHERE (f.requester = :user OR f.addressee = :user) " +
+            "WHERE (f.requester.id = :userId OR f.addressee.id = :userId) " +
             "  AND f.status = :status")
-    List<Friendship> findAllByUserAndStatus(@Param("user") User user, @Param("status") FriendshipStatus status);
+    List<Friendship> findAllByUserIdAndStatus(@Param("userId") UUID userId, @Param("status") FriendshipStatus status);
 
     // Busca somente os convites recebidos pelo usuário
     // Pode ser combinado com o status de pendente para ver os convites não aceitos ainda por ele

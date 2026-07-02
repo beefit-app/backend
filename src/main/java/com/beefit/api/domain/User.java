@@ -45,6 +45,7 @@ public class User implements UserDetails {
 
     @NotNull
     @Positive
+    @Max(300)
     @Column(name = "body_weight", nullable = false)
     private Float bodyWeight;
 

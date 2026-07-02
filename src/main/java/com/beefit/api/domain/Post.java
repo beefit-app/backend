@@ -53,6 +53,10 @@ public class Post {
     // Cache do total de likes para evitar COUNT(*) toda vez que renderizar o feed
     private Integer totalLikes = 0;
 
+    private String title;
+
+    private UUID photoMediaId;
+
     // Para quando a moderação deletar um post
     private Boolean isRemoved = false;
 

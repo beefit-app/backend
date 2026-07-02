@@ -10,6 +10,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.time.LocalDate;
 
 public interface WorkoutSessionRepository extends JpaRepository<WorkoutSession, UUID> {
 
@@ -22,6 +23,19 @@ public interface WorkoutSessionRepository extends JpaRepository<WorkoutSession, 
     // Esse and é reservado e é traduzido na query também
     // Esse metodo é capaz de selecionar só os treinos ativos ou finalizados de um certo usuário
     List<WorkoutSession> findByStatusAndUserId(WorkoutStatus status, UUID id);
+
+    @Query("""
+    SELECT w FROM WorkoutSession w
+    JOIN FETCH w.user
+    WHERE w.status = :status
+      AND w.isPrivate = false
+      AND w.user.id <> :currentUserId
+    ORDER BY w.startedAt DESC
+    """)
+    List<WorkoutSession> findAllPublicByStatusExcludingUser(
+            @Param("status") WorkoutStatus status,
+            @Param("currentUserId") UUID currentUserId
+    );
 
     @Query("""
     SELECT MAX(w.totalVolume) FROM WorkoutSession w WHERE w.user.id = :userId AND w.status = :status
@@ -43,7 +57,12 @@ public interface WorkoutSessionRepository extends JpaRepository<WorkoutSession, 
             @Param("endOfDay") LocalDateTime endOfDay
     );
 
-    @Query("SELECT COUNT(w) FROM WorkoutSession w WHERE w.endTime >= :twentyFourHoursAgo AND w.status = 'FINISHED'")
+    @Query("SELECT DISTINCT w.finishedAt FROM WorkoutSession w WHERE w.user.id = :userId " +
+            "AND w.status = :status AND w.finishedAt >= :start AND w.finishedAt < :end")
+    List<LocalDateTime> findFinishedDaysByUserAndMonth(@Param("userId") UUID userId, @Param("status") WorkoutStatus status,
+            @Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    @Query("SELECT COUNT(w) FROM WorkoutSession w WHERE w.finishedAt >= :twentyFourHoursAgo AND w.status = 'FINISHED'")
     Long countWorkoutsLast24Hours(@Param("twentyFourHoursAgo") LocalDateTime twentyFourHoursAgo);
 
 }

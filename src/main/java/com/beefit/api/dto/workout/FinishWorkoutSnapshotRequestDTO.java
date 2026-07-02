@@ -1,16 +1,17 @@
 package com.beefit.api.dto.workout;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
-import com.beefit.api.domain.enums.MuscleGroups;
-
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 
 public record FinishWorkoutSnapshotRequestDTO(
-        @NotNull LocalDateTime finishedAt,
-        @NotEmpty List<MuscleGroups> muscleGroups,
-        @NotNull @Valid List<FinishWorkoutExerciseDTO> exercises) {
+        @NotBlank String finishedAt,
+        @NotEmpty List<String> muscleGroups,
+        @NotNull @Valid List<FinishWorkoutExerciseDTO> exercises,
+        String title,
+        Boolean shouldPostWorkout,
+        java.util.UUID photoMediaId) {
 }

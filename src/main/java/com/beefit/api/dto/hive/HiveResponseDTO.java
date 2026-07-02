@@ -7,6 +7,7 @@ import java.util.UUID;
 public record HiveResponseDTO (
         UUID id,
         String name,
+        UUID creatorId,
         String inviteCode,
         LocalDate startDate,
         LocalDate endDate,

@@ -8,14 +8,21 @@ import org.springframework.web.bind.annotation.*;
 import com.beefit.api.domain.User;
 import com.beefit.api.dto.user.ChangePasswordDTO;
 import com.beefit.api.dto.user.DeleteUserRequestDTO;
+import com.beefit.api.dto.user.PublicUserProfileResponseDTO;
 import com.beefit.api.dto.user.UpdateAccountSettingsRequestDTO;
 import com.beefit.api.dto.user.UpdateProfileRequestDTO;
 import com.beefit.api.dto.user.UserProfileResponseDTO;
 import com.beefit.api.service.UserService;
+import com.beefit.api.service.PostService;
+import com.beefit.api.dto.feed.FeedPostResponseDTO;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
+import java.time.LocalDate;
+import java.time.YearMonth;
+import java.util.List;
 
 import jakarta.validation.Valid;
-
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/profile")
@@ -24,10 +31,53 @@ public class ProfileController {
     @Autowired
     private UserService userService;
 
+    @Autowired
+    private PostService postService;
+
+    @GetMapping("/{username}/posts")
+    public ResponseEntity<Page<FeedPostResponseDTO>> getUserPosts(@AuthenticationPrincipal User user,
+            @PathVariable String username,
+            @PageableDefault(size = 10) Pageable pageable) {
+        return ResponseEntity.ok(postService.getPostsByUsername(user, username, pageable));
+    }
+
+    @GetMapping("/{username}/training-days")
+    public ResponseEntity<List<Integer>> getUserTrainingDays(@PathVariable String username,
+            @RequestParam String month) {
+        YearMonth target = YearMonth.parse(month);
+        List<java.time.LocalDateTime> rawDays = userService.getPublicTrainingDays(username, target);
+        List<Integer> days = rawDays.stream()
+                .map(ldt -> ldt.toLocalDate().getDayOfMonth())
+                .distinct()
+                .sorted()
+                .toList();
+        return ResponseEntity.ok(days);
+    }
+
     @GetMapping("/{username}")
-    public ResponseEntity<UserProfileResponseDTO> getOtherProfile(@PathVariable UUID userId) {
-        UserProfileResponseDTO response = userService.getUserProfile(userId);
-        return ResponseEntity.ok(response);
+    public ResponseEntity<PublicUserProfileResponseDTO> getOtherProfile(@AuthenticationPrincipal User user,
+            @PathVariable String username) {
+        return ResponseEntity.ok(userService.getPublicUserProfile(user, username));
+    }
+
+    @GetMapping("/me/posts")
+    public ResponseEntity<Page<FeedPostResponseDTO>> getOwnPosts(@AuthenticationPrincipal User user,
+            @PageableDefault(size = 10) Pageable pageable) {
+        return ResponseEntity.ok(postService.getOwnPosts(user, pageable));
+    }
+
+    @GetMapping("/me/training-days")
+    public ResponseEntity<List<Integer>> getTrainingDays(@AuthenticationPrincipal User user,
+            @RequestParam String month) {
+        YearMonth target = YearMonth.parse(month);
+        List<java.time.LocalDateTime> rawDays = userService.getTrainingDays(user.getId(), target);
+        List<Integer> days = rawDays.stream()
+                .map(ldt -> ldt.toLocalDate().getDayOfMonth())
+                .distinct()
+                .sorted()
+                .toList();
+        System.out.println(">>> getTrainingDays returning days for " + user.getUsername() + ": " + days);
+        return ResponseEntity.ok(days);
     }
 
     // Rota para Visualizar o Perfil: GET http://localhost:8080/api/profile/{id}
@@ -64,8 +114,11 @@ public class ProfileController {
 
     @DeleteMapping("/me")
     public ResponseEntity<Void> deleteAccount(@AuthenticationPrincipal User user,
-            @Valid @RequestBody DeleteUserRequestDTO dto) {
-        userService.deleteAccount(user.getId(), dto);
+            @RequestHeader(value = "X-Confirm-Password", required = false) String password) {
+        if (password == null || password.isBlank()) {
+            throw new IllegalArgumentException("Confirme sua senha.");
+        }
+        userService.deleteAccount(user.getId(), new DeleteUserRequestDTO(password));
         return ResponseEntity.noContent().build();
     }
 }

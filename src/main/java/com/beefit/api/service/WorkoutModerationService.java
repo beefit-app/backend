@@ -1,10 +1,13 @@
 package com.beefit.api.service;
 
 import com.beefit.api.domain.Post;
+import com.beefit.api.dto.AdminPostResponseDTO;
 import com.beefit.api.dto.UpdatePostMetadataDTO;
-import com.beefit.api.exception.PostNotFoundException;
+import com.beefit.api.exception.friendship.PostNotFoundException;
 import com.beefit.api.repository.PostRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,6 +19,12 @@ import java.util.UUID;
 public class WorkoutModerationService {
 
     private final PostRepository postRepository;
+
+    @Transactional(readOnly = true)
+    public Page<AdminPostResponseDTO> listAllPosts(Pageable pageable) {
+        return postRepository.findAllByOrderByPublishedAtDesc(pageable)
+                .map(this::toAdminPostResponse);
+    }
 
     @Transactional
     public void removeInappropriatePost(UUID postId) {
@@ -36,11 +45,30 @@ public class WorkoutModerationService {
         // Atualiza os metadados da sessão de treino vinculada ao post
         var session = post.getWorkoutSession();
         if (dto.newTitle() != null) {
+            post.setTitle(dto.newTitle());
             session.setTitle(dto.newTitle());
         }
         // Exemplo: se houver campo de observação na sessão, atualize aqui
         // session.setObservation(dto.observation());
 
         postRepository.save(post);
+    }
+
+    private AdminPostResponseDTO toAdminPostResponse(Post post) {
+        var user = post.getUser();
+        var session = post.getWorkoutSession();
+
+        return new AdminPostResponseDTO(
+                post.getId(),
+                user.getId(),
+                user.getUsername(),
+                user.getFullName(),
+                post.getTitle(),
+                post.getPublishedAt(),
+                post.getTotalLikes(),
+                Boolean.TRUE.equals(post.getIsRemoved()),
+                session.getDurationSeconds(),
+                session.getTotalVolume()
+        );
     }
 }

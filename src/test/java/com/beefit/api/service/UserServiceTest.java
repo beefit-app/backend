@@ -36,6 +36,12 @@ class UserServiceTest {
     @Mock
     private PasswordEncoder passwordEncoder;
 
+    @Mock
+    private WorkoutMediaService workoutMediaService;
+
+    @Mock(answer = org.mockito.Answers.RETURNS_DEEP_STUBS)
+    private jakarta.persistence.EntityManager entityManager;
+
     @InjectMocks
     private UserService userService;
 
@@ -121,6 +127,7 @@ class UserServiceTest {
 
         userService.deleteAccount(userId, new DeleteUserRequestDTO("current"));
 
+        verify(workoutMediaService).deleteAllForOwner(userId);
         verify(userRepository).delete(user);
     }
 

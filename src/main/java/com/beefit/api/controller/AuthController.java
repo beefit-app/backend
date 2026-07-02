@@ -3,6 +3,9 @@ package com.beefit.api.controller;
 import com.beefit.api.domain.User;
 import com.beefit.api.dto.auth.AuthenticationDTO;
 import com.beefit.api.dto.auth.LoginResponseDTO;
+import com.beefit.api.dto.auth.LogoutRequestDTO;
+import com.beefit.api.dto.auth.RefreshTokenRequestDTO;
+import com.beefit.api.dto.auth.RefreshTokenResponseDTO;
 import com.beefit.api.dto.auth.RegisterDTO;
 import com.beefit.api.dto.auth.UserResponseDTO;
 import com.beefit.api.mapper.RegisterMapper;
@@ -29,7 +32,7 @@ public class AuthController implements GenericController {
     @PostMapping("/login")
     public ResponseEntity<LoginResponseDTO> login(@RequestBody @Valid AuthenticationDTO data) {
 
-        LoginResponseDTO login = authService.login(data.email(), data.password());
+        LoginResponseDTO login = authService.login(data.email(), data.password(), data.deviceId());
 
         return ResponseEntity.ok(login);
     }
@@ -43,11 +46,22 @@ public class AuthController implements GenericController {
         // Chama o service passando os dados de cadastro
         this.authService.register(registered);
 
-        LoginResponseDTO login = authService.login(data.email(), data.password());
+        LoginResponseDTO login = authService.login(data.email(), data.password(), data.deviceId());
         URI location = gerarLocation(registered.getId());
 
         // Retornando sucesso sempre por enquanto
         return ResponseEntity.created(location).body(login);
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<RefreshTokenResponseDTO> refresh(@RequestBody @Valid RefreshTokenRequestDTO data) {
+        return ResponseEntity.ok(authService.refreshSession(data.refreshToken(), data.deviceId()));
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(@RequestBody @Valid LogoutRequestDTO data) {
+        authService.logout(data.refreshToken(), data.deviceId());
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/me")

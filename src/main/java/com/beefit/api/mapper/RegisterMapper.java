@@ -11,6 +11,7 @@ public interface RegisterMapper {
         @Mapping(source = "password", target = "passwordHash")
         User toEntity(RegisterDTO dto);
 
+        @Mapping(target = "deviceId", ignore = true)
         @Mapping(target = "password", source = "passwordHash")
         RegisterDTO toDto(User user);
 }

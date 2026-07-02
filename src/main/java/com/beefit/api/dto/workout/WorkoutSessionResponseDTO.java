@@ -4,7 +4,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
-import com.beefit.api.domain.Card;
 import jakarta.annotation.Nullable;
 
 public record WorkoutSessionResponseDTO(
@@ -18,5 +17,5 @@ public record WorkoutSessionResponseDTO(
         List<String> muscleGroups,
         Boolean isPrivate,
         List<SessionExerciseResponseDTO> exercises,
-        Card card) {
+        WorkoutCardResponseDTO card) {
 }

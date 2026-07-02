@@ -37,13 +37,36 @@ public class WorkoutTemplateController {
         return ResponseEntity.ok(workoutTemplates);
     }
 
+    @PutMapping("/{templateId}")
+    public ResponseEntity<WorkoutTemplateResponseDTO> updateTemplate(
+            @PathVariable UUID templateId,
+            @RequestBody @Valid WorkoutTemplateRequestDTO workoutTemplateReqDTO,
+            @AuthenticationPrincipal User user
+    ) {
+        WorkoutTemplateResponseDTO responseDTO = WTService.updateTemplate(templateId, workoutTemplateReqDTO, user.getId());
+
+        return ResponseEntity.ok(responseDTO);
+    }
+
+    @DeleteMapping("/{templateId}")
+    public ResponseEntity<Void> deleteTemplate(
+            @PathVariable UUID templateId,
+            @AuthenticationPrincipal User user
+    ) {
+        WTService.deleteTemplate(templateId, user.getId());
+
+        return ResponseEntity.noContent().build();
+    }
+
     @PostMapping("/import/{postId}")
     public ResponseEntity<WorkoutTemplateResponseDTO> importTemplateFromPost(
             @PathVariable UUID postId,
+            @RequestParam(required = false) String name,
             @AuthenticationPrincipal User usuarioAutenticado
     ) {
         WorkoutTemplateResponseDTO responseDTO = WTService.importTemplateFromPost(
                 postId,
+                name,
                 usuarioAutenticado.getId()
         );
 

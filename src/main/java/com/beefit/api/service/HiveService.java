@@ -73,6 +73,55 @@ public class HiveService {
         return hiveRepository.getRankingForHive(hiveId);
     }
 
+    @Transactional
+    public void leaveHive(User user, UUID hiveId) {
+        Hive hive = hiveRepository.findById(hiveId).orElseThrow(HiveNotFoundException::new);
+        
+        boolean isMember = hive.getMembers().stream()
+                .anyMatch(member -> member.getId().equals(user.getId()));
+        if (!isMember) {
+            throw new PermissionException();
+        }
+
+        if (hive.getCreator().getId().equals(user.getId())) {
+            if (hive.getMembers().size() <= 1) {
+                hiveRepository.delete(hive);
+            } else {
+                List<HiveRankingDTO> ranking = hiveRepository.getRankingForHive(hiveId);
+                
+                UUID newCreatorId = ranking.stream()
+                        .map(HiveRankingDTO::userId)
+                        .filter(id -> !id.equals(user.getId()))
+                        .findFirst()
+                        .orElseThrow(() -> new IllegalStateException("Nenhum outro membro encontrado para assumir a colmeia"));
+                
+                User newCreator = hive.getMembers().stream()
+                        .filter(m -> m.getId().equals(newCreatorId))
+                        .findFirst()
+                        .orElseThrow(() -> new IllegalStateException("Membro sucessor não encontrado no grupo"));
+                
+                hive.setCreator(newCreator);
+                hive.getMembers().removeIf(m -> m.getId().equals(user.getId()));
+                hiveRepository.save(hive);
+            }
+        } else {
+            hive.getMembers().removeIf(member -> member.getId().equals(user.getId()));
+            hiveRepository.save(hive);
+        }
+    }
+
+    public List<Hive> getMyHives(User user) {
+        return hiveRepository.findAllByMembersContaining(user);
+    }
+
+    public Hive getHive(User user, UUID hiveId) {
+        Hive hive = hiveRepository.findById(hiveId).orElseThrow(HiveNotFoundException::new);
+        boolean member = hive.getMembers().stream()
+                .anyMatch(current -> current.getId() != null && current.getId().equals(user.getId()));
+        if (!member) throw new PermissionException();
+        return hive;
+    }
+
     // Funções Auxiliares
     private void validateUserNotAlreadyInHive(User user, Hive hive){
 
@@ -83,7 +132,7 @@ public class HiveService {
 
     private void validateHiveOwnership(User user, Hive hive){
 
-        if(hive.getCreator() != user){
+        if(!hive.getCreator().getId().equals(user.getId())){
             throw new PermissionException();
         }
     }

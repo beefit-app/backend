@@ -51,7 +51,7 @@ class GlobalExceptionHandlerTest {
                 request);
 
         assertEquals(404, response.status());
-        assertEquals("Elementos do treino não encontrado.", response.error());
+        assertEquals("Elementos do treino não encontrados.", response.error());
         assertEquals("/api/workout/123/finish", response.path());
     }
 

@@ -26,8 +26,12 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     @Query("UPDATE User u SET u.weeklyWorkoutsCount = 0")
     void resetAllWeeklyWorkoutsCount();
 
-    @Query("SELECT u FROM User u WHERE " +
-            "LOWER(u.nome) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+    @Query("SELECT u FROM User u WHERE u.id <> :currentUserId AND (" +
+            "LOWER(u.fullName) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+            "LOWER(u.username) LIKE LOWER(CONCAT('%', :search, '%')))")
+    Page<User> searchSocialUsers(@Param("currentUserId") UUID currentUserId, @Param("search") String search, Pageable pageable);
+
+    @Query("SELECT u FROM User u WHERE LOWER(u.fullName) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
             "LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%'))")
     Page<User> getAllBySearchAndPagination(@Param("search") String search, Pageable pageable);
 }

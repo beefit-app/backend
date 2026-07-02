@@ -46,13 +46,30 @@ public class PostService {
         Page<Post> postsPage = postRepository.findFriendsFeed(currentUser, pageable);
 
         // Mapeia a página de entidades para uma página de DTOs de resposta
-        return postsPage.map(this::convertToFeedPostResponseDTO);
+        return postsPage.map(post -> convertToFeedPostResponseDTO(post, currentUser));
+    }
+
+    @Transactional
+    public Page<FeedPostResponseDTO> getOwnPosts(User user, Pageable pageable) {
+        return postRepository.findAllByUserAndIsRemovedFalseOrderByPublishedAtDesc(user, pageable)
+                .map(post -> convertToFeedPostResponseDTO(post, user));
+    }
+
+    @Transactional
+    public Page<FeedPostResponseDTO> getPostsByUsername(User currentUser, String username, Pageable pageable) {
+        User target = userRepository.findByUsername(username).orElseThrow(UserNotFoundException::new);
+        if (target.getGhostMode()) {
+            throw new UserNotFoundException();
+        }
+
+        return postRepository.findAllByUserAndIsRemovedFalseOrderByPublishedAtDesc(target, pageable)
+                .map(post -> convertToFeedPostResponseDTO(post, currentUser));
     }
 
 
      // Método auxiliar que converte a entidade Post e suas dependências no DTO do Feed.
 
-    private FeedPostResponseDTO convertToFeedPostResponseDTO(Post post) {
+    private FeedPostResponseDTO convertToFeedPostResponseDTO(Post post, User currentUser) {
         User author = post.getUser();
         var session = post.getWorkoutSession();
 
@@ -92,6 +109,9 @@ public class PostService {
                 null, // Caso o time adicione link de foto de perfil no futuro, o gancho está aqui
                 post.getPublishedAt(),
                 post.getTotalLikes(),
+                likeRepository.existsByLikedByAndPost(currentUser, post),
+                post.getTitle(),
+                post.getPhotoMediaId() == null ? null : "/api/media/" + post.getPhotoMediaId(),
                 session.getDurationSeconds(),
                 session.getEstimatedCalories(),
                 bodyHeatMap,

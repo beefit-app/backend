@@ -5,6 +5,7 @@ import com.beefit.api.domain.User;
 import com.beefit.api.domain.enums.FriendshipStatus;
 import com.beefit.api.domain.enums.SocialEvent;
 import com.beefit.api.dto.friendship.FriendAcceptedEventDTO;
+import com.beefit.api.dto.friendship.FriendRemovedEventDTO;
 import com.beefit.api.dto.friendship.FriendRequestEventDTO;
 import com.beefit.api.dto.social.SocialEventDTO;
 import com.beefit.api.exception.friendship.FriendshipAlreadyExistException;
@@ -23,6 +24,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import com.beefit.api.dto.friendship.FriendshipResponseDTO;
+import com.beefit.api.dto.social.SocialUserResponseDTO;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 @Service
 @RequiredArgsConstructor
@@ -33,7 +38,7 @@ public class FriendshipService {
     private final SseService sseService;
 
     @Transactional
-    public void createFriendship(User requester, UUID addresseeId){
+    public FriendshipResponseDTO createFriendship(User requester, UUID addresseeId){
         if(addresseeId.equals(requester.getId())){
             throw new SameUserException();
         }
@@ -52,21 +57,24 @@ public class FriendshipService {
         friendship.setAddressee(addressee);
         friendship.setStatus(FriendshipStatus.PENDING);
 
-        friendshipRepository.save(friendship);
+        Friendship saved = friendshipRepository.saveAndFlush(friendship);
 
         FriendRequestEventDTO friendRequestEventDTO = new FriendRequestEventDTO(
-                friendship.getId(),
+                saved.getId(),
                 requester.getId(),
+                requester.getFullName(),
                 requester.getUsername(),
-                friendship.getSentAt()
+                requester.getProfilePicture(),
+                saved.getSentAt()
         );
 
         sseService.broadcastToFriend(new SocialEventDTO<>(SocialEvent.FRIEND_REQUEST_PENDING, friendRequestEventDTO)
-                , friendship.getAddressee().getId());
+                , saved.getAddressee().getId());
+        return toResponse(saved, requester);
     }
 
     @Transactional
-    public void acceptRequest(User addressee, UUID friendshipId){
+    public FriendshipResponseDTO acceptRequest(User addressee, UUID friendshipId){
         Friendship friendship = friendshipRepository.findById(friendshipId).orElseThrow(FriendshipNotFound::new);
 
         if(!addressee.getId().equals(friendship.getAddressee().getId())){
@@ -82,12 +90,15 @@ public class FriendshipService {
         FriendAcceptedEventDTO friendAcceptedEventDTO = new FriendAcceptedEventDTO(
                 friendshipId,
                 addressee.getId(),
+                addressee.getFullName(),
                 addressee.getUsername(),
+                addressee.getProfilePicture(),
                 friendship.getUpdatedAt()
         );
 
         sseService.broadcastToFriend(new SocialEventDTO<>(SocialEvent.FRIEND_REQUEST_ACCEPTED, friendAcceptedEventDTO)
                                     , friendship.getRequester().getId());
+        return toResponse(friendship, addressee);
     }
 
     @Transactional
@@ -119,20 +130,97 @@ public class FriendshipService {
             throw new FriendshipNotAcceptedException();
         }
 
+        User requester = friendship.getRequester();
+        User addressee = friendship.getAddressee();
+
         friendshipRepository.delete(friendship);
+
+        FriendRemovedEventDTO requesterEvent = new FriendRemovedEventDTO(
+                friendshipID,
+                addressee.getId(),
+                addressee.getFullName(),
+                addressee.getUsername(),
+                addressee.getProfilePicture(),
+                friendship.getUpdatedAt()
+        );
+        FriendRemovedEventDTO addresseeEvent = new FriendRemovedEventDTO(
+                friendshipID,
+                requester.getId(),
+                requester.getFullName(),
+                requester.getUsername(),
+                requester.getProfilePicture(),
+                friendship.getUpdatedAt()
+        );
+
+        sseService.broadcastToFriend(new SocialEventDTO<>(SocialEvent.FRIEND_REMOVED, requesterEvent), requester.getId());
+        sseService.broadcastToFriend(new SocialEventDTO<>(SocialEvent.FRIEND_REMOVED, addresseeEvent), addressee.getId());
     }
 
     public Optional<List<User>> getFriends(UUID userId){
         User user = userRepository.findById(userId).orElseThrow(UserNotFoundException::new);
 
-        List<Friendship> friendships = friendshipRepository.findAllByUserAndStatus(user, FriendshipStatus.ACCEPTED);
+        List<Friendship> friendships = friendshipRepository.findAllByUserIdAndStatus(user.getId(), FriendshipStatus.ACCEPTED);
 
         List<User> friends = friendships.stream()
-                .map(friendship -> friendship.getRequester().equals(user)
+                .map(friendship -> isSameUser(friendship.getRequester(), user)
                 ? friendship.getAddressee() :
                 friendship.getRequester()).toList();
 
         return Optional.of(friends);
+    }
+
+    @Transactional(readOnly = true)
+    public List<FriendshipResponseDTO> getFriendships(User user, FriendshipStatus status, String direction) {
+        return friendshipRepository.findAllByUserIdAndStatus(user.getId(), status).stream()
+                .filter(friendship -> direction == null || (direction.equals("incoming") && isSameUser(friendship.getAddressee(), user))
+                        || (direction.equals("outgoing") && isSameUser(friendship.getRequester(), user)))
+                .map(friendship -> toResponse(friendship, user)).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public Page<SocialUserResponseDTO> searchUsers(User user, String query, Pageable pageable) {
+        return userRepository.searchSocialUsers(user.getId(), query == null ? "" : query.trim(), pageable)
+                .map(this::toSocialUser);
+    }
+
+    @Transactional(readOnly = true)
+    public FriendshipRelation getRelationship(User viewer, User target) {
+        if (isSameUser(viewer, target)) {
+            return new FriendshipRelation("SELF", null);
+        }
+
+        return friendshipRepository.findFriendshipBetween(viewer, target)
+                .map(friendship -> {
+                    if (FriendshipStatus.ACCEPTED.equals(friendship.getStatus())) {
+                        return new FriendshipRelation("FRIEND", friendship.getId());
+                    }
+                    if (FriendshipStatus.PENDING.equals(friendship.getStatus())) {
+                        String status = isSameUser(friendship.getRequester(), viewer) ? "REQUEST_SENT" : "REQUEST_RECEIVED";
+                        return new FriendshipRelation(status, friendship.getId());
+                    }
+                    return new FriendshipRelation("NONE", null);
+                })
+                .orElseGet(() -> new FriendshipRelation("NONE", null));
+    }
+
+    private FriendshipResponseDTO toResponse(Friendship friendship, User viewer) {
+        boolean requester = isSameUser(friendship.getRequester(), viewer);
+        return new FriendshipResponseDTO(friendship.getId(), toSocialUser(requester ? friendship.getAddressee() : friendship.getRequester()),
+                friendship.getStatus().name(), requester ? "outgoing" : "incoming", friendship.getSentAt());
+    }
+
+    private boolean isSameUser(User first, User second) {
+        return first != null
+                && second != null
+                && first.getId() != null
+                && first.getId().equals(second.getId());
+    }
+
+    private SocialUserResponseDTO toSocialUser(User user) {
+        return new SocialUserResponseDTO(user.getId(), user.getFullName(), user.getUsername(), user.getProfilePicture());
+    }
+
+    public record FriendshipRelation(String status, UUID friendshipId) {
     }
 
 }

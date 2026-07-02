@@ -3,6 +3,7 @@ package com.beefit.api.service;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.ArrayList;
 
 import com.beefit.api.domain.*;
 import com.beefit.api.domain.enums.MuscleGroups;
@@ -17,9 +18,13 @@ import com.beefit.api.dto.workout.WorkoutTemplateExerciseResponseDTO;
 import com.beefit.api.dto.workout.WorkoutTemplateResponseDTO;
 import com.beefit.api.exception.exercises.CatalogExerciseNotFound;
 import com.beefit.api.exception.user.UserNotFoundException;
+import com.beefit.api.exception.workout.WorkoutTemplateNotFoundException;
 import com.beefit.api.repository.CatalogExerciseRepository;
 import com.beefit.api.repository.UserRepository;
 import com.beefit.api.repository.WorkoutTemplateRepository;
+import com.beefit.api.mapper.WorkoutMuscleGroupMapper;
+import com.beefit.api.domain.enums.SocialEvent;
+import com.beefit.api.dto.social.SocialEventDTO;
 
 import lombok.RequiredArgsConstructor;
 
@@ -31,6 +36,8 @@ public class WorkoutTemplateService {
     private final UserRepository userRepository;
     private final CatalogExerciseRepository catalogExerciseRepository;
     private final PostRepository postRepository;
+    private final WorkoutMuscleGroupMapper workoutMuscleGroupMapper;
+    private final SseService sseService;
 
     @Transactional
     // Lembrar de implementar o id do amigo na parte do social
@@ -40,7 +47,7 @@ public class WorkoutTemplateService {
                                                                                                         */) {
         WorkoutTemplate template = new WorkoutTemplate();
         template.setName(requestDTO.name());
-        template.setMuscleGroupsList(requestDTO.muscleGroups());
+        template.setMuscleGroupsList(workoutMuscleGroupMapper.toDomain(requestDTO.muscleGroups()));
 
         User user = userRepository.findById(userID)
                 .orElseThrow(UserNotFoundException::new);
@@ -65,6 +72,32 @@ public class WorkoutTemplateService {
         List<WorkoutTemplate> templates = WTRepository.findByUserId(userID);
 
         return templates.stream().map(this::toResponse).toList();
+    }
+
+    @Transactional
+    public WorkoutTemplateResponseDTO updateTemplate(UUID templateId, WorkoutTemplateRequestDTO requestDTO, UUID userID) {
+        WorkoutTemplate template = WTRepository.findById(templateId)
+                .orElseThrow(WorkoutTemplateNotFoundException::new);
+        validateTemplateAccess(template, userID);
+
+        template.setName(requestDTO.name());
+        template.setMuscleGroupsList(workoutMuscleGroupMapper.toDomain(requestDTO.muscleGroups()));
+        if (template.getExerciseList() == null) {
+            template.setExerciseList(new ArrayList<>());
+        }
+        template.getExerciseList().clear();
+        template.getExerciseList().addAll(buildTemplateExercises(requestDTO.exercises(), template));
+
+        return toResponse(WTRepository.save(template));
+    }
+
+    @Transactional
+    public void deleteTemplate(UUID templateId, UUID userID) {
+        WorkoutTemplate template = WTRepository.findById(templateId)
+                .orElseThrow(WorkoutTemplateNotFoundException::new);
+        validateTemplateAccess(template, userID);
+
+        WTRepository.delete(template);
     }
 
     private List<TemplateExercise> buildTemplateExercises(
@@ -97,9 +130,17 @@ public class WorkoutTemplateService {
                 template.getId(),
                 template.getName(),
                 template.getMuscleGroupsList(),
-                template.getExerciseList());
+                exercises);
     }
-    public WorkoutTemplateResponseDTO importTemplateFromPost(UUID postId, UUID currentUserId) {
+
+    private void validateTemplateAccess(WorkoutTemplate template, UUID userID) {
+        if (template.getUser() == null || template.getUser().getId() == null
+                || !template.getUser().getId().equals(userID)) {
+            throw new WorkoutTemplateNotFoundException();
+        }
+    }
+
+    public WorkoutTemplateResponseDTO importTemplateFromPost(UUID postId, String name, UUID currentUserId) {
 
         Post post = postRepository.findById(postId)
                 .orElseThrow(PostNotFoundException::new);
@@ -109,7 +150,7 @@ public class WorkoutTemplateService {
         List<MuscleGroups> importedMuscleGroups = session.getMuscleGroupsList();
 
         WorkoutTemplate newTemplate = new WorkoutTemplate();
-        newTemplate.setName("Imported from " + post.getUser().getFullName());
+        newTemplate.setName(name != null && !name.isBlank() ? name.trim() : (post.getTitle() != null && !post.getTitle().isBlank() ? post.getTitle().trim() : "Imported from " + post.getUser().getFullName()));
 
         User user = userRepository.findById(currentUserId).orElseThrow(UserNotFoundException::new);
         newTemplate.setUser(user);
@@ -122,6 +163,7 @@ public class WorkoutTemplateService {
                     templateEx.setCatalogExercise(sessionExercise.getExercise());
 
                     templateEx.setWorkoutTemplate(newTemplate);
+                    templateEx.setOrder(sessionExercise.getOrder());
 
                     return templateEx;
                 })
@@ -131,11 +173,20 @@ public class WorkoutTemplateService {
 
         WorkoutTemplate savedTemplate = WTRepository.save(newTemplate);
 
-        return new WorkoutTemplateResponseDTO(
+        WorkoutTemplateResponseDTO responseDTO = new WorkoutTemplateResponseDTO(
                 savedTemplate.getId(),
                 savedTemplate.getName(),
                 savedTemplate.getMuscleGroupsList(),
-                savedTemplate.getExerciseList()
+                savedTemplate.getExerciseList().stream()
+                        .map(templateExercise -> new WorkoutTemplateExerciseResponseDTO(
+                                templateExercise.getCatalogExercise().getId(),
+                                templateExercise.getCatalogExercise().getName(),
+                                templateExercise.getOrder()))
+                        .toList()
         );
+
+        sseService.broadcastToFriend(new SocialEventDTO<>(SocialEvent.TEMPLATE_IMPORTED, responseDTO), currentUserId);
+
+        return responseDTO;
     }
 }
