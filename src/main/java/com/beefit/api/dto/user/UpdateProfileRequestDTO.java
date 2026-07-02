@@ -1,8 +1,10 @@
 package com.beefit.api.dto.user;
 
+import jakarta.validation.constraints.*;
+
 public record UpdateProfileRequestDTO(
-        String fullName,
-        String biography,
+        @NotBlank @Size(min = 4, max = 100) String fullName,
+        @Size(max = 500) String biography,
         String profilePicture,
-        Float bodyWeight
+        @NotNull @Positive @Max(300) Float bodyWeight
 ) {}
