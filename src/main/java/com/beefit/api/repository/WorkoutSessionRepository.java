@@ -4,7 +4,10 @@ import com.beefit.api.domain.WorkoutSession;
 import com.beefit.api.domain.enums.WorkoutStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.repository.query.Param;
+
+import jakarta.persistence.LockModeType;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -13,6 +16,10 @@ import java.util.UUID;
 import java.time.LocalDate;
 
 public interface WorkoutSessionRepository extends JpaRepository<WorkoutSession, UUID> {
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT w FROM WorkoutSession w WHERE w.id = :id")
+    Optional<WorkoutSession> findByIdForFinish(@Param("id") UUID id);
 
     // O Spring DATA JPA consegue fazer uma análise do nome da função e montar a query sozinho
     // Ele faz o caminho: WorkoutSession -> User -> id e monta a query:

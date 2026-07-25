@@ -54,6 +54,12 @@ public class WorkoutSession {
     @Column(name = "title")
     private String title;
 
+    @Column(name = "finish_idempotency_key", length = 128)
+    private String finishIdempotencyKey;
+
+    @Column(name = "finish_request_hash", length = 64)
+    private String finishRequestHash;
+
     @NotNull
     @Column(name = "should_post_workout", nullable = false)
     private Boolean shouldPostWorkout = false;

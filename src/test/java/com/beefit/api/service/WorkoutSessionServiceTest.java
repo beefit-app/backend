@@ -248,7 +248,7 @@ class WorkoutSessionServiceTest {
                 false,
                 null);
 
-        when(workoutSessionRepository.findById(workoutId)).thenReturn(Optional.of(session));
+        when(workoutSessionRepository.findByIdForFinish(workoutId)).thenReturn(Optional.of(session));
         when(catalogExerciseRepository.findById(newCatalogExercise.getId())).thenReturn(Optional.of(newCatalogExercise));
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
         when(workoutMuscleGroupMapper.toDomain(List.of("peito", "pernas"))).thenReturn(List.of(MuscleGroups.CHEST, MuscleGroups.LEGS));
@@ -264,7 +264,7 @@ class WorkoutSessionServiceTest {
         when(workoutSessionRepository.save(any(WorkoutSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(workoutSessionMapper.toDto(any(WorkoutSession.class))).thenReturn(responseDto(WorkoutStatus.FINISHED));
 
-        WorkoutSessionResponseDTO response = workoutSessionService.finishWorkout(userId, workoutId, request);
+        WorkoutSessionResponseDTO response = workoutSessionService.finishWorkout(userId, workoutId, "finish-1", request);
 
         ArgumentCaptor<WorkoutSession> sessionCaptor = ArgumentCaptor.forClass(WorkoutSession.class);
         verify(workoutSessionRepository).save(sessionCaptor.capture());
@@ -291,6 +291,10 @@ class WorkoutSessionServiceTest {
         assertEquals(generatedCard.getId(), event.cardId());
         assertEquals("RARE", event.rarity());
         assertEquals("peito", event.muscleGroup());
+
+        WorkoutSessionResponseDTO replay = workoutSessionService.finishWorkout(userId, workoutId, "finish-1", request);
+        assertEquals(response, replay);
+        verify(cardService).generateCard(user, session);
     }
 
     @Test
@@ -299,7 +303,7 @@ class WorkoutSessionServiceTest {
         WorkoutSession session = inProgressSession(workoutId);
         session.setUser(user(UUID.randomUUID()));
 
-        when(workoutSessionRepository.findById(workoutId)).thenReturn(Optional.of(session));
+        when(workoutSessionRepository.findByIdForFinish(workoutId)).thenReturn(Optional.of(session));
 
         FinishWorkoutSnapshotRequestDTO request = new FinishWorkoutSnapshotRequestDTO(
                 LocalDateTime.now().toString(),
@@ -310,7 +314,7 @@ class WorkoutSessionServiceTest {
                 null);
 
         assertThrows(WorkoutSessionNotFoundException.class,
-                () -> workoutSessionService.finishWorkout(userId, workoutId, request));
+                () -> workoutSessionService.finishWorkout(userId, workoutId, "finish-1", request));
     }
 
     @Test
@@ -319,7 +323,7 @@ class WorkoutSessionServiceTest {
         WorkoutSession session = inProgressSession(workoutId);
         session.setStatus(WorkoutStatus.FINISHED);
 
-        when(workoutSessionRepository.findById(workoutId)).thenReturn(Optional.of(session));
+        when(workoutSessionRepository.findByIdForFinish(workoutId)).thenReturn(Optional.of(session));
 
         FinishWorkoutSnapshotRequestDTO request = new FinishWorkoutSnapshotRequestDTO(
                 LocalDateTime.now().toString(),
@@ -330,7 +334,7 @@ class WorkoutSessionServiceTest {
                 null);
 
         assertThrows(InvalidWorkoutSessionStateException.class,
-                () -> workoutSessionService.finishWorkout(userId, workoutId, request));
+                () -> workoutSessionService.finishWorkout(userId, workoutId, "finish-1", request));
     }
 
     @Test

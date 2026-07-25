@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.beefit.api.domain.User;
@@ -47,8 +48,9 @@ public class WorkoutController implements GenericController {
     @PostMapping("/{workoutId}/finish")
     public ResponseEntity<WorkoutSessionResponseDTO> finishWorkout(@AuthenticationPrincipal User user,
             @PathVariable UUID workoutId,
+            @RequestHeader("Idempotency-Key") String idempotencyKey,
             @Valid @RequestBody FinishWorkoutSnapshotRequestDTO request) {
-        WorkoutSessionResponseDTO response = workoutSessionService.finishWorkout(user.getId(), workoutId, request);
+        WorkoutSessionResponseDTO response = workoutSessionService.finishWorkout(user.getId(), workoutId, idempotencyKey, request);
         return ResponseEntity.ok(response);
     }
 

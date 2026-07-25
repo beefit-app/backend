@@ -132,6 +132,20 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(IdempotencyConflictException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleIdempotencyConflict(IdempotencyConflictException e, HttpServletRequest request) {
+        return new ErrorResponse(LocalDateTime.now(), HttpStatus.CONFLICT.value(), "Conflito de idempotência",
+                e.getMessage(), List.of(), request.getRequestURI());
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleIllegalArgument(IllegalArgumentException e, HttpServletRequest request) {
+        return new ErrorResponse(LocalDateTime.now(), HttpStatus.BAD_REQUEST.value(), "Requisição inválida",
+                e.getMessage(), List.of(), request.getRequestURI());
+    }
+
     @ExceptionHandler({SameUserException.class, FriendshipAlreadyExistException.class})
     @ResponseStatus(HttpStatus.CONFLICT)
     public ErrorResponse handleSendRequestException(RuntimeException e,

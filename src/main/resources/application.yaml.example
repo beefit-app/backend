@@ -2,6 +2,11 @@ spring:
   application:
     name: beefit-api
 
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 11MB
+
   # Configurações do Hibernate / JPA
   jpa:
     hibernate:
@@ -34,6 +39,6 @@ beefit:
     cors:
       allowed-origins: ""
     token:
-      secret: ${JWT_SECRET:my_secret_key}
+      secret: ${JWT_SECRET}
 
 # Lembrar de Adicionar Configurações para o Módulo de Segurança (JWT)
