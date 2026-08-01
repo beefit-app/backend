@@ -12,6 +12,11 @@ import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import com.beefit.api.domain.Card;
 import com.beefit.api.domain.Inventory;
@@ -21,18 +26,25 @@ import com.beefit.api.domain.enums.CardRarity;
 import com.beefit.api.domain.enums.MuscleGroups;
 import com.beefit.api.domain.enums.UserRole;
 import com.beefit.api.domain.enums.WorkoutStatus;
+import com.beefit.api.support.PostgreSqlTestSupport;
 
 import jakarta.persistence.EntityManager;
 
 @DataJpaTest(properties = {
-        "spring.datasource.url=jdbc:h2:mem:inventory-repository-test;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE",
-        "spring.datasource.driver-class-name=org.h2.Driver",
-        "spring.datasource.username=sa",
-        "spring.datasource.password=",
-        "spring.jpa.hibernate.ddl-auto=create-drop"
+        "spring.jpa.hibernate.ddl-auto=validate"
 })
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+@Testcontainers
 class InventoryRepositoryTest {
+
+    @Container
+    static final PostgreSQLContainer POSTGRES = PostgreSqlTestSupport
+            .createContainer("beefit_inventory_test");
+
+    @DynamicPropertySource
+    static void registerPostgresProperties(DynamicPropertyRegistry registry) {
+        PostgreSqlTestSupport.registerDataSourceProperties(registry, POSTGRES);
+    }
 
     @Autowired
     private InventoryRepository inventoryRepository;
