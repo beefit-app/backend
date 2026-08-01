@@ -112,13 +112,13 @@ class WorkoutSessionServiceTest {
         when(workoutSessionRepository.findByStatusAndUserId(WorkoutStatus.IN_PROGRESS, userId)).thenReturn(List.of());
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
         when(workoutMuscleGroupMapper.toDomain(List.of("peito"))).thenReturn(List.of(MuscleGroups.CHEST));
-        when(workoutSessionRepository.save(any(WorkoutSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(workoutSessionRepository.saveAndFlush(any(WorkoutSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(workoutSessionMapper.toDto(any(WorkoutSession.class))).thenReturn(responseDto(WorkoutStatus.IN_PROGRESS));
 
         WorkoutSessionResponseDTO response = assertDoesNotThrow(() -> workoutSessionService.startWorkout(userId, request));
 
         ArgumentCaptor<WorkoutSession> sessionCaptor = ArgumentCaptor.forClass(WorkoutSession.class);
-        verify(workoutSessionRepository).save(sessionCaptor.capture());
+        verify(workoutSessionRepository).saveAndFlush(sessionCaptor.capture());
         verify(workoutTemplateRepository, never()).findById(any(UUID.class));
 
         WorkoutSession savedSession = sessionCaptor.getValue();
@@ -153,13 +153,13 @@ class WorkoutSessionServiceTest {
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
         when(workoutTemplateRepository.findById(templateId)).thenReturn(Optional.of(template));
         when(workoutMuscleGroupMapper.toDomain(List.of("costas"))).thenReturn(List.of(MuscleGroups.BACK));
-        when(workoutSessionRepository.save(any(WorkoutSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(workoutSessionRepository.saveAndFlush(any(WorkoutSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(workoutSessionMapper.toDto(any(WorkoutSession.class))).thenReturn(responseDto(WorkoutStatus.IN_PROGRESS));
 
         workoutSessionService.startWorkout(userId, request);
 
         ArgumentCaptor<WorkoutSession> sessionCaptor = ArgumentCaptor.forClass(WorkoutSession.class);
-        verify(workoutSessionRepository).save(sessionCaptor.capture());
+        verify(workoutSessionRepository).saveAndFlush(sessionCaptor.capture());
 
         WorkoutSession savedSession = sessionCaptor.getValue();
         assertEquals(2, savedSession.getExercises().size());
@@ -204,6 +204,28 @@ class WorkoutSessionServiceTest {
         assertThrows(WorkoutAlreadyInProgressException.class,
                 () -> workoutSessionService.startWorkout(userId, request));
         verify(userRepository, never()).findById(userId);
+    }
+
+    @Test
+    void getWorkoutReturnsOwnedSessionForRecovery() {
+        UUID workoutId = UUID.randomUUID();
+        WorkoutSession session = inProgressSession(workoutId);
+        WorkoutSessionResponseDTO expected = responseDto(WorkoutStatus.IN_PROGRESS);
+        when(workoutSessionRepository.findById(workoutId)).thenReturn(Optional.of(session));
+        when(workoutSessionMapper.toDto(session)).thenReturn(expected);
+
+        assertEquals(expected, workoutSessionService.getWorkout(userId, workoutId));
+    }
+
+    @Test
+    void getWorkoutHidesAnotherUsersSession() {
+        UUID workoutId = UUID.randomUUID();
+        WorkoutSession session = inProgressSession(workoutId);
+        session.setUser(user(UUID.randomUUID()));
+        when(workoutSessionRepository.findById(workoutId)).thenReturn(Optional.of(session));
+
+        assertThrows(WorkoutSessionNotFoundException.class,
+                () -> workoutSessionService.getWorkout(userId, workoutId));
     }
 
     @Test
@@ -261,13 +283,13 @@ class WorkoutSessionServiceTest {
 
         when(cardService.generateCard(user, session)).thenReturn(generatedCard);
         when(workoutMuscleGroupMapper.toApi(MuscleGroups.CHEST)).thenReturn("peito");
-        when(workoutSessionRepository.save(any(WorkoutSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(workoutSessionRepository.saveAndFlush(any(WorkoutSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(workoutSessionMapper.toDto(any(WorkoutSession.class))).thenReturn(responseDto(WorkoutStatus.FINISHED));
 
         WorkoutSessionResponseDTO response = workoutSessionService.finishWorkout(userId, workoutId, "finish-1", request);
 
         ArgumentCaptor<WorkoutSession> sessionCaptor = ArgumentCaptor.forClass(WorkoutSession.class);
-        verify(workoutSessionRepository).save(sessionCaptor.capture());
+        verify(workoutSessionRepository).saveAndFlush(sessionCaptor.capture());
         verify(userRepository).save(user);
 
         WorkoutSession savedSession = sessionCaptor.getValue();

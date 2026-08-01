@@ -37,6 +37,12 @@ public class WorkoutController implements GenericController {
                 .orElseGet(() -> ResponseEntity.status(HttpStatus.NO_CONTENT).build());
     }
 
+    @GetMapping("/{workoutId}")
+    public ResponseEntity<WorkoutSessionResponseDTO> getWorkout(@AuthenticationPrincipal User user,
+            @PathVariable UUID workoutId) {
+        return ResponseEntity.ok(workoutSessionService.getWorkout(user.getId(), workoutId));
+    }
+
     @PostMapping("/start")
     public ResponseEntity<WorkoutSessionResponseDTO> startWorkout(@AuthenticationPrincipal User user,
             @Valid @RequestBody StartWorkoutRequestDTO request) {

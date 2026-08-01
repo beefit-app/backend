@@ -19,6 +19,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import org.hibernate.Hibernate;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -88,6 +89,15 @@ public class WorkoutSessionService {
     }
 
     @Transactional(readOnly = true)
+    public WorkoutSessionResponseDTO getWorkout(UUID userId, UUID workoutId) {
+        WorkoutSession session = workoutSessionRepository.findById(workoutId)
+                .orElseThrow(WorkoutSessionNotFoundException::new);
+        validateWorkoutOwnership(userId, session);
+        initializeWorkoutGraph(session);
+        return workoutSessionMapper.toDto(session);
+    }
+
+    @Transactional(readOnly = true)
     public List<WorkoutPresenceEventDTO> getPublicActiveWorkouts(UUID currentUserId) {
         return workoutSessionRepository.findAllPublicByStatusExcludingUser(WorkoutStatus.IN_PROGRESS, currentUserId)
                 .stream()
@@ -128,7 +138,12 @@ public class WorkoutSessionService {
             session.addExercise(sessionExercise);
         }
 
-        WorkoutSession savedSession = workoutSessionRepository.save(session);
+        WorkoutSession savedSession;
+        try {
+            savedSession = workoutSessionRepository.saveAndFlush(session);
+        } catch (DataIntegrityViolationException exception) {
+            throw new WorkoutAlreadyInProgressException();
+        }
 
         broadcastIfPublic(savedSession, SocialEvent.WORKOUT_STARTED, savedSession.getStartedAt());
 
@@ -141,6 +156,13 @@ public class WorkoutSessionService {
         if (idempotencyKey == null || idempotencyKey.isBlank() || idempotencyKey.length() > 128) {
             throw new InvalidWorkoutSnapshotException("Idempotency-Key inválida.");
         }
+
+        workoutSessionRepository.findByUserIdAndFinishIdempotencyKey(userId, idempotencyKey)
+                .filter(existing -> !existing.getId().equals(workoutId))
+                .ifPresent(existing -> {
+                    throw new IdempotencyConflictException(
+                            "A Idempotency-Key já foi usada para finalizar outro treino.");
+                });
 
         WorkoutSession session = workoutSessionRepository.findByIdForFinish(workoutId)
                 .orElseThrow(WorkoutSessionNotFoundException::new);
@@ -210,7 +232,12 @@ public class WorkoutSessionService {
 
             postRepository.save(autoPost);
         }
-        WorkoutSession savedSession = workoutSessionRepository.save(session);
+        WorkoutSession savedSession;
+        try {
+            savedSession = workoutSessionRepository.saveAndFlush(session);
+        } catch (DataIntegrityViolationException exception) {
+            throw new IdempotencyConflictException("A Idempotency-Key já foi usada em outra finalização.");
+        }
 
         broadcastCardGenerated(userId, savedSession, card);
         broadcastIfPublic(savedSession, SocialEvent.WORKOUT_FINISHED, finishedAt);

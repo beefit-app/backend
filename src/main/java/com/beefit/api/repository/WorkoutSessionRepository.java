@@ -21,6 +21,8 @@ public interface WorkoutSessionRepository extends JpaRepository<WorkoutSession, 
     @Query("SELECT w FROM WorkoutSession w WHERE w.id = :id")
     Optional<WorkoutSession> findByIdForFinish(@Param("id") UUID id);
 
+    Optional<WorkoutSession> findByUserIdAndFinishIdempotencyKey(UUID userId, String finishIdempotencyKey);
+
     // O Spring DATA JPA consegue fazer uma análise do nome da função e montar a query sozinho
     // Ele faz o caminho: WorkoutSession -> User -> id e monta a query:
     // SELECT * FROM workout_sessions WHERE user_id = {Valor passado}
