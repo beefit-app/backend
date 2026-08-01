@@ -3,30 +3,47 @@ package com.beefit.api.service;
 import com.beefit.api.domain.User;
 import com.beefit.api.domain.WorkoutMedia;
 import com.beefit.api.dto.media.WorkoutMediaResponseDTO;
+import com.beefit.api.domain.enums.UserRole;
+import com.beefit.api.exception.media.MediaNotFoundException;
+import com.beefit.api.repository.PostRepository;
+import com.beefit.api.repository.UserRepository;
 import com.beefit.api.repository.WorkoutMediaRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
+import java.io.ByteArrayInputStream;
+import java.awt.image.BufferedImage;
+import javax.imageio.ImageIO;
+import javax.imageio.ImageReader;
+import javax.imageio.stream.ImageInputStream;
+import java.util.Iterator;
+import java.util.Locale;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 public class WorkoutMediaService {
     private static final long MAX_FILE_SIZE = 10 * 1024 * 1024;
+    private static final int MAX_IMAGE_DIMENSION = 4096;
+    private static final long MAX_IMAGE_PIXELS = 16_000_000;
     private final WorkoutMediaRepository repository;
+    private final PostRepository postRepository;
+    private final UserRepository userRepository;
 
     public WorkoutMediaResponseDTO upload(User user, MultipartFile file) throws IOException {
-        if (file.isEmpty() || file.getSize() > MAX_FILE_SIZE || file.getContentType() == null
-                || !file.getContentType().startsWith("image/")) {
+        if (file.isEmpty() || file.getSize() > MAX_FILE_SIZE) {
             throw new IllegalArgumentException("Envie uma imagem de até 10 MB.");
         }
+        byte[] content = file.getBytes();
+        String contentType = inspectImage(content);
         WorkoutMedia media = new WorkoutMedia();
         media.setOwner(user);
-        media.setContent(file.getBytes());
-        media.setContentType(file.getContentType());
+        media.setContent(content);
+        media.setContentType(contentType);
         media.setFileName(file.getOriginalFilename() == null ? "workout-photo" : file.getOriginalFilename());
         WorkoutMedia saved = repository.save(media);
         return new WorkoutMediaResponseDTO(saved.getId(), "/api/media/" + saved.getId());
@@ -58,8 +75,52 @@ public class WorkoutMediaService {
         repository.deleteAll(repository.findByConsumedFalseAndCreatedAtBefore(java.time.LocalDateTime.now().minusHours(24)));
     }
 
-    public WorkoutMedia get(UUID mediaId) {
-        return repository.findById(mediaId)
-                .orElseThrow(() -> new IllegalArgumentException("Foto de treino não encontrada."));
+    private String inspectImage(byte[] content) throws IOException {
+        try (ImageInputStream input = ImageIO.createImageInputStream(new ByteArrayInputStream(content))) {
+            Iterator<ImageReader> readers = ImageIO.getImageReaders(input);
+            if (!readers.hasNext()) throw new IllegalArgumentException("Envie uma imagem JPEG ou PNG válida.");
+            ImageReader reader = readers.next();
+            try {
+                String format = reader.getFormatName().toLowerCase(Locale.ROOT);
+                if (!format.equals("jpeg") && !format.equals("jpg") && !format.equals("png")) {
+                    throw new IllegalArgumentException("São aceitas apenas imagens JPEG ou PNG.");
+                }
+                reader.setInput(input, true, true);
+                int width = reader.getWidth(0);
+                int height = reader.getHeight(0);
+                if (width < 1 || height < 1 || width > MAX_IMAGE_DIMENSION || height > MAX_IMAGE_DIMENSION
+                        || ((long) width * height) > MAX_IMAGE_PIXELS) {
+                    throw new IllegalArgumentException("A imagem excede as dimensões permitidas.");
+                }
+                BufferedImage image = reader.read(0);
+                if (image == null) throw new IllegalArgumentException("Imagem inválida.");
+                return format.equals("png") ? "image/png" : "image/jpeg";
+            } finally {
+                reader.dispose();
+            }
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public WorkoutMedia getVisible(UUID mediaId, User viewer) {
+        WorkoutMedia media = repository.findById(mediaId).orElseThrow(MediaNotFoundException::new);
+        if (media.getOwner().getId().equals(viewer.getId())) {
+            return media;
+        }
+
+        String mediaPath = "/api/media/" + mediaId;
+        if (userRepository.existsByProfilePicture(mediaPath)) {
+            return media;
+        }
+
+        if (viewer.getRole() == UserRole.ADMIN && postRepository.existsByPhotoMediaId(mediaId)) {
+            return media;
+        }
+
+        if (postRepository.existsVisibleMedia(mediaId, viewer.getId())) {
+            return media;
+        }
+
+        throw new MediaNotFoundException();
     }
 }

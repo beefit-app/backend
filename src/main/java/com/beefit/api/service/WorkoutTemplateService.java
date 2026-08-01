@@ -142,7 +142,7 @@ public class WorkoutTemplateService {
 
     public WorkoutTemplateResponseDTO importTemplateFromPost(UUID postId, String name, UUID currentUserId) {
 
-        Post post = postRepository.findById(postId)
+        Post post = postRepository.findVisibleById(postId, currentUserId)
                 .orElseThrow(PostNotFoundException::new);
 
         WorkoutSession session = post.getWorkoutSession();

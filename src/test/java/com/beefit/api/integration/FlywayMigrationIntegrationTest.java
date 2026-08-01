@@ -10,14 +10,13 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
+import com.beefit.api.support.PostgreSqlTestSupport;
+
 @Testcontainers(disabledWithoutDocker = true)
 class FlywayMigrationIntegrationTest {
 
     @Container
-    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:16-alpine")
-            .withDatabaseName("beefit_test")
-            .withUsername("beefit")
-            .withPassword("beefit");
+    static final PostgreSQLContainer POSTGRES = PostgreSqlTestSupport.createContainer("beefit_test");
 
     @Test
     void appliesInitialSchemaToAnEmptyPostgreSqlDatabase() throws Exception {
@@ -26,7 +25,7 @@ class FlywayMigrationIntegrationTest {
                 .locations("classpath:db/migration")
                 .load();
 
-        assertEquals(2, flyway.migrate().migrationsExecuted);
+        assertEquals(5, flyway.migrate().migrationsExecuted);
 
         try (var connection = DriverManager.getConnection(
                 POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());

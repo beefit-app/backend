@@ -62,6 +62,7 @@ import com.beefit.api.repository.CatalogExerciseRepository;
 import com.beefit.api.service.AdminUserService;
 import com.beefit.api.service.AuthService;
 import com.beefit.api.service.InventoryService;
+import com.beefit.api.service.RateLimitService;
 import com.beefit.api.service.UserService;
 import com.beefit.api.service.WorkoutModerationService;
 import com.beefit.api.service.WorkoutSessionService;
@@ -78,6 +79,9 @@ class ControllerUnitTest {
 
     @Mock
     private UserResponseMapper userResponseMapper;
+
+    @Mock
+    private RateLimitService rateLimitService;
 
     @Mock
     private UserService userService;
@@ -107,7 +111,7 @@ class ControllerUnitTest {
 
     @Test
     void authLoginReturnsOkWithLoginResponse() {
-        AuthController controller = new AuthController(authService, registerMapper, userResponseMapper);
+        AuthController controller = new AuthController(authService, registerMapper, userResponseMapper, rateLimitService);
         LoginResponseDTO loginResponse = new LoginResponseDTO(
                 "token",
                 "refresh-token",
@@ -115,7 +119,9 @@ class ControllerUnitTest {
 
         when(authService.login("test@example.com", "secret", "device-1")).thenReturn(loginResponse);
 
-        ResponseEntity<LoginResponseDTO> response = controller.login(new AuthenticationDTO("test@example.com", "secret", "device-1"));
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        ResponseEntity<LoginResponseDTO> response = controller.login(
+                new AuthenticationDTO("test@example.com", "secret", "device-1"), request);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(loginResponse, response.getBody());
@@ -123,7 +129,7 @@ class ControllerUnitTest {
 
     @Test
     void authRefreshReturnsNewTokens() {
-        AuthController controller = new AuthController(authService, registerMapper, userResponseMapper);
+        AuthController controller = new AuthController(authService, registerMapper, userResponseMapper, rateLimitService);
         RefreshTokenResponseDTO refreshResponse = new RefreshTokenResponseDTO("new-access", "new-refresh");
 
         when(authService.refreshSession("refresh-token", "device-1")).thenReturn(refreshResponse);
@@ -137,7 +143,7 @@ class ControllerUnitTest {
 
     @Test
     void authLogoutReturnsNoContent() {
-        AuthController controller = new AuthController(authService, registerMapper, userResponseMapper);
+        AuthController controller = new AuthController(authService, registerMapper, userResponseMapper, rateLimitService);
 
         ResponseEntity<Void> response = controller.logout(new LogoutRequestDTO("refresh-token", "device-1"));
 
@@ -147,7 +153,7 @@ class ControllerUnitTest {
 
     @Test
     void authMeMapsAuthenticatedUser() {
-        AuthController controller = new AuthController(authService, registerMapper, userResponseMapper);
+        AuthController controller = new AuthController(authService, registerMapper, userResponseMapper, rateLimitService);
         User user = user();
         UserResponseDTO dto = new UserResponseDTO(user.getId(), user.getFullName(), user.getUsername(), user.getEmail(), user.getBodyWeight(), user.getWeeklyGoal());
 
@@ -163,6 +169,7 @@ class ControllerUnitTest {
     void profileControllerDelegatesMutatingOperationsToService() {
         ProfileController controller = new ProfileController();
         ReflectionTestUtils.setField(controller, "userService", userService);
+        ReflectionTestUtils.setField(controller, "rateLimitService", rateLimitService);
         User user = user();
 
         ResponseEntity<Void> updateResponse = controller.updateProfile(

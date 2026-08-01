@@ -12,6 +12,8 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ClassPathResource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -21,6 +23,8 @@ import java.util.List;
 @Configuration
 @ConditionalOnProperty(prefix = "beefit.seed", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class DatabaseSeeder implements CommandLineRunner { // Interface faz a classe rodar na inciciação
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(DatabaseSeeder.class);
 
     private final ObjectProvider<CatalogExerciseRepository> catalogExerciseRepositoryProvider;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -43,7 +47,7 @@ public class DatabaseSeeder implements CommandLineRunner { // Interface faz a cl
         }
 
         if(catalogExerciseRepository.count() == 0){
-            System.out.println("Tabela de exercícios vazia. Iniciando processo de carga inicial...");
+            LOGGER.info("Catálogo vazio; iniciando carga inicial de exercícios.");
 
             // Mapeia para o arquivo json
             ClassPathResource resource = new ClassPathResource("seeds/exercises.json");
@@ -93,14 +97,14 @@ public class DatabaseSeeder implements CommandLineRunner { // Interface faz a cl
                 // Salva todos exercícios de uma vez
                 catalogExerciseRepository.saveAll(exercises);
 
-                System.out.println("Carregamento concluído com sucesso!");
+                LOGGER.info("Carga inicial de exercícios concluída.");
 
             } catch (IOException | IllegalArgumentException e){
                 throw new DatabaseSeederFailException("Não foi possível carregar os dados dos exercícios para o banco de dados.", e);
             }
         }
         else{
-            System.out.println("Iniciando aplicação...");
+            LOGGER.debug("Catálogo de exercícios já inicializado.");
         }
     }
 }

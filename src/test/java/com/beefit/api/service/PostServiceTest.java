@@ -8,6 +8,7 @@ import com.beefit.api.exception.user.UserNotFoundException;
 import com.beefit.api.repository.LikeRepository;
 import com.beefit.api.repository.PostRepository;
 import com.beefit.api.repository.UserRepository;
+import com.beefit.api.repository.FriendshipRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -15,6 +16,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageRequest;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -41,6 +43,9 @@ class PostServiceTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private FriendshipRepository friendshipRepository;
+
     @InjectMocks
     private PostService postService;
 
@@ -66,7 +71,7 @@ class PostServiceTest {
 
     @Test
     void toggleLikeCreatesLikeAndIncrementsCounterWhenPostWasNotLiked() {
-        when(postRepository.findByIdAndIsRemovedFalse(postId)).thenReturn(Optional.of(post));
+        when(postRepository.findVisibleById(postId, userId)).thenReturn(Optional.of(post));
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
         when(likeRepository.existsByLikedByAndPost(user, post)).thenReturn(false);
         when(postRepository.save(any(Post.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -90,7 +95,7 @@ class PostServiceTest {
     void toggleLikeRemovesExistingLikeAndDecrementsCounter() {
         post.setTotalLikes(1);
 
-        when(postRepository.findByIdAndIsRemovedFalse(postId)).thenReturn(Optional.of(post));
+        when(postRepository.findVisibleById(postId, userId)).thenReturn(Optional.of(post));
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
         when(likeRepository.existsByLikedByAndPost(user, post)).thenReturn(true);
 
@@ -105,7 +110,7 @@ class PostServiceTest {
 
     @Test
     void toggleLikeThrowsWhenPostDoesNotExistOrWasRemoved() {
-        when(postRepository.findByIdAndIsRemovedFalse(postId)).thenReturn(Optional.empty());
+        when(postRepository.findVisibleById(postId, userId)).thenReturn(Optional.empty());
 
         assertThrows(PostNotFoundException.class, () -> postService.toggleLike(userId, postId));
 
@@ -114,11 +119,23 @@ class PostServiceTest {
 
     @Test
     void toggleLikeThrowsWhenUserDoesNotExist() {
-        when(postRepository.findByIdAndIsRemovedFalse(postId)).thenReturn(Optional.of(post));
+        when(postRepository.findVisibleById(postId, userId)).thenReturn(Optional.of(post));
         when(userRepository.findById(userId)).thenReturn(Optional.empty());
 
         assertThrows(UserNotFoundException.class, () -> postService.toggleLike(userId, postId));
 
         verify(likeRepository, never()).existsByLikedByAndPost(any(User.class), any(Post.class));
+    }
+
+    @Test
+    void profilePostsAreHiddenFromUsersWhoAreNotAcceptedFriends() {
+        User target = new User();
+        target.setId(UUID.randomUUID());
+        target.setGhostMode(false);
+        when(userRepository.findByUsername("target")).thenReturn(Optional.of(target));
+        when(friendshipRepository.existsAcceptedFriendshipBetween(userId, target.getId())).thenReturn(false);
+
+        assertThrows(UserNotFoundException.class,
+                () -> postService.getPostsByUsername(user, "target", PageRequest.of(0, 10)));
     }
 }

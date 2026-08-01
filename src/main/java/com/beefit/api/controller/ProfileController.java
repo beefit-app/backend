@@ -14,6 +14,7 @@ import com.beefit.api.dto.user.UpdateProfileRequestDTO;
 import com.beefit.api.dto.user.UserProfileResponseDTO;
 import com.beefit.api.service.UserService;
 import com.beefit.api.service.PostService;
+import com.beefit.api.service.RateLimitService;
 import com.beefit.api.dto.feed.FeedPostResponseDTO;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -33,6 +34,9 @@ public class ProfileController {
 
     @Autowired
     private PostService postService;
+
+    @Autowired
+    private RateLimitService rateLimitService;
 
     @GetMapping("/{username}/posts")
     public ResponseEntity<Page<FeedPostResponseDTO>> getUserPosts(@AuthenticationPrincipal User user,
@@ -76,7 +80,6 @@ public class ProfileController {
                 .distinct()
                 .sorted()
                 .toList();
-        System.out.println(">>> getTrainingDays returning days for " + user.getUsername() + ": " + days);
         return ResponseEntity.ok(days);
     }
 
@@ -100,6 +103,7 @@ public class ProfileController {
     // automaticamente
     public ResponseEntity<Void> changePassword(@AuthenticationPrincipal User user,
             @Valid @RequestBody ChangePasswordDTO dto) {
+        rateLimitService.checkPasswordChange(user.getId());
         userService.changeUserPassword(user.getId(), dto);
         return ResponseEntity.noContent().build();
     }

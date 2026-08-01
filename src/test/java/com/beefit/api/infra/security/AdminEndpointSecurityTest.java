@@ -1,0 +1,159 @@
+package com.beefit.api.infra.security;
+
+import com.beefit.api.controller.AdminDashboardController;
+import com.beefit.api.controller.AdminUserController;
+import com.beefit.api.controller.AdminWorkoutController;
+import com.beefit.api.controller.WorkoutMediaController;
+import com.beefit.api.domain.User;
+import com.beefit.api.domain.enums.UserRole;
+import com.beefit.api.mapper.UserResponseMapper;
+import com.beefit.api.repository.UserRepository;
+import com.beefit.api.service.AdminDashboardService;
+import com.beefit.api.service.AdminUserService;
+import com.beefit.api.service.TokenService;
+import com.beefit.api.service.WorkoutModerationService;
+import com.beefit.api.service.WorkoutMediaService;
+import com.beefit.api.service.RateLimitService;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.UUID;
+
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+
+@WebMvcTest(controllers = {
+        AdminDashboardController.class,
+        AdminUserController.class,
+        AdminWorkoutController.class,
+        WorkoutMediaController.class
+})
+@Import({SecurityConfiguration.class, SecurityFilter.class})
+class AdminEndpointSecurityTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @MockitoBean
+    private TokenService tokenService;
+
+    @MockitoBean
+    private UserRepository userRepository;
+
+    @MockitoBean
+    private AdminDashboardService adminDashboardService;
+
+    @MockitoBean
+    private AdminUserService adminUserService;
+
+    @MockitoBean
+    private WorkoutModerationService workoutModerationService;
+
+    @MockitoBean
+    private UserResponseMapper userResponseMapper;
+
+    @MockitoBean
+    private WorkoutMediaService workoutMediaService;
+
+    @MockitoBean
+    private RateLimitService rateLimitService;
+
+    private User commonUser;
+    private User bannedAdmin;
+
+    @BeforeEach
+    void setUp() {
+        commonUser = user(UserRole.USER, null);
+        bannedAdmin = user(UserRole.ADMIN, LocalDateTime.now().plusHours(1));
+    }
+
+    @Test
+    void everyAdminEndpointRejectsCommonUsers() throws Exception {
+        mockValidToken("common@example.com", commonUser);
+        for (MockHttpServletRequestBuilder request : adminRequests()) {
+            mockMvc.perform(request.header("Authorization", "Bearer common-token"))
+                    .andExpect(status().isForbidden());
+        }
+    }
+
+    @Test
+    void everyAdminEndpointRejectsInvalidTokens() throws Exception {
+        when(tokenService.validateToken("invalid-token"))
+                .thenReturn(new TokenService.TokenValidationResult(TokenService.TokenValidationStatus.INVALID, null));
+        for (MockHttpServletRequestBuilder request : adminRequests()) {
+            mockMvc.perform(request.header("Authorization", "Bearer invalid-token"))
+                    .andExpect(status().isUnauthorized());
+        }
+    }
+
+    @Test
+    void everyAdminEndpointRejectsBannedAdmins() throws Exception {
+        mockValidToken("banned@example.com", bannedAdmin);
+        for (MockHttpServletRequestBuilder request : adminRequests()) {
+            mockMvc.perform(request.header("Authorization", "Bearer banned-token"))
+                    .andExpect(status().isForbidden());
+        }
+    }
+
+    @Test
+    void mediaEndpointRequiresAuthentication() throws Exception {
+        mockMvc.perform(get("/api/media/{id}", UUID.randomUUID()))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void apiResponsesIncludeSecurityHeaders() throws Exception {
+        when(tokenService.validateToken("invalid-token"))
+                .thenReturn(new TokenService.TokenValidationResult(TokenService.TokenValidationStatus.INVALID, null));
+
+        mockMvc.perform(get("/api/admin/dashboard").header("Authorization", "Bearer invalid-token"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(header().string("X-Content-Type-Options", "nosniff"))
+                .andExpect(header().string("X-Frame-Options", "DENY"))
+                .andExpect(header().string("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'"))
+                .andExpect(header().string("Referrer-Policy", "no-referrer"))
+                .andExpect(header().string("Permissions-Policy", "camera=(), microphone=(), geolocation=()"));
+    }
+
+    private void mockValidToken(String email, User user) {
+        String token = user == commonUser ? "common-token" : "banned-token";
+        when(tokenService.validateToken(token))
+                .thenReturn(new TokenService.TokenValidationResult(TokenService.TokenValidationStatus.VALID, email));
+        when(userRepository.findByEmail(email)).thenReturn(user);
+    }
+
+    private List<MockHttpServletRequestBuilder> adminRequests() {
+        UUID id = UUID.randomUUID();
+        return List.of(
+                get("/api/admin/dashboard"),
+                get("/api/admin/users"),
+                get("/api/admin/users/{id}", id),
+                patch("/api/admin/users/{id}/ban", id),
+                patch("/api/admin/users/{id}/unban", id),
+                get("/api/admin/posts"),
+                delete("/api/admin/posts/{id}", id),
+                patch("/api/admin/posts/{id}", id));
+    }
+
+    private User user(UserRole role, LocalDateTime bannedUntil) {
+        User user = new User();
+        user.setId(UUID.randomUUID());
+        user.setEmail(role.name().toLowerCase() + "@example.com");
+        user.setUsername(role.name().toLowerCase());
+        user.setRole(role);
+        user.setBannedUntil(bannedUntil);
+        return user;
+    }
+}

@@ -84,7 +84,8 @@ Critério de pronto:
 Critério de pronto:
 
 - Services críticos têm testes de sucesso e erro.
-- Não há dependência de Docker, Postgres ou contexto Spring completo.
+- Testes de persistência, migrations e contexto completo usam PostgreSQL 16 via
+  Testcontainers e exigem Docker disponível localmente ou no CI.
 
 ### 5. Cobrir controllers
 

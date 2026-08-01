@@ -4,6 +4,9 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -16,6 +19,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import org.hibernate.Hibernate;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,6 +44,7 @@ import com.beefit.api.dto.workout.WorkoutSessionResponseDTO;
 import com.beefit.api.exception.exercises.CatalogExerciseNotFound;
 import com.beefit.api.exception.user.UserNotFoundException;
 import com.beefit.api.exception.workout.InvalidMuscleGroupException;
+import com.beefit.api.exception.workout.IdempotencyConflictException;
 import com.beefit.api.exception.workout.InvalidWorkoutSessionStateException;
 import com.beefit.api.exception.workout.InvalidWorkoutSnapshotException;
 import com.beefit.api.exception.workout.WorkoutAlreadyInProgressException;
@@ -84,6 +89,15 @@ public class WorkoutSessionService {
     }
 
     @Transactional(readOnly = true)
+    public WorkoutSessionResponseDTO getWorkout(UUID userId, UUID workoutId) {
+        WorkoutSession session = workoutSessionRepository.findById(workoutId)
+                .orElseThrow(WorkoutSessionNotFoundException::new);
+        validateWorkoutOwnership(userId, session);
+        initializeWorkoutGraph(session);
+        return workoutSessionMapper.toDto(session);
+    }
+
+    @Transactional(readOnly = true)
     public List<WorkoutPresenceEventDTO> getPublicActiveWorkouts(UUID currentUserId) {
         return workoutSessionRepository.findAllPublicByStatusExcludingUser(WorkoutStatus.IN_PROGRESS, currentUserId)
                 .stream()
@@ -124,7 +138,12 @@ public class WorkoutSessionService {
             session.addExercise(sessionExercise);
         }
 
-        WorkoutSession savedSession = workoutSessionRepository.save(session);
+        WorkoutSession savedSession;
+        try {
+            savedSession = workoutSessionRepository.saveAndFlush(session);
+        } catch (DataIntegrityViolationException exception) {
+            throw new WorkoutAlreadyInProgressException();
+        }
 
         broadcastIfPublic(savedSession, SocialEvent.WORKOUT_STARTED, savedSession.getStartedAt());
 
@@ -132,16 +151,40 @@ public class WorkoutSessionService {
     }
 
     @Transactional
-    public WorkoutSessionResponseDTO finishWorkout(UUID userId, UUID workoutId,
+    public WorkoutSessionResponseDTO finishWorkout(UUID userId, UUID workoutId, String idempotencyKey,
             FinishWorkoutSnapshotRequestDTO request) {
-        WorkoutSession session = workoutSessionRepository.findById(workoutId)
+        if (idempotencyKey == null || idempotencyKey.isBlank() || idempotencyKey.length() > 128) {
+            throw new InvalidWorkoutSnapshotException("Idempotency-Key inválida.");
+        }
+
+        workoutSessionRepository.findByUserIdAndFinishIdempotencyKey(userId, idempotencyKey)
+                .filter(existing -> !existing.getId().equals(workoutId))
+                .ifPresent(existing -> {
+                    throw new IdempotencyConflictException(
+                            "A Idempotency-Key já foi usada para finalizar outro treino.");
+                });
+
+        WorkoutSession session = workoutSessionRepository.findByIdForFinish(workoutId)
                 .orElseThrow(WorkoutSessionNotFoundException::new);
         initializeWorkoutGraph(session);
-        LocalDateTime finishedAt = parseFinishedAt(request.finishedAt());
+        String requestHash = hashFinishRequest(request);
 
         validateWorkoutOwnership(userId, session);
+        if (session.getStatus() == WorkoutStatus.FINISHED
+                && idempotencyKey.equals(session.getFinishIdempotencyKey())) {
+            if (!requestHash.equals(session.getFinishRequestHash())) {
+                throw new IdempotencyConflictException("A Idempotency-Key já foi usada com outro conteúdo.");
+            }
+            return workoutSessionMapper.toDto(session);
+        }
+
+        LocalDateTime finishedAt = parseFinishedAt(request.finishedAt());
+
         validateWorkoutInProgress(session);
         validateFinishedAt(session, finishedAt);
+
+        session.setFinishIdempotencyKey(idempotencyKey);
+        session.setFinishRequestHash(requestHash);
 
         session.setMuscleGroupsList(workoutMuscleGroupMapper.toDomain(request.muscleGroups()));
         session.setTitle(request.title());
@@ -189,11 +232,27 @@ public class WorkoutSessionService {
 
             postRepository.save(autoPost);
         }
-        WorkoutSession savedSession = workoutSessionRepository.save(session);
+        WorkoutSession savedSession;
+        try {
+            savedSession = workoutSessionRepository.saveAndFlush(session);
+        } catch (DataIntegrityViolationException exception) {
+            throw new IdempotencyConflictException("A Idempotency-Key já foi usada em outra finalização.");
+        }
 
         broadcastCardGenerated(userId, savedSession, card);
         broadcastIfPublic(savedSession, SocialEvent.WORKOUT_FINISHED, finishedAt);
         return workoutSessionMapper.toDto(savedSession);
+    }
+
+    private String hashFinishRequest(FinishWorkoutSnapshotRequestDTO request) {
+        try {
+            String canonicalPayload = request.finishedAt() + "|" + request.muscleGroups() + "|" + request.exercises()
+                    + "|" + request.title() + "|" + request.shouldPostWorkout() + "|" + request.photoMediaId();
+            return java.util.HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                    .digest(canonicalPayload.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 não disponível.", exception);
+        }
     }
 
     private void broadcastCardGenerated(UUID userId, WorkoutSession session, Card card) {

@@ -4,6 +4,7 @@ import com.beefit.api.domain.User;
 import com.beefit.api.domain.WorkoutMedia;
 import com.beefit.api.dto.media.WorkoutMediaResponseDTO;
 import com.beefit.api.service.WorkoutMediaService;
+import com.beefit.api.service.RateLimitService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.MediaType;
@@ -25,22 +26,25 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class WorkoutMediaController {
     private final WorkoutMediaService workoutMediaService;
+    private final RateLimitService rateLimitService;
 
     @PostMapping(value = "/workout-photo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<WorkoutMediaResponseDTO> upload(@AuthenticationPrincipal User user,
             @RequestParam("file") MultipartFile file) throws IOException {
+        rateLimitService.checkUpload(user.getId());
         return ResponseEntity.ok(workoutMediaService.upload(user, file));
     }
 
     @PostMapping(value = "/profile-photo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<WorkoutMediaResponseDTO> uploadProfilePhoto(@AuthenticationPrincipal User user,
             @RequestParam("file") MultipartFile file) throws IOException {
+        rateLimitService.checkUpload(user.getId());
         return ResponseEntity.ok(workoutMediaService.upload(user, file));
     }
 
     @GetMapping("/{mediaId}")
-    public ResponseEntity<ByteArrayResource> get(@PathVariable UUID mediaId) {
-        WorkoutMedia media = workoutMediaService.get(mediaId);
+    public ResponseEntity<ByteArrayResource> get(@AuthenticationPrincipal User user, @PathVariable UUID mediaId) {
+        WorkoutMedia media = workoutMediaService.getVisible(mediaId, user);
         return ResponseEntity.ok().contentType(MediaType.parseMediaType(media.getContentType()))
                 .body(new ByteArrayResource(media.getContent()));
     }
