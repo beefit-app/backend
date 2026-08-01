@@ -21,6 +21,7 @@ import com.beefit.api.exception.user.UserNotFoundException;
 import com.beefit.api.repository.LikeRepository;
 import com.beefit.api.repository.PostRepository;
 import com.beefit.api.repository.UserRepository;
+import com.beefit.api.repository.FriendshipRepository;
 
 import jakarta.transaction.Transactional;
 
@@ -29,11 +30,14 @@ public class PostService {
     private final PostRepository postRepository;
     private final LikeRepository likeRepository;
     private final UserRepository userRepository;
+    private final FriendshipRepository friendshipRepository;
 
-    public PostService(PostRepository postRepository, LikeRepository likeRepository, UserRepository userRepository) {
+    public PostService(PostRepository postRepository, LikeRepository likeRepository, UserRepository userRepository,
+            FriendshipRepository friendshipRepository) {
         this.postRepository = postRepository;
         this.likeRepository = likeRepository;
         this.userRepository = userRepository;
+        this.friendshipRepository = friendshipRepository;
     }
 
      // Recupera o feed social de forma paginada.
@@ -58,7 +62,8 @@ public class PostService {
     @Transactional
     public Page<FeedPostResponseDTO> getPostsByUsername(User currentUser, String username, Pageable pageable) {
         User target = userRepository.findByUsername(username).orElseThrow(UserNotFoundException::new);
-        if (target.getGhostMode()) {
+        if (!target.getId().equals(currentUser.getId()) && (target.getGhostMode()
+                || !friendshipRepository.existsAcceptedFriendshipBetween(currentUser.getId(), target.getId()))) {
             throw new UserNotFoundException();
         }
 
@@ -121,7 +126,7 @@ public class PostService {
 
     @Transactional
     public PostLikeDTO toggleLike(UUID userId, UUID postId) {
-        Post post = postRepository.findByIdAndIsRemovedFalse(postId).orElseThrow(PostNotFoundException::new);
+        Post post = postRepository.findVisibleById(postId, userId).orElseThrow(PostNotFoundException::new);
         User user = userRepository.findById(userId).orElseThrow(UserNotFoundException::new);
 
         Boolean isPostLikedAlready = likeRepository.existsByLikedByAndPost(user, post);

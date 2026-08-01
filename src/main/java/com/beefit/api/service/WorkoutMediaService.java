@@ -3,11 +3,16 @@ package com.beefit.api.service;
 import com.beefit.api.domain.User;
 import com.beefit.api.domain.WorkoutMedia;
 import com.beefit.api.dto.media.WorkoutMediaResponseDTO;
+import com.beefit.api.domain.enums.UserRole;
+import com.beefit.api.exception.media.MediaNotFoundException;
+import com.beefit.api.repository.PostRepository;
+import com.beefit.api.repository.UserRepository;
 import com.beefit.api.repository.WorkoutMediaRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
 import java.io.ByteArrayInputStream;
@@ -26,6 +31,8 @@ public class WorkoutMediaService {
     private static final int MAX_IMAGE_DIMENSION = 4096;
     private static final long MAX_IMAGE_PIXELS = 16_000_000;
     private final WorkoutMediaRepository repository;
+    private final PostRepository postRepository;
+    private final UserRepository userRepository;
 
     public WorkoutMediaResponseDTO upload(User user, MultipartFile file) throws IOException {
         if (file.isEmpty() || file.getSize() > MAX_FILE_SIZE) {
@@ -94,8 +101,26 @@ public class WorkoutMediaService {
         }
     }
 
-    public WorkoutMedia get(UUID mediaId) {
-        return repository.findById(mediaId)
-                .orElseThrow(() -> new IllegalArgumentException("Foto de treino não encontrada."));
+    @Transactional(readOnly = true)
+    public WorkoutMedia getVisible(UUID mediaId, User viewer) {
+        WorkoutMedia media = repository.findById(mediaId).orElseThrow(MediaNotFoundException::new);
+        if (media.getOwner().getId().equals(viewer.getId())) {
+            return media;
+        }
+
+        String mediaPath = "/api/media/" + mediaId;
+        if (userRepository.existsByProfilePicture(mediaPath)) {
+            return media;
+        }
+
+        if (viewer.getRole() == UserRole.ADMIN && postRepository.existsByPhotoMediaId(mediaId)) {
+            return media;
+        }
+
+        if (postRepository.existsVisibleMedia(mediaId, viewer.getId())) {
+            return media;
+        }
+
+        throw new MediaNotFoundException();
     }
 }

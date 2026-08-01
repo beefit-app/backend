@@ -6,6 +6,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.Customizer;
@@ -18,6 +20,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -35,6 +38,7 @@ public class SecurityConfiguration {
     private String[] allowedOrigins;
 
     private final SecurityFilter securityFilter;
+    private final Environment environment;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -54,25 +58,36 @@ public class SecurityConfiguration {
                                 errorCode = "TOKEN_EXPIRED";
                             } else if ("INVALID".equals(authFailure)) {
                                 errorCode = "TOKEN_INVALID";
+                            } else if ("BANNED".equals(authFailure)) {
+                                errorCode = "ACCOUNT_BANNED";
                             }
                             String message = switch (errorCode) {
                                 case "TOKEN_EXPIRED" -> "Sua sessão expirou.";
                                 case "TOKEN_INVALID" -> "Sua sessão é inválida.";
+                                case "ACCOUNT_BANNED" -> "Esta conta está temporariamente bloqueada.";
                                 default -> "Autenticação obrigatória.";
                             };
 
-                            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                            response.setStatus("ACCOUNT_BANNED".equals(errorCode)
+                                    ? HttpServletResponse.SC_FORBIDDEN
+                                    : HttpServletResponse.SC_UNAUTHORIZED);
                             response.setContentType("application/json");
                             response.setCharacterEncoding("UTF-8");
 
                             response.getWriter().write("""
                                       {
-                                          "status": 401,
+                                          "status": %d,
                                           "error": "%s",
                                           "message": "%s"
                                       }
-                                    """.formatted(errorCode, message));
+                                    """.formatted(response.getStatus(), errorCode, message));
                         }))
+
+                .headers(headers -> headers
+                        .contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'none'; frame-ancestors 'none'"))
+                        .frameOptions(frame -> frame.deny())
+                        .referrerPolicy(referrer -> referrer.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER))
+                        .permissionsPolicy(permissions -> permissions.policy("camera=(), microphone=(), geolocation=()")))
 
                 .authorizeHttpRequests(authorize -> authorize
                         // .requestMatchers(HttpMethod.POST, "/dashboard").hasRole("ADMIN")
@@ -83,7 +98,6 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.POST, "/auth/register").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/refresh").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/logout").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/media/**").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .addFilterBefore(securityFilter, UsernamePasswordAuthenticationFilter.class)
@@ -93,14 +107,28 @@ public class SecurityConfiguration {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOriginPatterns(List.of(allowedOrigins));
+        List<String> origins = List.of(allowedOrigins);
+        if (isProduction()) {
+            if (origins.isEmpty() || origins.stream().anyMatch(origin -> origin.isBlank() || origin.contains("*"))) {
+                throw new IllegalStateException("CORS de produção exige origens exatas, sem curingas.");
+            }
+            configuration.setAllowedOrigins(origins);
+        } else {
+            configuration.setAllowedOriginPatterns(origins);
+        }
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(List.of("*"));
+        configuration.setAllowedHeaders(List.of(
+                "Authorization", "Content-Type", "Accept", "Idempotency-Key", "X-Confirm-Password"));
+        configuration.setExposedHeaders(List.of("Retry-After"));
         configuration.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;
+    }
+
+    private boolean isProduction() {
+        return environment.acceptsProfiles(Profiles.of("prod"));
     }
 
     @Bean

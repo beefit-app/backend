@@ -112,8 +112,8 @@ public class UserService {
             // Altera os dados permitidos com base no DTO recebido
             user.setFullName(request.fullName());
             user.setBiography(request.biography());
-            user.setProfilePicture(request.profilePicture());
             consumeProfileMedia(request.profilePicture(), user.getId());
+            user.setProfilePicture(request.profilePicture());
             user.setBodyWeight(request.bodyWeight());
             // O Spring Data JPA salva automaticamente no final do metodo devido ao
             // @Transactional
@@ -124,8 +124,11 @@ public class UserService {
 
     private void consumeProfileMedia(String value, UUID userId) {
         if (value == null || !value.startsWith("/api/media/")) return;
-        try { workoutMediaService.consumeForProfile(UUID.fromString(value.substring(value.lastIndexOf('/') + 1)), userId); }
-        catch (IllegalArgumentException ignored) { /* URLs externas permanecem compatíveis */ }
+        try {
+            workoutMediaService.consumeForProfile(UUID.fromString(value.substring(value.lastIndexOf('/') + 1)), userId);
+        } catch (IllegalArgumentException exception) {
+            throw new IllegalArgumentException("Foto de perfil inválida.");
+        }
     }
 
     @Transactional

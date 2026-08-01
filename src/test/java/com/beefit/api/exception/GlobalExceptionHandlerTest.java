@@ -5,11 +5,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import java.util.List;
 
 import com.beefit.api.exception.user.EmailAlreadyInUse;
+import com.beefit.api.exception.security.RateLimitExceededException;
 import com.beefit.api.exception.user.InvalidPasswordException;
 import com.beefit.api.exception.workout.InvalidMuscleGroupException;
 import com.beefit.api.exception.workout.WorkoutSessionNotFoundException;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.http.HttpHeaders;
 
 class GlobalExceptionHandlerTest {
 
@@ -66,6 +68,17 @@ class GlobalExceptionHandlerTest {
         assertEquals(400, response.status());
         assertEquals(List.of(), response.fields());
         assertEquals("/api/workout/123/muscle-groups/foo", response.path());
+    }
+
+    @Test
+    void handleRateLimitExceededReturnsRetryAfterHeader() {
+        var response = handler.handleRateLimitExceeded(
+                new RateLimitExceededException(42),
+                request("/auth/login"));
+
+        assertEquals(429, response.getStatusCode().value());
+        assertEquals("42", response.getHeaders().getFirst(HttpHeaders.RETRY_AFTER));
+        assertEquals("Limite de requisições excedido", response.getBody().error());
     }
 
     private MockHttpServletRequest request(String uri) {

@@ -30,6 +30,12 @@ public interface FriendshipRepository extends JpaRepository<Friendship, UUID> {
             "   OR (f.requester = :userB AND f.addressee = :userA)")
     Optional<Friendship> findFriendshipBetween(@Param("userA") User userA, @Param("userB") User userB);
 
+    @Query("SELECT CASE WHEN COUNT(f) > 0 THEN true ELSE false END FROM Friendship f " +
+            "WHERE f.status = com.beefit.api.domain.enums.FriendshipStatus.ACCEPTED AND (" +
+            "(f.requester.id = :userAId AND f.addressee.id = :userBId) OR " +
+            "(f.requester.id = :userBId AND f.addressee.id = :userAId))")
+    boolean existsAcceptedFriendshipBetween(@Param("userAId") UUID userAId, @Param("userBId") UUID userBId);
+
     // Busca todas as amizades ou convites de um usuário
     @Query("SELECT f FROM Friendship f " +
             "WHERE (f.requester.id = :userId OR f.addressee.id = :userId) " +

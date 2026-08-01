@@ -68,6 +68,13 @@ public class SecurityFilter extends OncePerRequestFilter {
                 return;
             }
 
+            if (!user.isEnabled()) {
+                request.setAttribute(AUTH_FAILURE_REASON_ATTRIBUTE, "BANNED");
+                SecurityContextHolder.clearContext();
+                filterChain.doFilter(request, response);
+                return;
+            }
+
             var authentication = new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities());
             SecurityContextHolder.getContext().setAuthentication(authentication);
         }

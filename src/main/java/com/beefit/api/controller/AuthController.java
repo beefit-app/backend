@@ -11,6 +11,8 @@ import com.beefit.api.dto.auth.UserResponseDTO;
 import com.beefit.api.mapper.RegisterMapper;
 import com.beefit.api.mapper.UserResponseMapper;
 import com.beefit.api.service.AuthService;
+import com.beefit.api.service.RateLimitService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -27,10 +29,14 @@ public class AuthController implements GenericController {
     private final AuthService authService;
     private final RegisterMapper registerMapper;
     private final UserResponseMapper userResponseMapper;
+    private final RateLimitService rateLimitService;
 
     // Endpoint de Login
     @PostMapping("/login")
-    public ResponseEntity<LoginResponseDTO> login(@RequestBody @Valid AuthenticationDTO data) {
+    public ResponseEntity<LoginResponseDTO> login(@RequestBody @Valid AuthenticationDTO data,
+            HttpServletRequest request) {
+
+        rateLimitService.checkLogin(request.getRemoteAddr(), data.email());
 
         LoginResponseDTO login = authService.login(data.email(), data.password(), data.deviceId());
 
@@ -39,7 +45,10 @@ public class AuthController implements GenericController {
 
     // Endpoint de Cadastro
     @PostMapping("/register")
-    public ResponseEntity<LoginResponseDTO> register(@RequestBody @Valid RegisterDTO data) {
+    public ResponseEntity<LoginResponseDTO> register(@RequestBody @Valid RegisterDTO data,
+            HttpServletRequest request) {
+
+        rateLimitService.checkRegistration(request.getRemoteAddr());
 
         User registered = registerMapper.toEntity(data);
 
@@ -55,6 +64,7 @@ public class AuthController implements GenericController {
 
     @PostMapping("/refresh")
     public ResponseEntity<RefreshTokenResponseDTO> refresh(@RequestBody @Valid RefreshTokenRequestDTO data) {
+        rateLimitService.checkRefresh(data.deviceId());
         return ResponseEntity.ok(authService.refreshSession(data.refreshToken(), data.deviceId()));
     }
 

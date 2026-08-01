@@ -92,6 +92,19 @@ class UserServiceTest {
     }
 
     @Test
+    void updateUserProfileRejectsMediaOwnedByAnotherUser() {
+        UUID mediaId = UUID.randomUUID();
+        UpdateProfileRequestDTO request = new UpdateProfileRequestDTO(
+                "New Name", "New bio", "/api/media/" + mediaId, 72.5f);
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        org.mockito.Mockito.doThrow(new IllegalArgumentException("Foto de perfil não encontrada."))
+                .when(workoutMediaService).consumeForProfile(mediaId, userId);
+
+        assertThrows(IllegalArgumentException.class, () -> userService.updateUserProfile(userId, request));
+        assertEquals("picture", user.getProfilePicture());
+    }
+
+    @Test
     void changeUserPasswordEncodesNewPasswordWhenCurrentPasswordMatches() {
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("current", user.getPassword())).thenReturn(true);

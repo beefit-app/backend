@@ -11,9 +11,13 @@ import com.beefit.api.exception.hive.ExceededHiveLimitException;
 import com.beefit.api.exception.hive.HiveNotFoundException;
 import com.beefit.api.exception.hive.InvalidTimePeriodException;
 import com.beefit.api.exception.hive.UserAlreadyInHiveException;
+import com.beefit.api.exception.media.MediaNotFoundException;
+import com.beefit.api.exception.security.RateLimitExceededException;
 import com.beefit.api.exception.user.*;
 import com.beefit.api.exception.workout.*;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -90,7 +94,7 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler({ WorkoutSessionNotFoundException.class, WorkoutTemplateNotFoundException.class,
-            CatalogExerciseNotFound.class, PostNotFoundException.class })
+            CatalogExerciseNotFound.class, PostNotFoundException.class, MediaNotFoundException.class })
     @ResponseStatus(HttpStatus.NOT_FOUND)
     public ErrorResponse handleWorkoutElementsNotFoundException(RuntimeException e,
             HttpServletRequest request) {
@@ -144,6 +148,22 @@ public class GlobalExceptionHandler {
     public ErrorResponse handleIllegalArgument(IllegalArgumentException e, HttpServletRequest request) {
         return new ErrorResponse(LocalDateTime.now(), HttpStatus.BAD_REQUEST.value(), "Requisição inválida",
                 e.getMessage(), List.of(), request.getRequestURI());
+    }
+
+    @ExceptionHandler(RateLimitExceededException.class)
+    public ResponseEntity<ErrorResponse> handleRateLimitExceeded(
+            RateLimitExceededException e,
+            HttpServletRequest request) {
+        ErrorResponse response = new ErrorResponse(
+                LocalDateTime.now(),
+                HttpStatus.TOO_MANY_REQUESTS.value(),
+                "Limite de requisições excedido",
+                e.getMessage(),
+                List.of(),
+                request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, Long.toString(e.getRetryAfterSeconds()))
+                .body(response);
     }
 
     @ExceptionHandler({SameUserException.class, FriendshipAlreadyExistException.class})
