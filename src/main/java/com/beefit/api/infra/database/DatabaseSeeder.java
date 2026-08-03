@@ -2,6 +2,7 @@ package com.beefit.api.infra.database;
 
 import com.beefit.api.domain.CatalogExercise;
 import com.beefit.api.domain.enums.MuscleGroups;
+import com.beefit.api.domain.enums.AnatomicalMuscle;
 import com.beefit.api.dto.seed.ExerciseSeedDTO;
 import com.beefit.api.exception.exercises.DatabaseSeederFailException;
 import com.beefit.api.repository.CatalogExerciseRepository;
@@ -18,7 +19,9 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Configuration
 @ConditionalOnProperty(prefix = "beefit.seed", name = "enabled", havingValue = "true", matchIfMissing = true)
@@ -46,18 +49,17 @@ public class DatabaseSeeder implements CommandLineRunner { // Interface faz a cl
             return;
         }
 
-        if(catalogExerciseRepository.count() == 0){
-            LOGGER.info("Catálogo vazio; iniciando carga inicial de exercícios.");
+        ClassPathResource resource = new ClassPathResource("seeds/exercises.json");
 
-            // Mapeia para o arquivo json
-            ClassPathResource resource = new ClassPathResource("seeds/exercises.json");
-
-            try(InputStream inputStream = resource.getInputStream() /* Passa do Json para bytes */){
+        try(InputStream inputStream = resource.getInputStream() /* Passa do Json para bytes */){
                 // Cria lista de ExerciseSeedDTO a partir dos Json
                 List<ExerciseSeedDTO> seeds = objectMapper.readValue(
                         inputStream,
                         new TypeReference<List<ExerciseSeedDTO>>() {}
                 );
+
+            if(catalogExerciseRepository.count() == 0){
+                LOGGER.info("Catálogo vazio; iniciando carga inicial de exercícios.");
 
                 // Gera lista vazia de exercícios
                 List<CatalogExercise> exercises = new ArrayList<>();
@@ -89,6 +91,8 @@ public class DatabaseSeeder implements CommandLineRunner { // Interface faz a cl
 
                     exercise.setPrimaryMuscleGroupsList(primaryGroups);
                     exercise.setSecondaryMuscleGroupsList(secondaryGroups);
+                    exercise.setPrimaryMusclesList(toAnatomicalMuscles(seed.getPrimaryMuscleGroupList()));
+                    exercise.setSecondaryMusclesList(toAnatomicalMuscles(seed.getSecondaryMuscleGroupList()));
 
                     // Adiciona o exercício criado à lista
                     exercises.add(exercise);
@@ -98,13 +102,46 @@ public class DatabaseSeeder implements CommandLineRunner { // Interface faz a cl
                 catalogExerciseRepository.saveAll(exercises);
 
                 LOGGER.info("Carga inicial de exercícios concluída.");
-
-            } catch (IOException | IllegalArgumentException e){
-                throw new DatabaseSeederFailException("Não foi possível carregar os dados dos exercícios para o banco de dados.", e);
+            } else {
+                backfillAnatomicalMuscles(catalogExerciseRepository, seeds);
             }
+        } catch (IOException | IllegalArgumentException e){
+            throw new DatabaseSeederFailException("Não foi possível carregar os dados dos exercícios para o banco de dados.", e);
         }
-        else{
-            LOGGER.debug("Catálogo de exercícios já inicializado.");
+    }
+
+    private List<AnatomicalMuscle> toAnatomicalMuscles(List<String> seedValues) {
+        return seedValues == null ? List.of() : seedValues.stream()
+                .map(AnatomicalMuscle::fromSeedValue)
+                .distinct()
+                .toList();
+    }
+
+    private void backfillAnatomicalMuscles(
+            CatalogExerciseRepository catalogExerciseRepository,
+            List<ExerciseSeedDTO> seeds) {
+        Map<String, ExerciseSeedDTO> seedsByName = new HashMap<>();
+        for (ExerciseSeedDTO seed : seeds) {
+            seedsByName.put(capitalize(seed.getName()), seed);
         }
+
+        List<CatalogExercise> changedExercises = new ArrayList<>();
+        for (CatalogExercise exercise : catalogExerciseRepository.findAll()) {
+            if (exercise.getPrimaryMusclesList() != null && !exercise.getPrimaryMusclesList().isEmpty()) continue;
+            ExerciseSeedDTO seed = seedsByName.get(exercise.getName());
+            if (seed == null) continue;
+            exercise.setPrimaryMusclesList(toAnatomicalMuscles(seed.getPrimaryMuscleGroupList()));
+            exercise.setSecondaryMusclesList(toAnatomicalMuscles(seed.getSecondaryMuscleGroupList()));
+            changedExercises.add(exercise);
+        }
+
+        if (!changedExercises.isEmpty()) {
+            catalogExerciseRepository.saveAll(changedExercises);
+            LOGGER.info("Músculos anatômicos preenchidos em {} exercícios existentes.", changedExercises.size());
+        }
+    }
+
+    private String capitalize(String value) {
+        return value.substring(0, 1).toUpperCase() + value.substring(1);
     }
 }

@@ -1,14 +1,19 @@
 package com.beefit.api.domain;
 
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.UUID;
 
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import com.beefit.api.domain.enums.CardRarity;
 import com.beefit.api.domain.enums.MuscleGroups;
 
 import jakarta.persistence.Entity;
+import jakarta.persistence.Column;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
@@ -62,6 +67,11 @@ public class Card {
 
     @NotNull
     private Double bodyWeightAtGeneration;
+
+    @NotNull
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "muscle_intensities", columnDefinition = "jsonb", nullable = false)
+    private Map<String, Integer> muscleIntensities = new LinkedHashMap<>();
 
     @CreationTimestamp
     private LocalDateTime generatedAt;

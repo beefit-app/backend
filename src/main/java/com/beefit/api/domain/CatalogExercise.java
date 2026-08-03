@@ -1,6 +1,7 @@
 package com.beefit.api.domain;
 
 import com.beefit.api.domain.enums.MuscleGroups;
+import com.beefit.api.domain.enums.AnatomicalMuscle;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -10,6 +11,7 @@ import lombok.Setter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -38,6 +40,16 @@ public class CatalogExercise {
     @JdbcTypeCode(SqlTypes.ARRAY)
     @Column(name = "secondary_muscle_groups", columnDefinition = "varchar array")
     private List<MuscleGroups> secondaryMuscleGroupsList;
+
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    @Column(name = "primary_muscles", columnDefinition = "varchar array")
+    private List<AnatomicalMuscle> primaryMusclesList = new ArrayList<>();
+
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    @Column(name = "secondary_muscles", columnDefinition = "varchar array")
+    private List<AnatomicalMuscle> secondaryMusclesList = new ArrayList<>();
 
     @Column(length = 1000)
     private String instructions;

@@ -267,6 +267,7 @@ public class WorkoutSessionService {
                                 card.getAttackPower(),
                                 card.getCardRarity().name(),
                                 workoutMuscleGroupMapper.toApi(card.getMuscleGroup()),
+                                card.getMuscleIntensities(),
                                 card.getIsPersonalRecord()
                         )
                 ),

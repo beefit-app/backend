@@ -25,12 +25,24 @@ class FlywayMigrationIntegrationTest {
                 .locations("classpath:db/migration")
                 .load();
 
-        assertEquals(5, flyway.migrate().migrationsExecuted);
+        assertEquals(7, flyway.migrate().migrationsExecuted);
 
         try (var connection = DriverManager.getConnection(
                 POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
              var statement = connection.createStatement();
              var result = statement.executeQuery("select count(*) from information_schema.tables where table_name = 'users'")) {
+            result.next();
+            assertEquals(1, result.getInt(1));
+        }
+
+        try (var connection = DriverManager.getConnection(
+                POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
+             var statement = connection.createStatement();
+             var result = statement.executeQuery("""
+                     select count(*)
+                     from information_schema.columns
+                     where table_name = 'card' and column_name = 'muscle_intensities'
+                     """)) {
             result.next();
             assertEquals(1, result.getInt(1));
         }

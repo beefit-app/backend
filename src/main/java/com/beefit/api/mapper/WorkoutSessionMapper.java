@@ -24,6 +24,7 @@ public interface WorkoutSessionMapper {
                 card.getAttackPower(),
                 card.getCardRarity().name(),
                 card.getMuscleGroup().name(),
+                card.getMuscleIntensities(),
                 card.getIsPersonalRecord());
     }
 

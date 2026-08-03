@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -279,6 +280,7 @@ class WorkoutSessionServiceTest {
         generatedCard.setAttackPower(250.0);
         generatedCard.setCardRarity(CardRarity.RARE);
         generatedCard.setMuscleGroup(MuscleGroups.CHEST);
+        generatedCard.setMuscleIntensities(Map.of("chest", 4, "deltoids", 2, "triceps", 2));
         generatedCard.setIsPersonalRecord(Boolean.TRUE);
 
         when(cardService.generateCard(user, session)).thenReturn(generatedCard);
@@ -313,6 +315,7 @@ class WorkoutSessionServiceTest {
         assertEquals(generatedCard.getId(), event.cardId());
         assertEquals("RARE", event.rarity());
         assertEquals("peito", event.muscleGroup());
+        assertEquals(Map.of("chest", 4, "deltoids", 2, "triceps", 2), event.muscleIntensities());
 
         WorkoutSessionResponseDTO replay = workoutSessionService.finishWorkout(userId, workoutId, "finish-1", request);
         assertEquals(response, replay);

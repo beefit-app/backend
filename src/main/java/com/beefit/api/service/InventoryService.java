@@ -36,6 +36,7 @@ public class InventoryService {
                 card.getCardRarity().name(),
                 card.getCardRarity().getRarity(),
                 workoutMuscleGroupMapper.toApi(card.getMuscleGroup()),
+                card.getMuscleIntensities(),
                 card.getIsPersonalRecord(),
                 card.getBodyWeightAtGeneration(),
                 card.getGeneratedAt());

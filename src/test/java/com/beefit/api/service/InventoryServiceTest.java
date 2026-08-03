@@ -6,6 +6,7 @@ import static org.mockito.Mockito.when;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
@@ -66,6 +67,7 @@ class InventoryServiceTest {
         card.setAttackPower(120.0);
         card.setCardRarity(CardRarity.LEGENDARY);
         card.setMuscleGroup(MuscleGroups.CHEST);
+        card.setMuscleIntensities(Map.of("chest", 4, "deltoids", 2, "triceps", 2));
         card.setIsPersonalRecord(Boolean.TRUE);
         card.setBodyWeightAtGeneration(80.0);
         card.setGeneratedAt(LocalDateTime.of(2026, 6, 18, 10, 30));
@@ -91,6 +93,7 @@ class InventoryServiceTest {
         assertEquals("LEGENDARY", response.rarity());
         assertEquals("Lendário", response.rarityLabel());
         assertEquals("peito", response.muscleGroup());
+        assertEquals(Map.of("chest", 4, "deltoids", 2, "triceps", 2), response.muscleIntensities());
         assertEquals(Boolean.TRUE, response.isPersonalRecord());
         assertEquals(80.0, response.bodyWeightAtGeneration());
         assertEquals(LocalDateTime.of(2026, 6, 18, 10, 30), response.generatedAt());
