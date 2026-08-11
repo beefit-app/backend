@@ -37,12 +37,16 @@ public class GlobalExceptionHandler {
     @ExceptionHandler({ EmailAlreadyInUse.class, UsernameAlreadyInUse.class }) // Essa anotação indica o tipo de exception que deve ser interceptada
     @ResponseStatus(HttpStatus.CONFLICT)
     public ErrorResponse handleRegisterConflictExceptions(RuntimeException e, HttpServletRequest request) {
+        // O conflito sempre nasce de um campo especifico do cadastro. Sem atribui-lo, a
+        // tela so consegue mostrar um aviso solto e o input responsavel fica sem marcacao.
+        String field = e instanceof EmailAlreadyInUse ? "email" : "username";
+
         return new ErrorResponse(
                 LocalDateTime.now(),
                 HttpStatus.CONFLICT.value(),
                 "Dados inválidos",
                 e.getMessage(),
-                List.of(),
+                List.of(new ErrorCampo(field, e.getMessage())),
                 request.getRequestURI()
         );
     }
