@@ -21,8 +21,8 @@ public record RegisterDTO(@NotBlank(message = "Informe seu nome completo.") Stri
                           String password,
 
                           @NotNull(message = "Informe seu peso.")
-                          @Positive(message = "O peso deve ser maior que zero.")
-                          @Max(value = 300, message = "O peso deve ser de até 300 kg.")
+                          @Min(value = 30, message = "O peso deve ser de 30 a 300 kg.")
+                          @Max(value = 300, message = "O peso deve ser de 30 a 300 kg.")
                           Float bodyWeight,
 
                           @NotNull(message = "Informe sua meta semanal.")
