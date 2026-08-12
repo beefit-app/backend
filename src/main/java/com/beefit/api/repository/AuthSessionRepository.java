@@ -16,4 +16,6 @@ public interface AuthSessionRepository extends JpaRepository<AuthSession, UUID> 
     List<AuthSession> findAllByUserIdAndDeviceIdAndRevokedAtIsNullAndExpiresAtAfter(UUID userId,
                                                                                      String deviceId,
                                                                                      LocalDateTime now);
+
+    List<AuthSession> findAllByUserIdAndRevokedAtIsNull(UUID userId);
 }
