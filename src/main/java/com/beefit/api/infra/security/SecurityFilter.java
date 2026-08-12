@@ -1,5 +1,7 @@
 package com.beefit.api.infra.security;
 
+import com.beefit.api.domain.User;
+import com.beefit.api.repository.AuthSessionRepository;
 import com.beefit.api.repository.UserRepository;
 import com.beefit.api.service.TokenService;
 import jakarta.servlet.FilterChain;
@@ -15,6 +17,8 @@ import org.springframework.web.servlet.HandlerMapping;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
@@ -32,6 +36,7 @@ public class SecurityFilter extends OncePerRequestFilter {
 
     private final TokenService tokenService;
     private final UserRepository userRepository;
+    private final AuthSessionRepository authSessionRepository;
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
@@ -75,10 +80,36 @@ public class SecurityFilter extends OncePerRequestFilter {
                 return;
             }
 
+            // Sem esta checagem o JWT sozinho ja bastaria, e revogar a sessao no
+            // logout ou na troca de senha nao teria efeito nenhum sobre o access
+            // token ate ele expirar por conta propria.
+            if (!isSessionActive(validation.sessionId(), user)) {
+                request.setAttribute(AUTH_FAILURE_REASON_ATTRIBUTE, TokenService.TokenValidationStatus.INVALID.name());
+                SecurityContextHolder.clearContext();
+                filterChain.doFilter(request, response);
+                return;
+            }
+
             var authentication = new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities());
             SecurityContextHolder.getContext().setAuthentication(authentication);
         }
         filterChain.doFilter(request, response);
+    }
+
+    private boolean isSessionActive(UUID sessionId, UserDetails authenticatedUser) {
+        if (sessionId == null) {
+            return false;
+        }
+
+        return authSessionRepository.findById(sessionId)
+                .filter(session -> session.getRevokedAt() == null)
+                .filter(session -> session.getExpiresAt().isAfter(LocalDateTime.now()))
+                // O token nomeia o usuario pelo e-mail e a sessao pelo id; conferir
+                // que os dois apontam para a mesma conta impede que um token
+                // reaproveite a sessao de outra.
+                .filter(session -> authenticatedUser instanceof User user
+                        && session.getUser().getId().equals(user.getId()))
+                .isPresent();
     }
 
     private String resolveRequestPath(HttpServletRequest request) {

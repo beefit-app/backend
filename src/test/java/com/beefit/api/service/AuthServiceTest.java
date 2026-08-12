@@ -100,7 +100,14 @@ class AuthServiceTest {
         when(authenticationConfiguration.getAuthenticationManager()).thenReturn(authenticationManager);
         when(authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(user.getEmail(), "secret")))
                 .thenReturn(authentication);
-        when(tokenService.generateToken(user)).thenReturn("jwt-token");
+        when(authSessionRepository.save(org.mockito.ArgumentMatchers.any(AuthSession.class)))
+                .thenAnswer(invocation -> {
+                    AuthSession saved = invocation.getArgument(0);
+                    if (saved.getId() == null) saved.setId(UUID.randomUUID());
+                    return saved;
+                });
+        when(tokenService.generateToken(org.mockito.ArgumentMatchers.eq(user),
+                org.mockito.ArgumentMatchers.any(UUID.class))).thenReturn("jwt-token");
         when(userResponseMapper.toDto(user)).thenReturn(dto);
         when(authSessionRepository.findAllByUserIdAndDeviceIdAndRevokedAtIsNullAndExpiresAtAfter(
                 org.mockito.ArgumentMatchers.eq(user.getId()),
@@ -160,7 +167,14 @@ class AuthServiceTest {
         when(authSessionRepository.findByRefreshTokenHashAndDeviceIdAndRevokedAtIsNull(
                 org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.eq("device-1")))
                 .thenReturn(Optional.of(currentSession));
-        when(tokenService.generateToken(user)).thenReturn("new-access-token");
+        when(authSessionRepository.save(org.mockito.ArgumentMatchers.any(AuthSession.class)))
+                .thenAnswer(invocation -> {
+                    AuthSession saved = invocation.getArgument(0);
+                    if (saved.getId() == null) saved.setId(UUID.randomUUID());
+                    return saved;
+                });
+        when(tokenService.generateToken(org.mockito.ArgumentMatchers.eq(user),
+                org.mockito.ArgumentMatchers.any(UUID.class))).thenReturn("new-access-token");
 
         RefreshTokenResponseDTO response = authService.refreshSession("refresh-token", "device-1");
 
