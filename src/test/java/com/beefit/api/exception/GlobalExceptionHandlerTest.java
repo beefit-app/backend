@@ -11,6 +11,8 @@ import com.beefit.api.exception.workout.InvalidMuscleGroupException;
 import com.beefit.api.exception.workout.WorkoutSessionNotFoundException;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.http.HttpHeaders;
 
 class GlobalExceptionHandlerTest {
@@ -79,6 +81,47 @@ class GlobalExceptionHandlerTest {
         assertEquals(429, response.getStatusCode().value());
         assertEquals("42", response.getHeaders().getFirst(HttpHeaders.RETRY_AFTER));
         assertEquals("Limite de requisições excedido", response.getBody().error());
+    }
+
+    @Test
+    void handleBadCredentialsExplicaOQueAconteceu() {
+        // Sem este tratador a excecao escapava para o authenticationEntryPoint do
+        // Spring Security e o usuario lia "Autenticação obrigatória." ao errar a senha.
+        ErrorResponse response = handler.handleBadCredentials(
+                new BadCredentialsException("Bad credentials"),
+                request("/auth/login"));
+
+        assertEquals(401, response.status());
+        assertEquals("INVALID_CREDENTIALS", response.error());
+        assertEquals("E-mail ou senha inválidos.", response.message());
+        assertEquals("/auth/login", response.path());
+    }
+
+    @Test
+    void handleBadCredentialsNaoRevelaQualCampoFalhou() {
+        // E-mail inexistente e senha errada precisam produzir a mesma resposta:
+        // distinguir permitiria descobrir quais e-mails existem no sistema.
+        ErrorResponse senhaErrada = handler.handleBadCredentials(
+                new BadCredentialsException("Bad credentials"), request("/auth/login"));
+        ErrorResponse usuarioInexistente = handler.handleBadCredentials(
+                new BadCredentialsException("User not found"), request("/auth/login"));
+
+        assertEquals(senhaErrada.message(), usuarioInexistente.message());
+        assertEquals(senhaErrada.status(), usuarioInexistente.status());
+    }
+
+    @Test
+    void handleBlockedAccountNaoMandaTentarSenhaDeNovo() {
+        // User.isEnabled() devolve !isBanned(), entao conta banida lanca
+        // DisabledException. Responder "senha invalida" faria a pessoa insistir ate
+        // esbarrar no limite de tentativas.
+        ErrorResponse response = handler.handleBlockedAccount(
+                new DisabledException("conta banida"),
+                request("/auth/login"));
+
+        assertEquals(403, response.status());
+        assertEquals("ACCOUNT_BANNED", response.error());
+        assertEquals("Esta conta está temporariamente bloqueada.", response.message());
     }
 
     private MockHttpServletRequest request(String uri) {

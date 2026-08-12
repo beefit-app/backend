@@ -4,9 +4,11 @@ import com.beefit.api.controller.AdminDashboardController;
 import com.beefit.api.controller.AdminUserController;
 import com.beefit.api.controller.AdminWorkoutController;
 import com.beefit.api.controller.WorkoutMediaController;
+import com.beefit.api.domain.AuthSession;
 import com.beefit.api.domain.User;
 import com.beefit.api.domain.enums.UserRole;
 import com.beefit.api.mapper.UserResponseMapper;
+import com.beefit.api.repository.AuthSessionRepository;
 import com.beefit.api.repository.UserRepository;
 import com.beefit.api.service.AdminDashboardService;
 import com.beefit.api.service.AdminUserService;
@@ -53,6 +55,9 @@ class AdminEndpointSecurityTest {
     private UserRepository userRepository;
 
     @MockitoBean
+    private AuthSessionRepository authSessionRepository;
+
+    @MockitoBean
     private AdminDashboardService adminDashboardService;
 
     @MockitoBean
@@ -91,7 +96,7 @@ class AdminEndpointSecurityTest {
     @Test
     void everyAdminEndpointRejectsInvalidTokens() throws Exception {
         when(tokenService.validateToken("invalid-token"))
-                .thenReturn(new TokenService.TokenValidationResult(TokenService.TokenValidationStatus.INVALID, null));
+                .thenReturn(new TokenService.TokenValidationResult(TokenService.TokenValidationStatus.INVALID, null, null));
         for (MockHttpServletRequestBuilder request : adminRequests()) {
             mockMvc.perform(request.header("Authorization", "Bearer invalid-token"))
                     .andExpect(status().isUnauthorized());
@@ -116,7 +121,7 @@ class AdminEndpointSecurityTest {
     @Test
     void apiResponsesIncludeSecurityHeaders() throws Exception {
         when(tokenService.validateToken("invalid-token"))
-                .thenReturn(new TokenService.TokenValidationResult(TokenService.TokenValidationStatus.INVALID, null));
+                .thenReturn(new TokenService.TokenValidationResult(TokenService.TokenValidationStatus.INVALID, null, null));
 
         mockMvc.perform(get("/api/admin/dashboard").header("Authorization", "Bearer invalid-token"))
                 .andExpect(status().isUnauthorized())
@@ -129,9 +134,21 @@ class AdminEndpointSecurityTest {
 
     private void mockValidToken(String email, User user) {
         String token = user == commonUser ? "common-token" : "banned-token";
+        UUID sessionId = UUID.randomUUID();
         when(tokenService.validateToken(token))
-                .thenReturn(new TokenService.TokenValidationResult(TokenService.TokenValidationStatus.VALID, email));
+                .thenReturn(new TokenService.TokenValidationResult(
+                        TokenService.TokenValidationStatus.VALID, email, sessionId));
         when(userRepository.findByEmail(email)).thenReturn(user);
+        // O filtro so autentica se a sessao do token ainda estiver ativa.
+        when(authSessionRepository.findById(sessionId)).thenReturn(java.util.Optional.of(activeSession(user)));
+    }
+
+    private AuthSession activeSession(User owner) {
+        AuthSession session = new AuthSession();
+        session.setId(UUID.randomUUID());
+        session.setUser(owner);
+        session.setExpiresAt(LocalDateTime.now().plusDays(1));
+        return session;
     }
 
     private List<MockHttpServletRequestBuilder> adminRequests() {

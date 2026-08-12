@@ -137,7 +137,6 @@ public class AuthService implements UserDetailsService {
     }
 
     private SessionTokens createAuthSession(User user, String deviceId) {
-        String accessToken = tokenService.generateToken(user);
         String refreshToken = generateRefreshToken();
         LocalDateTime now = LocalDateTime.now();
 
@@ -148,7 +147,12 @@ public class AuthService implements UserDetailsService {
         authSession.setCreatedAt(now);
         authSession.setLastUsedAt(now);
         authSession.setExpiresAt(now.plusDays(REFRESH_TOKEN_DURATION_DAYS));
-        authSessionRepository.save(authSession);
+
+        // A sessao e gravada antes de emitir o access token porque o token carrega
+        // o id dela: e esse vinculo que permite ao SecurityFilter recusar um token
+        // cuja sessao ja foi revogada por logout ou troca de senha.
+        AuthSession savedSession = authSessionRepository.save(authSession);
+        String accessToken = tokenService.generateToken(user, savedSession.getId());
 
         return new SessionTokens(accessToken, refreshToken);
     }

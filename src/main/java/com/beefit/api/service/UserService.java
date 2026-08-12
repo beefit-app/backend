@@ -1,5 +1,6 @@
 package com.beefit.api.service;
 
+import com.beefit.api.domain.AuthSession;
 import com.beefit.api.domain.User;
 import com.beefit.api.dto.user.ChangePasswordDTO;
 import com.beefit.api.dto.user.DeleteUserRequestDTO;
@@ -9,12 +10,14 @@ import com.beefit.api.dto.user.UpdateProfileRequestDTO;
 import com.beefit.api.dto.user.UserProfileResponseDTO;
 import com.beefit.api.exception.user.InvalidPasswordException;
 import com.beefit.api.exception.user.UserNotFoundException;
+import com.beefit.api.repository.AuthSessionRepository;
 import com.beefit.api.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
 import java.time.YearMonth;
@@ -33,6 +36,7 @@ public class UserService {
     private final WorkoutMediaService workoutMediaService;
     private final FriendshipService friendshipService;
     private final EntityManager entityManager;
+    private final AuthSessionRepository authSessionRepository;
 
     private UserProfileResponseDTO findUserDetails(User user){
 
@@ -142,6 +146,21 @@ public class UserService {
         }
 
         user.setPasswordHash(passwordEncoder.encode(dto.newPassword()));
+
+        // Quem troca a senha normalmente esta reagindo a uma suspeita de invasao;
+        // sem isto o invasor seguiria dentro com o refresh token antigo, que vale
+        // 30 dias e se renova. Cai tambem o aparelho que fez a troca, que precisa
+        // entrar de novo: poupar a sessao atual exigiria carregar o id dela ate
+        // aqui, e o ganho nao paga a complexidade.
+        revokeAllSessions(userId);
+    }
+
+    private void revokeAllSessions(UUID userId) {
+        LocalDateTime revokedAt = LocalDateTime.now();
+        for (AuthSession session : authSessionRepository.findAllByUserIdAndRevokedAtIsNull(userId)) {
+            session.setRevokedAt(revokedAt);
+            session.setLastUsedAt(revokedAt);
+        }
     }
 
     @Transactional

@@ -19,6 +19,9 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
+import org.springframework.security.authentication.LockedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -37,12 +40,16 @@ public class GlobalExceptionHandler {
     @ExceptionHandler({ EmailAlreadyInUse.class, UsernameAlreadyInUse.class }) // Essa anotação indica o tipo de exception que deve ser interceptada
     @ResponseStatus(HttpStatus.CONFLICT)
     public ErrorResponse handleRegisterConflictExceptions(RuntimeException e, HttpServletRequest request) {
+        // O conflito sempre nasce de um campo especifico do cadastro. Sem atribui-lo, a
+        // tela so consegue mostrar um aviso solto e o input responsavel fica sem marcacao.
+        String field = e instanceof EmailAlreadyInUse ? "email" : "username";
+
         return new ErrorResponse(
                 LocalDateTime.now(),
                 HttpStatus.CONFLICT.value(),
                 "Dados inválidos",
                 e.getMessage(),
-                List.of(),
+                List.of(new ErrorCampo(field, e.getMessage())),
                 request.getRequestURI()
         );
     }
@@ -55,6 +62,47 @@ public class GlobalExceptionHandler {
                 HttpStatus.UNAUTHORIZED.value(),
                 "Unauthorized",
                 e.getMessage(),
+                List.of(),
+                request.getRequestURI()
+        );
+    }
+
+    // Sem estes dois tratadores, a excecao lancada pelo AuthenticationManager escapa
+    // do DispatcherServlet, o ExceptionTranslationFilter do Spring Security a captura
+    // e responde pelo authenticationEntryPoint — cujo caso padrao e "Autenticação
+    // obrigatória.". Aquele ponto de entrada e para quem acessa rota protegida sem
+    // token, nao para login recusado. Estar no @RestControllerAdvice faz o resolvedor
+    // do DispatcherServlet atender antes de a excecao chegar ao filtro.
+
+    @ExceptionHandler(BadCredentialsException.class)
+    @ResponseStatus(HttpStatus.UNAUTHORIZED)
+    public ErrorResponse handleBadCredentials(BadCredentialsException e, HttpServletRequest request) {
+        // Uma frase so para senha errada e e-mail inexistente: o DaoAuthenticationProvider
+        // ja esconde o "usuario nao encontrado", e distinguir os dois permitiria
+        // descobrir quais e-mails existem no sistema.
+        return new ErrorResponse(
+                LocalDateTime.now(),
+                HttpStatus.UNAUTHORIZED.value(),
+                "INVALID_CREDENTIALS",
+                "E-mail ou senha inválidos.",
+                List.of(),
+                request.getRequestURI()
+        );
+    }
+
+    @ExceptionHandler({ DisabledException.class, LockedException.class })
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    public ErrorResponse handleBlockedAccount(RuntimeException e, HttpServletRequest request) {
+        // User.isEnabled() devolve !isBanned(), entao quem esta banido lanca
+        // DisabledException, nao BadCredentialsException. Responder "senha invalida"
+        // aqui faria a pessoa tentar de novo ate esbarrar no limite de 5 tentativas
+        // por conta a cada 15 minutos. Codigo e texto iguais aos do
+        // authenticationEntryPoint, que trata o mesmo caso no outro caminho.
+        return new ErrorResponse(
+                LocalDateTime.now(),
+                HttpStatus.FORBIDDEN.value(),
+                "ACCOUNT_BANNED",
+                "Esta conta está temporariamente bloqueada.",
                 List.of(),
                 request.getRequestURI()
         );
