@@ -38,6 +38,7 @@ import com.beefit.api.dto.workout.CardGeneratedEventDTO;
 import com.beefit.api.dto.workout.FinishWorkoutExerciseDTO;
 import com.beefit.api.dto.workout.FinishWorkoutSetDTO;
 import com.beefit.api.dto.workout.FinishWorkoutSnapshotRequestDTO;
+import com.beefit.api.dto.workout.StartWorkoutExerciseItemDTO;
 import com.beefit.api.dto.workout.StartWorkoutRequestDTO;
 import com.beefit.api.dto.workout.WorkoutPresenceEventDTO;
 import com.beefit.api.dto.workout.WorkoutSessionResponseDTO;
@@ -210,7 +211,16 @@ public class WorkoutSessionService {
         session.setCard(card);
 
         user.setWorkoutsCount(user.getWorkoutsCount() + 1);
-        if (durationSeconds >= MIN_HONEY_WORKOUT_DURATION_SECONDS) {
+        LocalDateTime honeyDayStart = finishedAt.toLocalDate().atStartOfDay();
+        boolean alreadyEarnedHoneyToday = durationSeconds >= MIN_HONEY_WORKOUT_DURATION_SECONDS
+                && workoutSessionRepository.existsEligibleFinishedWorkoutOnDay(
+                        userId,
+                        session.getId(),
+                        WorkoutStatus.FINISHED,
+                        MIN_HONEY_WORKOUT_DURATION_SECONDS,
+                        honeyDayStart,
+                        honeyDayStart.plusDays(1));
+        if (durationSeconds >= MIN_HONEY_WORKOUT_DURATION_SECONDS && !alreadyEarnedHoneyToday) {
             user.setOffensiveHoneys(user.getOffensiveHoneys() + 1);
             user.setWeeklyWorkoutsCount(user.getWeeklyWorkoutsCount() + 1);
         }
@@ -264,11 +274,15 @@ public class WorkoutSessionService {
                         new CardGeneratedEventDTO(
                                 session.getId(),
                                 card.getId(),
-                                card.getAttackPower(),
+                                card.getExercise().getId(),
+                                card.getExercise().getName(),
+                                card.getBestSetWeightKg(),
+                                card.getBestSetReps(),
+                                card.getEstimatedOneRepMax(),
+                                card.getImprovementPercentage(),
                                 card.getCardRarity().name(),
                                 workoutMuscleGroupMapper.toApi(card.getMuscleGroup()),
-                                card.getMuscleIntensities(),
-                                card.getIsPersonalRecord()
+                                card.getMuscleIntensities()
                         )
                 ),
                 userId
@@ -344,10 +358,43 @@ public class WorkoutSessionService {
     }
 
     private List<SessionExercise> resolveInitialExercises(UUID userId, StartWorkoutRequestDTO request) {
-        if (request.templateId() == null) {
+        if (request.templateId() != null) {
+            return buildExercisesFromTemplate(userId, request.templateId());
+        }
+
+        return buildExercisesFromRequest(request.exercises());
+    }
+
+    private List<SessionExercise> buildExercisesFromRequest(List<StartWorkoutExerciseItemDTO> requestedExercises) {
+        if (requestedExercises == null || requestedExercises.isEmpty()) {
             return List.of();
         }
-        return buildExercisesFromTemplate(userId, request.templateId());
+
+        validateUniqueInitialExerciseOrders(requestedExercises);
+
+        List<SessionExercise> exercises = new ArrayList<>();
+        for (StartWorkoutExerciseItemDTO requestedExercise : requestedExercises) {
+            CatalogExercise catalogExercise = catalogExerciseRepository
+                    .findById(requestedExercise.catalogExerciseId())
+                    .orElseThrow(CatalogExerciseNotFound::new);
+
+            SessionExercise sessionExercise = new SessionExercise();
+            sessionExercise.setExercise(catalogExercise);
+            sessionExercise.setOrder(requestedExercise.order());
+            exercises.add(sessionExercise);
+        }
+
+        exercises.sort(Comparator.comparing(SessionExercise::getOrder));
+        return exercises;
+    }
+
+    private void validateUniqueInitialExerciseOrders(List<StartWorkoutExerciseItemDTO> requestedExercises) {
+        Set<Integer> seenOrders = new HashSet<>();
+        for (StartWorkoutExerciseItemDTO exercise : requestedExercises) {
+            if (!seenOrders.add(exercise.order())) {
+                throw new InvalidWorkoutSnapshotException("Existem exercícios com a mesma ordem no início do treino.");
+            }
+        }
     }
 
     // Revisar método. Eu (Ryan) troquei de TemplateExercise para CatalogExercise

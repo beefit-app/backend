@@ -21,11 +21,15 @@ public interface WorkoutSessionMapper {
         if (card == null) return null;
         return new WorkoutCardResponseDTO(
                 card.getId(),
-                card.getAttackPower(),
+                card.getExercise().getId(),
+                card.getExercise().getName(),
+                card.getBestSetWeightKg(),
+                card.getBestSetReps(),
+                card.getEstimatedOneRepMax(),
+                card.getImprovementPercentage(),
                 card.getCardRarity().name(),
                 card.getMuscleGroup().name(),
-                card.getMuscleIntensities(),
-                card.getIsPersonalRecord());
+                card.getMuscleIntensities());
     }
 
 }

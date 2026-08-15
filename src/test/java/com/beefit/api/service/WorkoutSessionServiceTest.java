@@ -39,7 +39,9 @@ import com.beefit.api.dto.workout.CardGeneratedEventDTO;
 import com.beefit.api.dto.workout.FinishWorkoutExerciseDTO;
 import com.beefit.api.dto.workout.FinishWorkoutSetDTO;
 import com.beefit.api.dto.workout.FinishWorkoutSnapshotRequestDTO;
+import com.beefit.api.dto.workout.StartWorkoutExerciseItemDTO;
 import com.beefit.api.dto.workout.StartWorkoutRequestDTO;
+import com.beefit.api.exception.workout.InvalidWorkoutSnapshotException;
 import com.beefit.api.dto.workout.WorkoutSessionResponseDTO;
 import com.beefit.api.exception.workout.InvalidMuscleGroupException;
 import com.beefit.api.exception.workout.InvalidWorkoutSessionStateException;
@@ -129,6 +131,61 @@ class WorkoutSessionServiceTest {
         assertEquals(Boolean.TRUE, savedSession.getIsPrivate());
         assertEquals(0, savedSession.getExercises().size());
         assertEquals("in_progress", response.status());
+    }
+
+    @Test
+    void startWorkoutWithoutTemplatePersistsRequestedExercisesInOrder() {
+        UUID firstCatalogId = UUID.randomUUID();
+        UUID secondCatalogId = UUID.randomUUID();
+        CatalogExercise firstCatalogExercise = catalogExercise(firstCatalogId, "Supino");
+        CatalogExercise secondCatalogExercise = catalogExercise(secondCatalogId, "Puxada");
+        StartWorkoutRequestDTO request = new StartWorkoutRequestDTO(
+                List.of("peito"),
+                Boolean.TRUE,
+                null,
+                List.of(
+                        new StartWorkoutExerciseItemDTO(secondCatalogId, 2),
+                        new StartWorkoutExerciseItemDTO(firstCatalogId, 1)));
+
+        when(workoutSessionRepository.findByStatusAndUserId(WorkoutStatus.IN_PROGRESS, userId)).thenReturn(List.of());
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(workoutMuscleGroupMapper.toDomain(List.of("peito"))).thenReturn(List.of(MuscleGroups.CHEST));
+        when(catalogExerciseRepository.findById(firstCatalogId)).thenReturn(Optional.of(firstCatalogExercise));
+        when(catalogExerciseRepository.findById(secondCatalogId)).thenReturn(Optional.of(secondCatalogExercise));
+        when(workoutSessionRepository.saveAndFlush(any(WorkoutSession.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(workoutSessionMapper.toDto(any(WorkoutSession.class))).thenReturn(responseDto(WorkoutStatus.IN_PROGRESS));
+
+        workoutSessionService.startWorkout(userId, request);
+
+        ArgumentCaptor<WorkoutSession> sessionCaptor = ArgumentCaptor.forClass(WorkoutSession.class);
+        verify(workoutSessionRepository).saveAndFlush(sessionCaptor.capture());
+        WorkoutSession savedSession = sessionCaptor.getValue();
+        assertEquals(2, savedSession.getExercises().size());
+        assertEquals(firstCatalogExercise, savedSession.getExercises().get(0).getExercise());
+        assertEquals(1, savedSession.getExercises().get(0).getOrder());
+        assertEquals(savedSession, savedSession.getExercises().get(0).getWorkoutSession());
+        assertEquals(secondCatalogExercise, savedSession.getExercises().get(1).getExercise());
+        assertEquals(2, savedSession.getExercises().get(1).getOrder());
+    }
+
+    @Test
+    void startWorkoutRejectsDuplicateRequestedExerciseOrders() {
+        StartWorkoutRequestDTO request = new StartWorkoutRequestDTO(
+                List.of("peito"),
+                Boolean.TRUE,
+                null,
+                List.of(
+                        new StartWorkoutExerciseItemDTO(UUID.randomUUID(), 1),
+                        new StartWorkoutExerciseItemDTO(UUID.randomUUID(), 1)));
+
+        when(workoutSessionRepository.findByStatusAndUserId(WorkoutStatus.IN_PROGRESS, userId)).thenReturn(List.of());
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(workoutMuscleGroupMapper.toDomain(List.of("peito"))).thenReturn(List.of(MuscleGroups.CHEST));
+
+        assertThrows(InvalidWorkoutSnapshotException.class,
+                () -> workoutSessionService.startWorkout(userId, request));
+        verify(workoutSessionRepository, never()).saveAndFlush(any(WorkoutSession.class));
     }
 
     @Test
@@ -277,11 +334,14 @@ class WorkoutSessionServiceTest {
         when(workoutMuscleGroupMapper.toDomain(List.of("peito", "pernas"))).thenReturn(List.of(MuscleGroups.CHEST, MuscleGroups.LEGS));
         Card generatedCard = new Card();
         generatedCard.setId(UUID.randomUUID());
-        generatedCard.setAttackPower(250.0);
+        generatedCard.setExercise(newCatalogExercise);
+        generatedCard.setBestSetWeightKg(80.0);
+        generatedCard.setBestSetReps(5);
+        generatedCard.setEstimatedOneRepMax(93.33);
+        generatedCard.setImprovementPercentage(9.0);
         generatedCard.setCardRarity(CardRarity.RARE);
         generatedCard.setMuscleGroup(MuscleGroups.CHEST);
         generatedCard.setMuscleIntensities(Map.of("chest", 4, "deltoids", 2, "triceps", 2));
-        generatedCard.setIsPersonalRecord(Boolean.TRUE);
 
         when(cardService.generateCard(user, session)).thenReturn(generatedCard);
         when(workoutMuscleGroupMapper.toApi(MuscleGroups.CHEST)).thenReturn("peito");
@@ -299,6 +359,7 @@ class WorkoutSessionServiceTest {
         assertEquals(LocalDateTime.of(2026, 5, 26, 10, 45), savedSession.getFinishedAt());
         assertEquals(2700, savedSession.getDurationSeconds());
         assertEquals(1, user.getOffensiveHoneys());
+        assertEquals(1, user.getWeeklyWorkoutsCount());
         assertEquals(1, user.getWorkoutsCount());
         assertEquals(List.of(MuscleGroups.CHEST, MuscleGroups.LEGS), savedSession.getMuscleGroupsList());
         assertEquals(2, savedSession.getExercises().size());
@@ -313,6 +374,10 @@ class WorkoutSessionServiceTest {
         CardGeneratedEventDTO event = (CardGeneratedEventDTO) eventCaptor.getValue().dataSocialEvent();
         assertEquals(workoutId, event.workoutId());
         assertEquals(generatedCard.getId(), event.cardId());
+        assertEquals(newCatalogExercise.getId(), event.exerciseId());
+        assertEquals(newCatalogExercise.getName(), event.exerciseName());
+        assertEquals(80.0, event.bestSetWeightKg());
+        assertEquals(5, event.bestSetReps());
         assertEquals("RARE", event.rarity());
         assertEquals("peito", event.muscleGroup());
         assertEquals(Map.of("chest", 4, "deltoids", 2, "triceps", 2), event.muscleIntensities());
@@ -320,6 +385,59 @@ class WorkoutSessionServiceTest {
         WorkoutSessionResponseDTO replay = workoutSessionService.finishWorkout(userId, workoutId, "finish-1", request);
         assertEquals(response, replay);
         verify(cardService).generateCard(user, session);
+        verify(workoutSessionRepository).existsEligibleFinishedWorkoutOnDay(
+                userId,
+                workoutId,
+                WorkoutStatus.FINISHED,
+                1800,
+                LocalDateTime.of(2026, 5, 26, 0, 0),
+                LocalDateTime.of(2026, 5, 27, 0, 0));
+    }
+
+    @Test
+    void finishSecondEligibleWorkoutOnSameDayDoesNotIncrementHoneysAgain() {
+        UUID workoutId = UUID.randomUUID();
+        WorkoutSession session = inProgressSession(workoutId);
+        user.setOffensiveHoneys(5);
+        user.setWeeklyWorkoutsCount(2);
+        FinishWorkoutSnapshotRequestDTO request = minimalFinishRequest("2026-05-26T10:30:00-03:00");
+
+        prepareMinimalFinish(workoutId, session);
+        when(workoutSessionRepository.existsEligibleFinishedWorkoutOnDay(
+                userId,
+                workoutId,
+                WorkoutStatus.FINISHED,
+                1800,
+                LocalDateTime.of(2026, 5, 26, 0, 0),
+                LocalDateTime.of(2026, 5, 27, 0, 0))).thenReturn(true);
+
+        workoutSessionService.finishWorkout(userId, workoutId, "finish-same-day", request);
+
+        assertEquals(5, user.getOffensiveHoneys());
+        assertEquals(2, user.getWeeklyWorkoutsCount());
+        assertEquals(1, user.getWorkoutsCount());
+    }
+
+    @Test
+    void finishWorkoutBelowThirtyMinutesDoesNotIncrementHoneys() {
+        UUID workoutId = UUID.randomUUID();
+        WorkoutSession session = inProgressSession(workoutId);
+        FinishWorkoutSnapshotRequestDTO request = minimalFinishRequest("2026-05-26T10:29:59-03:00");
+
+        prepareMinimalFinish(workoutId, session);
+
+        workoutSessionService.finishWorkout(userId, workoutId, "finish-short", request);
+
+        assertEquals(0, user.getOffensiveHoneys());
+        assertEquals(0, user.getWeeklyWorkoutsCount());
+        assertEquals(1, user.getWorkoutsCount());
+        verify(workoutSessionRepository, never()).existsEligibleFinishedWorkoutOnDay(
+                any(UUID.class),
+                any(UUID.class),
+                any(WorkoutStatus.class),
+                org.mockito.ArgumentMatchers.anyInt(),
+                any(LocalDateTime.class),
+                any(LocalDateTime.class));
     }
 
     @Test
@@ -390,6 +508,26 @@ class WorkoutSessionServiceTest {
 
         assertThrows(InvalidMuscleGroupException.class,
                 () -> workoutSessionService.addMuscleGroup(userId, workoutId, "foo"));
+    }
+
+    private FinishWorkoutSnapshotRequestDTO minimalFinishRequest(String finishedAt) {
+        return new FinishWorkoutSnapshotRequestDTO(
+                finishedAt,
+                List.of("peito"),
+                List.of(),
+                "Treino",
+                false,
+                null);
+    }
+
+    private void prepareMinimalFinish(UUID workoutId, WorkoutSession session) {
+        when(workoutSessionRepository.findByIdForFinish(workoutId)).thenReturn(Optional.of(session));
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(workoutMuscleGroupMapper.toDomain(List.of("peito"))).thenReturn(List.of(MuscleGroups.CHEST));
+        when(workoutSessionRepository.saveAndFlush(any(WorkoutSession.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(workoutSessionMapper.toDto(any(WorkoutSession.class)))
+                .thenReturn(responseDto(WorkoutStatus.FINISHED));
     }
 
     private User user(UUID id) {

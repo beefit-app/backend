@@ -285,7 +285,7 @@ public class GlobalExceptionHandler {
     // Abaixo estão algumas funções "genéricas" para agrupar exceções de mesmo HttpStatus
 
     // Trata erros de recurso não encontrado (Status 404)
-    @ExceptionHandler({HiveNotFoundException.class})
+    @ExceptionHandler({HiveNotFoundException.class, UserNotFoundException.class})
     @ResponseStatus(HttpStatus.NOT_FOUND)
     public ErrorResponse handleNotFound(RuntimeException e, HttpServletRequest request) {
         return new ErrorResponse(

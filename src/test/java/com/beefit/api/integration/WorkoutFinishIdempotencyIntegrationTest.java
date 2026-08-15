@@ -19,9 +19,12 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.transaction.annotation.Transactional;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
+
+import jakarta.persistence.EntityManager;
 
 import com.beefit.api.domain.CatalogExercise;
 import com.beefit.api.domain.SessionExercise;
@@ -66,6 +69,7 @@ class WorkoutFinishIdempotencyIntegrationTest {
     @Autowired private CardRepository cardRepository;
     @Autowired private InventoryRepository inventoryRepository;
     @Autowired private PostRepository postRepository;
+    @Autowired private EntityManager entityManager;
 
     @MockitoBean private SseService sseService;
     @MockitoBean private FriendshipService friendshipService;
@@ -95,10 +99,10 @@ class WorkoutFinishIdempotencyIntegrationTest {
 
         User completedUser = userRepository.findById(user.getId()).orElseThrow();
         assertEquals(1, completedUser.getWorkoutsCount());
-        assertEquals(1, completedUser.getCardsCount());
-        assertEquals(1, cardRepository.count());
+        assertEquals(0, completedUser.getCardsCount());
+        assertEquals(0, cardRepository.count());
         assertEquals(1, postRepository.count());
-        assertEquals(1, inventoryRepository.findByUserIdWithCards(user.getId()).orElseThrow().getTotalCards());
+        assertEquals(Optional.empty(), inventoryRepository.findByUserIdWithCards(user.getId()));
 
         FinishWorkoutSnapshotRequestDTO changedRequest = finishRequest(workout, catalogExercise, "Conteúdo alterado");
         assertThrows(IdempotencyConflictException.class,
@@ -110,6 +114,45 @@ class WorkoutFinishIdempotencyIntegrationTest {
         UUID otherWorkoutId = otherWorkout.getId();
         assertThrows(IdempotencyConflictException.class,
                 () -> workoutSessionService.finishWorkout(user.getId(), otherWorkoutId, key, request));
+    }
+
+    @Test
+    @Transactional
+    void finishPersistsExerciseAddedAfterWorkoutStarted() {
+        User user = userRepository.saveAndFlush(newUser());
+        CatalogExercise catalogExercise = catalogExerciseRepository.saveAndFlush(newExercise());
+        WorkoutSession workout = newWorkoutWithoutExercises(user);
+        workout = workoutSessionRepository.saveAndFlush(workout);
+        when(friendshipService.getFriends(user.getId())).thenReturn(Optional.of(List.of()));
+
+        String finishedAt = LocalDateTime.now()
+                .atZone(ZoneId.systemDefault())
+                .toOffsetDateTime()
+                .toString();
+        FinishWorkoutSnapshotRequestDTO request = new FinishWorkoutSnapshotRequestDTO(
+                finishedAt,
+                List.of("peito"),
+                List.of(new FinishWorkoutExerciseDTO(
+                        null,
+                        catalogExercise.getId().toString(),
+                        catalogExercise.getName(),
+                        1,
+                        List.of(new FinishWorkoutSetDTO(null, 1, 82.5, 8)))),
+                "Treino com exercício adicionado",
+                false,
+                null);
+
+        workoutSessionService.finishWorkout(user.getId(), workout.getId(), "finish-added-exercise", request);
+
+        entityManager.clear();
+        WorkoutSession reloaded = workoutSessionRepository.findByIdForFinish(workout.getId()).orElseThrow();
+        assertEquals(WorkoutStatus.FINISHED, reloaded.getStatus());
+        assertEquals(1, reloaded.getExercises().size());
+        SessionExercise persistedExercise = reloaded.getExercises().getFirst();
+        assertEquals(catalogExercise.getId(), persistedExercise.getExercise().getId());
+        assertEquals(1, persistedExercise.getSets().size());
+        assertEquals(82.5, persistedExercise.getSets().getFirst().getWeightKg());
+        assertEquals(8, persistedExercise.getSets().getFirst().getReps());
     }
 
     private com.beefit.api.dto.workout.WorkoutSessionResponseDTO finishAfterGate(
@@ -147,13 +190,7 @@ class WorkoutFinishIdempotencyIntegrationTest {
     }
 
     private WorkoutSession newWorkout(User user, CatalogExercise catalogExercise) {
-        WorkoutSession workout = new WorkoutSession();
-        workout.setUser(user);
-        workout.setStartedAt(LocalDateTime.now().minusMinutes(35));
-        workout.setMuscleGroupsList(List.of(MuscleGroups.CHEST));
-        workout.setShouldPostWorkout(false);
-        workout.setIsPrivate(false);
-        workout.setStatus(WorkoutStatus.IN_PROGRESS);
+        WorkoutSession workout = newWorkoutWithoutExercises(user);
 
         SessionExercise sessionExercise = new SessionExercise();
         sessionExercise.setExercise(catalogExercise);
@@ -165,6 +202,17 @@ class WorkoutFinishIdempotencyIntegrationTest {
         set.setIsPersonalRecord(false);
         sessionExercise.addSet(set);
         workout.addExercise(sessionExercise);
+        return workout;
+    }
+
+    private WorkoutSession newWorkoutWithoutExercises(User user) {
+        WorkoutSession workout = new WorkoutSession();
+        workout.setUser(user);
+        workout.setStartedAt(LocalDateTime.now().minusMinutes(35));
+        workout.setMuscleGroupsList(List.of(MuscleGroups.CHEST));
+        workout.setShouldPostWorkout(false);
+        workout.setIsPrivate(false);
+        workout.setStatus(WorkoutStatus.IN_PROGRESS);
         return workout;
     }
 

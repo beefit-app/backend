@@ -19,10 +19,12 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import com.beefit.api.domain.Card;
+import com.beefit.api.domain.CatalogExercise;
 import com.beefit.api.domain.Inventory;
 import com.beefit.api.domain.User;
 import com.beefit.api.domain.WorkoutSession;
 import com.beefit.api.domain.enums.CardRarity;
+import com.beefit.api.domain.enums.AnatomicalMuscle;
 import com.beefit.api.domain.enums.MuscleGroups;
 import com.beefit.api.domain.enums.UserRole;
 import com.beefit.api.domain.enums.WorkoutStatus;
@@ -48,6 +50,9 @@ class InventoryRepositoryTest {
 
     @Autowired
     private InventoryRepository inventoryRepository;
+
+    @Autowired
+    private WorkoutSessionRepository workoutSessionRepository;
 
     @Autowired
     private EntityManager entityManager;
@@ -104,6 +109,26 @@ class InventoryRepositoryTest {
         assertEquals(1, result.getContent().size());
     }
 
+    @Test
+    void findsPreviousBestPerformanceForWeightedAndBodyweightExercises() {
+        User owner = persistUser("performance");
+        CatalogExercise weightedExercise = persistExercise("Supino");
+        CatalogExercise bodyweightExercise = persistExercise("Barra fixa");
+        persistPerformanceWorkout(owner, weightedExercise, 100.0, 5);
+        WorkoutSession currentWeighted = persistPerformanceWorkout(owner, weightedExercise, 110.0, 5);
+        persistPerformanceWorkout(owner, bodyweightExercise, 0.0, 18);
+        WorkoutSession currentBodyweight = persistPerformanceWorkout(owner, bodyweightExercise, 0.0, 20);
+        entityManager.flush();
+
+        assertEquals(116.666,
+                workoutSessionRepository.findBestEstimatedOneRepMaxBeforeWorkout(
+                        owner.getId(), weightedExercise.getId(), currentWeighted.getId()).orElseThrow(),
+                0.001);
+        assertEquals(18,
+                workoutSessionRepository.findBestBodyweightRepsBeforeWorkout(
+                        owner.getId(), bodyweightExercise.getId(), currentBodyweight.getId()).orElseThrow());
+    }
+
     private User persistUser(String username) {
         User user = new User();
         user.setFullName(username + " User");
@@ -130,7 +155,49 @@ class InventoryRepositoryTest {
         return inventory;
     }
 
+    private CatalogExercise persistExercise(String name) {
+        CatalogExercise exercise = new CatalogExercise();
+        exercise.setName(name);
+        exercise.setPrimaryMuscleGroupsList(List.of(MuscleGroups.CHEST));
+        exercise.setSecondaryMuscleGroupsList(List.of());
+        exercise.setPrimaryMusclesList(List.of(AnatomicalMuscle.CHEST));
+        exercise.setSecondaryMusclesList(List.of());
+        entityManager.persist(exercise);
+        return exercise;
+    }
+
+    private WorkoutSession persistPerformanceWorkout(
+            User user,
+            CatalogExercise catalogExercise,
+            double weightKg,
+            int reps) {
+        WorkoutSession workout = new WorkoutSession();
+        workout.setUser(user);
+        workout.setStartedAt(LocalDateTime.now().minusHours(1));
+        workout.setFinishedAt(LocalDateTime.now());
+        workout.setDurationSeconds(3600);
+        workout.setStatus(WorkoutStatus.FINISHED);
+        workout.setShouldPostWorkout(false);
+        workout.setIsPrivate(false);
+        workout.setMuscleGroupsList(List.of(MuscleGroups.CHEST));
+
+        com.beefit.api.domain.SessionExercise sessionExercise = new com.beefit.api.domain.SessionExercise();
+        sessionExercise.setExercise(catalogExercise);
+        sessionExercise.setOrder(1);
+        com.beefit.api.domain.Set set = new com.beefit.api.domain.Set();
+        set.setOrder(1);
+        set.setWeightKg(weightKg);
+        set.setReps(reps);
+        set.setIsPersonalRecord(false);
+        sessionExercise.addSet(set);
+        workout.addExercise(sessionExercise);
+        entityManager.persist(workout);
+        return workout;
+    }
+
     private Card persistCard(Inventory inventory, User user, CardRarity rarity, List<MuscleGroups> muscleGroups) {
+        CatalogExercise exercise = persistExercise("Exercício " + UUID.randomUUID());
+
         WorkoutSession workoutSession = new WorkoutSession();
         workoutSession.setUser(user);
         workoutSession.setStartedAt(LocalDateTime.now().minusHours(1));
@@ -144,10 +211,14 @@ class InventoryRepositoryTest {
         Card card = new Card();
         card.setInventory(inventory);
         card.setWorkoutSession(workoutSession);
-        card.setAttackPower(100.0);
+        card.setExercise(exercise);
+        card.setBestSetWeightKg(80.0);
+        card.setBestSetReps(8);
+        card.setEstimatedOneRepMax(101.33);
+        card.setImprovementPercentage(10.0);
         card.setCardRarity(rarity);
         card.setMuscleGroup(muscleGroups.getFirst());
-        card.setIsPersonalRecord(false);
+        card.setMuscleIntensities(java.util.Map.of("chest", 4));
         card.setBodyWeightAtGeneration(user.getBodyWeight().doubleValue());
         entityManager.persist(card);
         return card;

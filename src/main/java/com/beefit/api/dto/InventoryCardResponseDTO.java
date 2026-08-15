@@ -7,12 +7,16 @@ import java.util.UUID;
 public record InventoryCardResponseDTO(
         UUID id,
         UUID workoutSessionId,
-        Double attackPower,
+        UUID exerciseId,
+        String exerciseName,
+        Double bestSetWeightKg,
+        Integer bestSetReps,
+        Double estimatedOneRepMax,
+        Double improvementPercentage,
         String rarity,
         String rarityLabel,
         String muscleGroup,
         Map<String, Integer> muscleIntensities,
-        Boolean isPersonalRecord,
         Double bodyWeightAtGeneration,
         LocalDateTime generatedAt
 ) {

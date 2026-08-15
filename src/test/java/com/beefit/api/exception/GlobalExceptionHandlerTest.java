@@ -9,6 +9,7 @@ import java.util.List;
 import com.beefit.api.exception.user.EmailAlreadyInUse;
 import com.beefit.api.exception.security.RateLimitExceededException;
 import com.beefit.api.exception.user.InvalidPasswordException;
+import com.beefit.api.exception.user.UserNotFoundException;
 import com.beefit.api.exception.hive.HiveNotFoundException;
 import com.beefit.api.exception.hive.UserAlreadyInHiveException;
 import com.beefit.api.exception.workout.InventoryNotFoundException;
@@ -151,6 +152,12 @@ class GlobalExceptionHandlerTest {
                 .andExpect(status().isNotFound());
     }
 
+    @Test
+    void userNotFoundUsesHttpNotFoundStatus() throws Exception {
+        exceptionStatusClient().perform(get("/test-errors/user-not-found"))
+                .andExpect(status().isNotFound());
+    }
+
     private MockMvc exceptionStatusClient() {
         return MockMvcBuilders.standaloneSetup(new ExceptionStatusController())
                 .setControllerAdvice(handler)
@@ -173,6 +180,11 @@ class GlobalExceptionHandlerTest {
         @GetMapping("/test-errors/inventory-not-found")
         void inventoryNotFound() {
             throw new InventoryNotFoundException();
+        }
+
+        @GetMapping("/test-errors/user-not-found")
+        void userNotFound() {
+            throw new UserNotFoundException();
         }
     }
 

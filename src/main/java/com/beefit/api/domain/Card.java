@@ -49,10 +49,25 @@ public class Card {
     @JoinColumn(name = "workoutSession_id", nullable = false)
     private WorkoutSession workoutSession;
 
-    // Não aparece para o usuário, mas existe pra posterioridades e para calculo da
-    // raridade
     @NotNull
-    private Double attackPower;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "exercise_id", nullable = false)
+    private CatalogExercise exercise;
+
+    @NotNull
+    @Column(name = "best_set_weight_kg", nullable = false)
+    private Double bestSetWeightKg;
+
+    @NotNull
+    @Column(name = "best_set_reps", nullable = false)
+    private Integer bestSetReps;
+
+    @Column(name = "estimated_one_rep_max")
+    private Double estimatedOneRepMax;
+
+    @NotNull
+    @Column(name = "improvement_percentage", nullable = false)
+    private Double improvementPercentage;
 
     @NotNull
     @Enumerated(value = EnumType.STRING)
@@ -61,9 +76,6 @@ public class Card {
     @NotNull
     @Enumerated(value = EnumType.STRING)
     private MuscleGroups muscleGroup;
-
-    @NotNull
-    private Boolean isPersonalRecord;
 
     @NotNull
     private Double bodyWeightAtGeneration;
