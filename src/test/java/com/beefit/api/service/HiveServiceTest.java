@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -20,6 +21,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.beefit.api.domain.Hive;
 import com.beefit.api.domain.User;
+import com.beefit.api.domain.enums.WorkoutStatus;
 import com.beefit.api.dto.hive.HiveRankingDTO;
 import com.beefit.api.exception.user.PermissionException;
 import com.beefit.api.repository.HiveRepository;
@@ -44,6 +46,8 @@ class HiveServiceTest {
         Hive hive = new Hive();
         hive.setId(hiveId);
         hive.setCreator(creator);
+        hive.setStartDate(LocalDate.of(2026, 8, 1));
+        hive.setEndDate(LocalDate.of(2026, 8, 7));
         
         Set<User> members = new HashSet<>();
         members.add(creator);
@@ -75,6 +79,8 @@ class HiveServiceTest {
         Hive hive = new Hive();
         hive.setId(hiveId);
         hive.setCreator(creator);
+        hive.setStartDate(LocalDate.of(2026, 8, 1));
+        hive.setEndDate(LocalDate.of(2026, 8, 7));
 
         Set<User> members = new HashSet<>();
         members.add(creator);
@@ -91,7 +97,11 @@ class HiveServiceTest {
             new HiveRankingDTO(firstPlaceId, "First Place", "first", null, 8L),
             new HiveRankingDTO(otherId, "Other", "other", null, 5L)
         );
-        when(hiveRepository.getRankingForHive(hiveId)).thenReturn(ranking);
+        when(hiveRepository.getRankingForHive(
+                hiveId,
+                WorkoutStatus.FINISHED,
+                LocalDate.of(2026, 8, 1).atStartOfDay(),
+                LocalDate.of(2026, 8, 8).atStartOfDay())).thenReturn(ranking);
 
         hiveService.leaveHive(creator, hiveId);
 

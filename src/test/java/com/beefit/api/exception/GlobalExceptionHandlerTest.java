@@ -1,12 +1,17 @@
 package com.beefit.api.exception;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.util.List;
 
 import com.beefit.api.exception.user.EmailAlreadyInUse;
 import com.beefit.api.exception.security.RateLimitExceededException;
 import com.beefit.api.exception.user.InvalidPasswordException;
+import com.beefit.api.exception.hive.HiveNotFoundException;
+import com.beefit.api.exception.hive.UserAlreadyInHiveException;
+import com.beefit.api.exception.workout.InventoryNotFoundException;
 import com.beefit.api.exception.workout.InvalidMuscleGroupException;
 import com.beefit.api.exception.workout.WorkoutSessionNotFoundException;
 import org.junit.jupiter.api.Test;
@@ -14,6 +19,10 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.http.HttpHeaders;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 class GlobalExceptionHandlerTest {
 
@@ -122,6 +131,49 @@ class GlobalExceptionHandlerTest {
         assertEquals(403, response.status());
         assertEquals("ACCOUNT_BANNED", response.error());
         assertEquals("Esta conta está temporariamente bloqueada.", response.message());
+    }
+
+    @Test
+    void hiveNotFoundUsesHttpNotFoundStatus() throws Exception {
+        exceptionStatusClient().perform(get("/test-errors/hive-not-found"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void userAlreadyInHiveUsesHttpConflictStatus() throws Exception {
+        exceptionStatusClient().perform(get("/test-errors/user-already-in-hive"))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void inventoryNotFoundUsesHttpNotFoundStatus() throws Exception {
+        exceptionStatusClient().perform(get("/test-errors/inventory-not-found"))
+                .andExpect(status().isNotFound());
+    }
+
+    private MockMvc exceptionStatusClient() {
+        return MockMvcBuilders.standaloneSetup(new ExceptionStatusController())
+                .setControllerAdvice(handler)
+                .build();
+    }
+
+    @RestController
+    private static class ExceptionStatusController {
+
+        @GetMapping("/test-errors/hive-not-found")
+        void hiveNotFound() {
+            throw new HiveNotFoundException();
+        }
+
+        @GetMapping("/test-errors/user-already-in-hive")
+        void userAlreadyInHive() {
+            throw new UserAlreadyInHiveException();
+        }
+
+        @GetMapping("/test-errors/inventory-not-found")
+        void inventoryNotFound() {
+            throw new InventoryNotFoundException();
+        }
     }
 
     private MockHttpServletRequest request(String uri) {

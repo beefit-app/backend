@@ -126,7 +126,7 @@ public class PostService {
 
     @Transactional
     public PostLikeDTO toggleLike(UUID userId, UUID postId) {
-        Post post = postRepository.findVisibleById(postId, userId).orElseThrow(PostNotFoundException::new);
+        Post post = postRepository.findVisibleByIdForUpdate(postId, userId).orElseThrow(PostNotFoundException::new);
         User user = userRepository.findById(userId).orElseThrow(UserNotFoundException::new);
 
         Boolean isPostLikedAlready = likeRepository.existsByLikedByAndPost(user, post);

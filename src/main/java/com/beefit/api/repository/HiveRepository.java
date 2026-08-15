@@ -11,6 +11,9 @@ import org.springframework.stereotype.Repository;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.time.LocalDateTime;
+
+import com.beefit.api.domain.enums.WorkoutStatus;
 
 @Repository
 public interface HiveRepository extends JpaRepository<Hive, UUID> {
@@ -35,12 +38,17 @@ public interface HiveRepository extends JpaRepository<Hive, UUID> {
             "FROM Hive h " +
             "JOIN h.members m " +
             "LEFT JOIN WorkoutSession ws ON ws.user = m " +
-            "   AND ws.startedAt >= h.startDate " +
-            "   AND ws.startedAt <= h.endDate " +
+            "   AND ws.status = :status " +
+            "   AND ws.startedAt >= :startInclusive " +
+            "   AND ws.startedAt < :endExclusive " +
             "WHERE h.id = :hiveId " +
             "GROUP BY m " +
             "ORDER BY COUNT(ws) DESC, m.offensiveHoneys ASC") // A ofensiva está como critério de desempate
-    List<HiveRankingDTO> getRankingForHive(@Param("hiveId") UUID hiveId);
+    List<HiveRankingDTO> getRankingForHive(
+            @Param("hiveId") UUID hiveId,
+            @Param("status") WorkoutStatus status,
+            @Param("startInclusive") LocalDateTime startInclusive,
+            @Param("endExclusive") LocalDateTime endExclusive);
 
     // Pega a pontuação de um usuário específico na colmeia
     @Query("SELECT COUNT(ws) " +
@@ -49,9 +57,15 @@ public interface HiveRepository extends JpaRepository<Hive, UUID> {
             // Fazemos o JOIN com a sessão de treino garantindo que ela pertence ao membro
             // e que ocorreu dentro da janela de datas da colmeia
             "LEFT JOIN WorkoutSession ws ON ws.user = m " +
-            "   AND ws.startedAt >= h.startDate " +
-            "   AND ws.startedAt <= h.endDate " +
+            "   AND ws.status = :status " +
+            "   AND ws.startedAt >= :startInclusive " +
+            "   AND ws.startedAt < :endExclusive " +
             "WHERE h.id = :hiveId " +
             "  AND m.id = :userId")
-    Long getUserScoreInHive(@Param("hiveId") UUID hiveId, @Param("userId") UUID userId);
+    Long getUserScoreInHive(
+            @Param("hiveId") UUID hiveId,
+            @Param("userId") UUID userId,
+            @Param("status") WorkoutStatus status,
+            @Param("startInclusive") LocalDateTime startInclusive,
+            @Param("endExclusive") LocalDateTime endExclusive);
 }

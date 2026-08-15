@@ -99,7 +99,7 @@ public class WorkoutSessionService {
 
     @Transactional(readOnly = true)
     public List<WorkoutPresenceEventDTO> getPublicActiveWorkouts(UUID currentUserId) {
-        return workoutSessionRepository.findAllPublicByStatusExcludingUser(WorkoutStatus.IN_PROGRESS, currentUserId)
+        return workoutSessionRepository.findAllVisibleToFriendByStatusExcludingUser(WorkoutStatus.IN_PROGRESS, currentUserId)
                 .stream()
                 .map(session -> new WorkoutPresenceEventDTO(
                         SocialEvent.WORKOUT_STARTED.name(),

@@ -71,7 +71,7 @@ class PostServiceTest {
 
     @Test
     void toggleLikeCreatesLikeAndIncrementsCounterWhenPostWasNotLiked() {
-        when(postRepository.findVisibleById(postId, userId)).thenReturn(Optional.of(post));
+        when(postRepository.findVisibleByIdForUpdate(postId, userId)).thenReturn(Optional.of(post));
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
         when(likeRepository.existsByLikedByAndPost(user, post)).thenReturn(false);
         when(postRepository.save(any(Post.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -95,7 +95,7 @@ class PostServiceTest {
     void toggleLikeRemovesExistingLikeAndDecrementsCounter() {
         post.setTotalLikes(1);
 
-        when(postRepository.findVisibleById(postId, userId)).thenReturn(Optional.of(post));
+        when(postRepository.findVisibleByIdForUpdate(postId, userId)).thenReturn(Optional.of(post));
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
         when(likeRepository.existsByLikedByAndPost(user, post)).thenReturn(true);
 
@@ -110,7 +110,7 @@ class PostServiceTest {
 
     @Test
     void toggleLikeThrowsWhenPostDoesNotExistOrWasRemoved() {
-        when(postRepository.findVisibleById(postId, userId)).thenReturn(Optional.empty());
+        when(postRepository.findVisibleByIdForUpdate(postId, userId)).thenReturn(Optional.empty());
 
         assertThrows(PostNotFoundException.class, () -> postService.toggleLike(userId, postId));
 
@@ -119,7 +119,7 @@ class PostServiceTest {
 
     @Test
     void toggleLikeThrowsWhenUserDoesNotExist() {
-        when(postRepository.findVisibleById(postId, userId)).thenReturn(Optional.of(post));
+        when(postRepository.findVisibleByIdForUpdate(postId, userId)).thenReturn(Optional.of(post));
         when(userRepository.findById(userId)).thenReturn(Optional.empty());
 
         assertThrows(UserNotFoundException.class, () -> postService.toggleLike(userId, postId));

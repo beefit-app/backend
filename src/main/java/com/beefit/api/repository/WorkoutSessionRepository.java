@@ -38,10 +38,17 @@ public interface WorkoutSessionRepository extends JpaRepository<WorkoutSession, 
     JOIN FETCH w.user
     WHERE w.status = :status
       AND w.isPrivate = false
+      AND w.user.ghostMode = false
       AND w.user.id <> :currentUserId
+      AND EXISTS (
+          SELECT 1 FROM Friendship f
+          WHERE f.status = com.beefit.api.domain.enums.FriendshipStatus.ACCEPTED
+            AND ((f.requester.id = :currentUserId AND f.addressee.id = w.user.id)
+              OR (f.addressee.id = :currentUserId AND f.requester.id = w.user.id))
+      )
     ORDER BY w.startedAt DESC
     """)
-    List<WorkoutSession> findAllPublicByStatusExcludingUser(
+    List<WorkoutSession> findAllVisibleToFriendByStatusExcludingUser(
             @Param("status") WorkoutStatus status,
             @Param("currentUserId") UUID currentUserId
     );

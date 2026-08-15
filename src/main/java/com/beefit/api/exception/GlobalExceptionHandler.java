@@ -286,6 +286,7 @@ public class GlobalExceptionHandler {
 
     // Trata erros de recurso não encontrado (Status 404)
     @ExceptionHandler({HiveNotFoundException.class})
+    @ResponseStatus(HttpStatus.NOT_FOUND)
     public ErrorResponse handleNotFound(RuntimeException e, HttpServletRequest request) {
         return new ErrorResponse(
                 LocalDateTime.now(),
@@ -299,6 +300,7 @@ public class GlobalExceptionHandler {
 
     // Trata erros de conflito (Status 409)
     @ExceptionHandler({UserAlreadyInHiveException.class})
+    @ResponseStatus(HttpStatus.CONFLICT)
     public ErrorResponse handleUserAlreadyInHiveException(RuntimeException e, HttpServletRequest request) {
         return new ErrorResponse(
                 LocalDateTime.now(),
@@ -333,6 +335,7 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(InventoryNotFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
     public ErrorResponse handleNotFoundInventory(RuntimeException e, HttpServletRequest request) {
         return new ErrorResponse(
                 LocalDateTime.now(),
