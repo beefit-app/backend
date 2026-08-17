@@ -35,6 +35,8 @@ spring:
         wait: always
 
 beefit:
+  business:
+    time-zone: ${BEEFIT_BUSINESS_TIME_ZONE:America/Sao_Paulo}
   security:
     cors:
       allowed-origins: ${BEEFIT_SECURITY_CORS_ALLOWED_ORIGINS:http://localhost:*,http://127.0.0.1:*,http://10.0.2.2:*}

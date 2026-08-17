@@ -106,7 +106,9 @@ public interface WorkoutSessionRepository extends JpaRepository<WorkoutSession, 
     @Query("SELECT COUNT(w) > 0 FROM WorkoutSession w WHERE w.user.id = :userId " +
             "AND w.id <> :currentWorkoutId AND w.status = :status " +
             "AND w.durationSeconds >= :minimumDurationSeconds " +
-            "AND w.finishedAt >= :startOfDay AND w.finishedAt < :endOfDay")
+            "AND w.finishedAt >= :startOfDay AND w.finishedAt < :endOfDay " +
+            "AND EXISTS (SELECT 1 FROM SessionExercise se JOIN se.sets s " +
+            "WHERE se.workoutSession = w AND s.reps > 0)")
     boolean existsEligibleFinishedWorkoutOnDay(
             @Param("userId") UUID userId,
             @Param("currentWorkoutId") UUID currentWorkoutId,

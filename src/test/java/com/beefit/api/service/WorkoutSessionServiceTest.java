@@ -5,11 +5,15 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -92,6 +96,9 @@ class WorkoutSessionServiceTest {
     @Mock
     private WorkoutMediaService workoutMediaService;
 
+    @Mock
+    private Clock businessClock;
+
     @InjectMocks
     private WorkoutSessionService workoutSessionService;
 
@@ -102,6 +109,8 @@ class WorkoutSessionServiceTest {
     void setUp() {
         userId = UUID.randomUUID();
         user = user(userId);
+        lenient().when(businessClock.instant()).thenReturn(Instant.parse("2026-05-26T15:00:00Z"));
+        lenient().when(businessClock.getZone()).thenReturn(ZoneId.of("America/Sao_Paulo"));
     }
 
     @Test
@@ -400,7 +409,8 @@ class WorkoutSessionServiceTest {
         WorkoutSession session = inProgressSession(workoutId);
         user.setOffensiveHoneys(5);
         user.setWeeklyWorkoutsCount(2);
-        FinishWorkoutSnapshotRequestDTO request = minimalFinishRequest("2026-05-26T10:30:00-03:00");
+        FinishWorkoutSnapshotRequestDTO request = finishRequestWithCompletedSet(
+                session, "2026-05-26T10:30:00-03:00", 8);
 
         prepareMinimalFinish(workoutId, session);
         when(workoutSessionRepository.existsEligibleFinishedWorkoutOnDay(
@@ -438,6 +448,115 @@ class WorkoutSessionServiceTest {
                 org.mockito.ArgumentMatchers.anyInt(),
                 any(LocalDateTime.class),
                 any(LocalDateTime.class));
+    }
+
+    @Test
+    void finishWorkoutAtThirtyMinutesWithCompletedSetIncrementsHoney() {
+        UUID workoutId = UUID.randomUUID();
+        WorkoutSession session = inProgressSession(workoutId);
+        FinishWorkoutSnapshotRequestDTO request = finishRequestWithCompletedSet(
+                session, "2026-05-26T10:30:00-03:00", 8);
+
+        prepareMinimalFinish(workoutId, session);
+
+        workoutSessionService.finishWorkout(userId, workoutId, "finish-thirty-minutes", request);
+
+        assertEquals(1, user.getOffensiveHoneys());
+        assertEquals(1, user.getWeeklyWorkoutsCount());
+        verify(workoutSessionRepository).existsEligibleFinishedWorkoutOnDay(
+                userId,
+                workoutId,
+                WorkoutStatus.FINISHED,
+                1800,
+                LocalDateTime.of(2026, 5, 26, 0, 0),
+                LocalDateTime.of(2026, 5, 27, 0, 0));
+    }
+
+    @Test
+    void finishThirtyMinuteWorkoutWithoutCompletedSetDoesNotIncrementHoneys() {
+        UUID workoutId = UUID.randomUUID();
+        WorkoutSession session = inProgressSession(workoutId);
+        FinishWorkoutSnapshotRequestDTO request = minimalFinishRequest("2026-05-26T10:30:00-03:00");
+
+        prepareMinimalFinish(workoutId, session);
+
+        workoutSessionService.finishWorkout(userId, workoutId, "finish-empty", request);
+
+        assertEquals(0, user.getOffensiveHoneys());
+        assertEquals(0, user.getWeeklyWorkoutsCount());
+        assertEquals(1, user.getWorkoutsCount());
+        verify(workoutSessionRepository, never()).existsEligibleFinishedWorkoutOnDay(
+                any(UUID.class), any(UUID.class), any(WorkoutStatus.class),
+                org.mockito.ArgumentMatchers.anyInt(), any(LocalDateTime.class), any(LocalDateTime.class));
+    }
+
+    @Test
+    void finishThirtyMinuteWorkoutWithZeroRepetitionsDoesNotIncrementHoneys() {
+        UUID workoutId = UUID.randomUUID();
+        WorkoutSession session = inProgressSession(workoutId);
+        FinishWorkoutSnapshotRequestDTO request = finishRequestWithCompletedSet(
+                session, "2026-05-26T10:30:00-03:00", 0);
+
+        prepareMinimalFinish(workoutId, session);
+
+        workoutSessionService.finishWorkout(userId, workoutId, "finish-zero-reps", request);
+
+        assertEquals(0, user.getOffensiveHoneys());
+        assertEquals(0, user.getWeeklyWorkoutsCount());
+        verify(workoutSessionRepository, never()).existsEligibleFinishedWorkoutOnDay(
+                any(UUID.class), any(UUID.class), any(WorkoutStatus.class),
+                org.mockito.ArgumentMatchers.anyInt(), any(LocalDateTime.class), any(LocalDateTime.class));
+    }
+
+    @Test
+    void finishWorkoutRejectsFinishedAtBeyondClockTolerance() {
+        UUID workoutId = UUID.randomUUID();
+        WorkoutSession session = inProgressSession(workoutId);
+        when(workoutSessionRepository.findByIdForFinish(workoutId)).thenReturn(Optional.of(session));
+
+        InvalidWorkoutSnapshotException exception = assertThrows(InvalidWorkoutSnapshotException.class,
+                () -> workoutSessionService.finishWorkout(
+                        userId,
+                        workoutId,
+                        "finish-future",
+                        minimalFinishRequest("2026-05-26T12:05:01-03:00")));
+
+        assertEquals("A data de finalização não pode estar no futuro.", exception.getMessage());
+        verify(userRepository, never()).findById(userId);
+    }
+
+    @Test
+    void finishWorkoutNormalizesAcceptedClockSkewToServerTime() {
+        UUID workoutId = UUID.randomUUID();
+        WorkoutSession session = inProgressSession(workoutId);
+        prepareMinimalFinish(workoutId, session);
+
+        workoutSessionService.finishWorkout(
+                userId,
+                workoutId,
+                "finish-clock-skew",
+                minimalFinishRequest("2026-05-26T12:04:00-03:00"));
+
+        assertEquals(LocalDateTime.of(2026, 5, 26, 12, 0), session.getFinishedAt());
+        assertEquals(7200, session.getDurationSeconds());
+    }
+
+    @Test
+    void finishWorkoutRejectsDurationLongerThanTwentyFourHours() {
+        UUID workoutId = UUID.randomUUID();
+        WorkoutSession session = inProgressSession(workoutId);
+        session.setStartedAt(LocalDateTime.of(2026, 5, 25, 11, 59));
+        when(workoutSessionRepository.findByIdForFinish(workoutId)).thenReturn(Optional.of(session));
+
+        InvalidWorkoutSnapshotException exception = assertThrows(InvalidWorkoutSnapshotException.class,
+                () -> workoutSessionService.finishWorkout(
+                        userId,
+                        workoutId,
+                        "finish-too-long",
+                        minimalFinishRequest("2026-05-26T12:00:00-03:00")));
+
+        assertEquals("A duração do treino não pode ultrapassar 24 horas.", exception.getMessage());
+        verify(userRepository, never()).findById(userId);
     }
 
     @Test
@@ -515,6 +634,28 @@ class WorkoutSessionServiceTest {
                 finishedAt,
                 List.of("peito"),
                 List.of(),
+                "Treino",
+                false,
+                null);
+    }
+
+    private FinishWorkoutSnapshotRequestDTO finishRequestWithCompletedSet(
+            WorkoutSession session, String finishedAt, int reps) {
+        CatalogExercise catalogExercise = catalogExercise(UUID.randomUUID(), "Supino reto");
+        SessionExercise exercise = sessionExercise(UUID.randomUUID(), catalogExercise, 1);
+        com.beefit.api.domain.Set completedSet = set(UUID.randomUUID(), 1, 80.0, reps);
+        exercise.addSet(completedSet);
+        session.addExercise(exercise);
+
+        return new FinishWorkoutSnapshotRequestDTO(
+                finishedAt,
+                List.of("peito"),
+                List.of(new FinishWorkoutExerciseDTO(
+                        exercise.getId(),
+                        catalogExercise.getId().toString(),
+                        catalogExercise.getName(),
+                        1,
+                        List.of(new FinishWorkoutSetDTO(completedSet.getId(), 1, 80.0, reps)))),
                 "Treino",
                 false,
                 null);

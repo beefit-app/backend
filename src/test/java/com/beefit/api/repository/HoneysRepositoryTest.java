@@ -19,7 +19,10 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import com.beefit.api.domain.User;
+import com.beefit.api.domain.CatalogExercise;
+import com.beefit.api.domain.SessionExercise;
 import com.beefit.api.domain.WorkoutSession;
+import com.beefit.api.domain.enums.MuscleGroups;
 import com.beefit.api.domain.enums.UserRole;
 import com.beefit.api.domain.enums.WorkoutStatus;
 import com.beefit.api.support.PostgreSqlTestSupport;
@@ -49,7 +52,7 @@ class HoneysRepositoryTest {
         User user = userRepository.saveAndFlush(newUser("daily", 4, 0, 0));
         LocalDateTime dayStart = LocalDateTime.of(2026, 8, 15, 0, 0);
         WorkoutSession currentWorkout = persistFinishedWorkout(user, dayStart.plusHours(10), 1800);
-        persistFinishedWorkout(user, dayStart.plusHours(8), 1799);
+        persistFinishedWorkout(user, dayStart.plusHours(8), 1800, false);
         workoutSessionRepository.flush();
 
         assertFalse(workoutSessionRepository.existsEligibleFinishedWorkoutOnDay(
@@ -81,6 +84,11 @@ class HoneysRepositoryTest {
     }
 
     private WorkoutSession persistFinishedWorkout(User user, LocalDateTime finishedAt, int durationSeconds) {
+        return persistFinishedWorkout(user, finishedAt, durationSeconds, true);
+    }
+
+    private WorkoutSession persistFinishedWorkout(
+            User user, LocalDateTime finishedAt, int durationSeconds, boolean hasCompletedSet) {
         WorkoutSession workout = new WorkoutSession();
         workout.setUser(user);
         workout.setStartedAt(finishedAt.minusSeconds(durationSeconds));
@@ -90,6 +98,28 @@ class HoneysRepositoryTest {
         workout.setShouldPostWorkout(false);
         workout.setIsPrivate(true);
         workout.setMuscleGroupsList(List.of());
+
+        if (!hasCompletedSet) {
+            return workoutSessionRepository.save(workout);
+        }
+
+        CatalogExercise catalogExercise = new CatalogExercise();
+        catalogExercise.setName("Exercício " + UUID.randomUUID());
+        catalogExercise.setPrimaryMuscleGroupsList(List.of(MuscleGroups.CHEST));
+        catalogExercise.setSecondaryMuscleGroupsList(List.of());
+        entityManager.persist(catalogExercise);
+
+        SessionExercise exercise = new SessionExercise();
+        exercise.setExercise(catalogExercise);
+        exercise.setOrder(1);
+        com.beefit.api.domain.Set completedSet = new com.beefit.api.domain.Set();
+        completedSet.setOrder(1);
+        completedSet.setWeightKg(80.0);
+        completedSet.setReps(8);
+        completedSet.setIsPersonalRecord(false);
+        exercise.addSet(completedSet);
+        workout.addExercise(exercise);
+
         return workoutSessionRepository.save(workout);
     }
 

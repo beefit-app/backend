@@ -1,9 +1,10 @@
 package com.beefit.api.service;
 
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
-import java.time.ZoneId;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -65,6 +66,8 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class WorkoutSessionService {
     private static final int MIN_HONEY_WORKOUT_DURATION_SECONDS = 1800;
+    private static final Duration MAX_FUTURE_CLOCK_SKEW = Duration.ofMinutes(5);
+    private static final Duration MAX_WORKOUT_DURATION = Duration.ofHours(24);
 
     private final WorkoutSessionRepository workoutSessionRepository;
     private final WorkoutTemplateRepository workoutTemplateRepository;
@@ -77,6 +80,7 @@ public class WorkoutSessionService {
     private final PostRepository postRepository;
     private final FriendshipService friendshipService;
     private final WorkoutMediaService workoutMediaService;
+    private final Clock businessClock;
 
     @Transactional(readOnly = true)
     public Optional<WorkoutSessionResponseDTO> getActiveWorkout(UUID userId) {
@@ -122,7 +126,7 @@ public class WorkoutSessionService {
 
         WorkoutSession session = new WorkoutSession();
         session.setUser(user);
-        session.setStartedAt(LocalDateTime.now());
+        session.setStartedAt(LocalDateTime.now(businessClock));
         session.setFinishedAt(null);
         session.setDurationSeconds(null);
         session.setEstimatedCalories(null);
@@ -182,7 +186,7 @@ public class WorkoutSessionService {
         LocalDateTime finishedAt = parseFinishedAt(request.finishedAt());
 
         validateWorkoutInProgress(session);
-        validateFinishedAt(session, finishedAt);
+        finishedAt = validateAndNormalizeFinishedAt(session, finishedAt, LocalDateTime.now(businessClock));
 
         session.setFinishIdempotencyKey(idempotencyKey);
         session.setFinishRequestHash(requestHash);
@@ -212,7 +216,8 @@ public class WorkoutSessionService {
 
         user.setWorkoutsCount(user.getWorkoutsCount() + 1);
         LocalDateTime honeyDayStart = finishedAt.toLocalDate().atStartOfDay();
-        boolean alreadyEarnedHoneyToday = durationSeconds >= MIN_HONEY_WORKOUT_DURATION_SECONDS
+        boolean eligibleForHoney = isEligibleForHoney(session, durationSeconds);
+        boolean alreadyEarnedHoneyToday = eligibleForHoney
                 && workoutSessionRepository.existsEligibleFinishedWorkoutOnDay(
                         userId,
                         session.getId(),
@@ -220,7 +225,7 @@ public class WorkoutSessionService {
                         MIN_HONEY_WORKOUT_DURATION_SECONDS,
                         honeyDayStart,
                         honeyDayStart.plusDays(1));
-        if (durationSeconds >= MIN_HONEY_WORKOUT_DURATION_SECONDS && !alreadyEarnedHoneyToday) {
+        if (eligibleForHoney && !alreadyEarnedHoneyToday) {
             user.setOffensiveHoneys(user.getOffensiveHoneys() + 1);
             user.setWeeklyWorkoutsCount(user.getWeeklyWorkoutsCount() + 1);
         }
@@ -296,7 +301,7 @@ public class WorkoutSessionService {
 
         try {
             return OffsetDateTime.parse(finishedAtValue)
-                    .atZoneSameInstant(ZoneId.systemDefault())
+                    .atZoneSameInstant(businessClock.getZone())
                     .toLocalDateTime();
         } catch (RuntimeException ignored) {
             // Tenta formatos sem offset para compatibilidade transitória.
@@ -304,7 +309,7 @@ public class WorkoutSessionService {
 
         try {
             return Instant.parse(finishedAtValue)
-                    .atZone(ZoneId.systemDefault())
+                    .atZone(businessClock.getZone())
                     .toLocalDateTime();
         } catch (RuntimeException ignored) {
             // Tenta formato local como último fallback.
@@ -326,7 +331,7 @@ public class WorkoutSessionService {
         validateWorkoutOwnership(userId, session);
         validateWorkoutInProgress(session);
 
-        LocalDateTime canceledAt = LocalDateTime.now();
+        LocalDateTime canceledAt = LocalDateTime.now(businessClock);
         session.setFinishedAt(canceledAt);
         session.setStatus(WorkoutStatus.CANCELED);
 
@@ -353,7 +358,7 @@ public class WorkoutSessionService {
         session.getMuscleGroupsList().add(muscleGroup);
         WorkoutSession savedSession = workoutSessionRepository.save(session);
 
-        broadcastIfPublic(savedSession, SocialEvent.WORKOUT_MUSCLE_GROUP_ADDED, LocalDateTime.now());
+        broadcastIfPublic(savedSession, SocialEvent.WORKOUT_MUSCLE_GROUP_ADDED, LocalDateTime.now(businessClock));
         return workoutSessionMapper.toDto(savedSession);
     }
 
@@ -446,11 +451,26 @@ public class WorkoutSessionService {
         }
     }
 
-    private void validateFinishedAt(WorkoutSession session, LocalDateTime finishedAt) {
+    private LocalDateTime validateAndNormalizeFinishedAt(
+            WorkoutSession session, LocalDateTime finishedAt, LocalDateTime receivedAt) {
         if (finishedAt.isBefore(session.getStartedAt())) {
             throw new InvalidWorkoutSnapshotException(
                     "A data de finalização não pode ser anterior ao início do treino.");
         }
+
+        if (finishedAt.isAfter(receivedAt.plus(MAX_FUTURE_CLOCK_SKEW))) {
+            throw new InvalidWorkoutSnapshotException(
+                    "A data de finalização não pode estar no futuro.");
+        }
+
+        LocalDateTime effectiveFinishedAt = finishedAt.isAfter(receivedAt) ? receivedAt : finishedAt;
+        Duration duration = Duration.between(session.getStartedAt(), effectiveFinishedAt);
+        if (duration.compareTo(MAX_WORKOUT_DURATION) > 0) {
+            throw new InvalidWorkoutSnapshotException(
+                    "A duração do treino não pode ultrapassar 24 horas.");
+        }
+
+        return effectiveFinishedAt;
     }
 
     private void initializeWorkoutGraph(WorkoutSession session) {
@@ -584,7 +604,17 @@ public class WorkoutSessionService {
     }
 
     private Integer calculateDurationSeconds(LocalDateTime startedAt, LocalDateTime finishedAt) {
-        return Math.toIntExact(java.time.Duration.between(startedAt, finishedAt).getSeconds());
+        return Math.toIntExact(Duration.between(startedAt, finishedAt).getSeconds());
+    }
+
+    private boolean isEligibleForHoney(WorkoutSession session, int durationSeconds) {
+        if (durationSeconds < MIN_HONEY_WORKOUT_DURATION_SECONDS) {
+            return false;
+        }
+
+        return session.getExercises().stream()
+                .flatMap(exercise -> exercise.getSets().stream())
+                .anyMatch(set -> set.getReps() != null && set.getReps() > 0);
     }
 
     private Double calculateTotalVolume(WorkoutSession session) {
