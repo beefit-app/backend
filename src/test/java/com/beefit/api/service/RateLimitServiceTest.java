@@ -26,7 +26,7 @@ class RateLimitServiceTest {
     void rejectsLoginWhenAccountLimitIsExceededWithoutPersistingPlainEmail() {
         when(repository.increment(anyString(), any(Instant.class), any(Instant.class)))
                 .thenReturn(1, 6);
-        RateLimitService service = new RateLimitService(repository);
+        RateLimitService service = new RateLimitService(repository, 5);
 
         assertThrows(RateLimitExceededException.class,
                 () -> service.checkLogin("192.0.2.1", "Sensitive@Example.com"));

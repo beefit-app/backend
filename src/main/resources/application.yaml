@@ -40,6 +40,8 @@ beefit:
   security:
     cors:
       allowed-origins: ${BEEFIT_SECURITY_CORS_ALLOWED_ORIGINS:http://localhost:*,http://127.0.0.1:*,http://10.0.2.2:*}
+    rate-limit:
+      registration-maximum: ${BEEFIT_SECURITY_RATE_LIMIT_REGISTRATION_MAXIMUM:5}
     token:
       secret: ${JWT_SECRET}
 

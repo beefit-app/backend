@@ -2,7 +2,7 @@ package com.beefit.api.service;
 
 import com.beefit.api.exception.security.RateLimitExceededException;
 import com.beefit.api.repository.RateLimitRepository;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -16,7 +16,6 @@ import java.util.Locale;
 import java.util.UUID;
 
 @Service
-@RequiredArgsConstructor
 public class RateLimitService {
 
     private static final Duration LOGIN_WINDOW = Duration.ofMinutes(15);
@@ -26,6 +25,14 @@ public class RateLimitService {
     private static final Duration UPLOAD_WINDOW = Duration.ofHours(1);
 
     private final RateLimitRepository repository;
+    private final int registrationMaximum;
+
+    public RateLimitService(
+            RateLimitRepository repository,
+            @Value("${beefit.security.rate-limit.registration-maximum:5}") int registrationMaximum) {
+        this.repository = repository;
+        this.registrationMaximum = registrationMaximum;
+    }
 
     public void checkLogin(String remoteAddress, String email) {
         check("login-ip", remoteAddress, 10, LOGIN_WINDOW);
@@ -33,7 +40,7 @@ public class RateLimitService {
     }
 
     public void checkRegistration(String remoteAddress) {
-        check("register-ip", remoteAddress, 5, REGISTER_WINDOW);
+        check("register-ip", remoteAddress, registrationMaximum, REGISTER_WINDOW);
     }
 
     public void checkRefresh(String deviceId) {

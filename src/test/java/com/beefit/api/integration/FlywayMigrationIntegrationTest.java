@@ -21,7 +21,7 @@ class FlywayMigrationIntegrationTest {
     static final PostgreSQLContainer POSTGRES = PostgreSqlTestSupport.createContainer("beefit_test");
 
     @Test
-    void migratesLegacyCardsUsingExercisePerformanceHistory() throws Exception {
+    void migratesLegacyCardsAndDeduplicatesOppositeFriendships() throws Exception {
         Flyway legacyFlyway = Flyway.configure()
                 .dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
                 .locations("classpath:db/migration")
@@ -30,6 +30,7 @@ class FlywayMigrationIntegrationTest {
         assertEquals(7, legacyFlyway.migrate().migrationsExecuted);
 
         UUID userId = UUID.randomUUID();
+        UUID friendId = UUID.randomUUID();
         UUID inventoryId = UUID.randomUUID();
         UUID exerciseId = UUID.randomUUID();
         UUID baselineWorkoutId = UUID.randomUUID();
@@ -52,6 +53,20 @@ class FlywayMigrationIntegrationTest {
                     """.formatted(userId));
             statement.executeUpdate("INSERT INTO inventory (total_cards, id, user_id) VALUES (2, '%s', '%s')"
                     .formatted(inventoryId, userId));
+            statement.executeUpdate("""
+                    INSERT INTO users (
+                        body_weight, cards_count, ghost_mode, offensive_honeys, weekly_goal,
+                        weekly_workouts_count, workouts_count, id, full_name, email,
+                        password_hash, role, username
+                    ) VALUES (75, 0, false, 0, 3, 0, 0, '%s', 'Friend Test',
+                        'friend@test.local', 'hash', 'USER', 'friend-test')
+                    """.formatted(friendId));
+            statement.executeUpdate("""
+                    INSERT INTO friendship (id, requester_id, addressee_id, status, sent_at)
+                    VALUES ('%s', '%s', '%s', 'PENDING', '2026-01-01 10:00:00'),
+                           ('%s', '%s', '%s', 'ACCEPTED', '2026-01-02 10:00:00')
+                    """.formatted(UUID.randomUUID(), userId, friendId,
+                            UUID.randomUUID(), friendId, userId));
             statement.executeUpdate("""
                     INSERT INTO exercises (
                         id, name, primary_muscle_groups, secondary_muscle_groups,
@@ -76,6 +91,7 @@ class FlywayMigrationIntegrationTest {
         Flyway currentFlyway = Flyway.configure()
                 .dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
                 .locations("classpath:db/migration")
+                .target(MigrationVersion.fromVersion("8"))
                 .load();
         assertEquals(1, currentFlyway.migrate().migrationsExecuted);
 
@@ -106,6 +122,27 @@ class FlywayMigrationIntegrationTest {
                 result.next();
                 assertEquals(1, result.getInt(1));
             }
+        }
+
+        Flyway friendshipFlyway = Flyway.configure()
+                .dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
+                .locations("classpath:db/migration")
+                .target(MigrationVersion.fromVersion("9"))
+                .load();
+        assertEquals(1, friendshipFlyway.migrate().migrationsExecuted);
+
+        try (var connection = DriverManager.getConnection(
+                POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());
+             var statement = connection.createStatement();
+             var result = statement.executeQuery("""
+                     SELECT COUNT(*) AS relationship_count, MAX(status) AS remaining_status
+                     FROM friendship
+                     WHERE LEAST(requester_id, addressee_id) = LEAST('%s'::uuid, '%s'::uuid)
+                       AND GREATEST(requester_id, addressee_id) = GREATEST('%s'::uuid, '%s'::uuid)
+                     """.formatted(userId, friendId, userId, friendId))) {
+            result.next();
+            assertEquals(1, result.getInt("relationship_count"));
+            assertEquals("ACCEPTED", result.getString("remaining_status"));
         }
     }
 

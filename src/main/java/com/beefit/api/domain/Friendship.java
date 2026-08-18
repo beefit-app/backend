@@ -13,13 +13,9 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-// Esse Constraint serve para impedir o envio de 2 solicitações, ou de uma solicitação quando 2 pessoas já são amigas
-@Table(name = "friendship", uniqueConstraints = {
-        @UniqueConstraint(columnNames = {
-                "requester_id",
-                "addressee_id"
-        })
-})
+// A unicidade do par de usuários, independentemente da direção do convite,
+// é garantida pelo índice funcional criado pelo Flyway.
+@Table(name = "friendship")
 @AllArgsConstructor
 @NoArgsConstructor
 @Getter

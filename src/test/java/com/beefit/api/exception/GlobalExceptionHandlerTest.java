@@ -2,11 +2,14 @@ package com.beefit.api.exception;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.util.List;
 
 import com.beefit.api.exception.user.EmailAlreadyInUse;
+import com.beefit.api.exception.friendship.FriendshipNotFound;
+import com.beefit.api.exception.friendship.FriendshipNotPendingException;
 import com.beefit.api.exception.security.RateLimitExceededException;
 import com.beefit.api.exception.user.InvalidPasswordException;
 import com.beefit.api.exception.user.UserNotFoundException;
@@ -158,6 +161,20 @@ class GlobalExceptionHandlerTest {
                 .andExpect(status().isNotFound());
     }
 
+    @Test
+    void friendshipNotFoundUsesHttpNotFoundStatus() throws Exception {
+        exceptionStatusClient().perform(get("/test-errors/friendship-not-found"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404));
+    }
+
+    @Test
+    void friendshipInvalidStateUsesHttpConflictStatus() throws Exception {
+        exceptionStatusClient().perform(get("/test-errors/friendship-invalid-state"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value(409));
+    }
+
     private MockMvc exceptionStatusClient() {
         return MockMvcBuilders.standaloneSetup(new ExceptionStatusController())
                 .setControllerAdvice(handler)
@@ -185,6 +202,16 @@ class GlobalExceptionHandlerTest {
         @GetMapping("/test-errors/user-not-found")
         void userNotFound() {
             throw new UserNotFoundException();
+        }
+
+        @GetMapping("/test-errors/friendship-not-found")
+        void friendshipNotFound() {
+            throw new FriendshipNotFound();
+        }
+
+        @GetMapping("/test-errors/friendship-invalid-state")
+        void friendshipInvalidState() {
+            throw new FriendshipNotPendingException();
         }
     }
 

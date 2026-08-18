@@ -6,7 +6,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -23,7 +26,10 @@ import com.beefit.api.domain.Hive;
 import com.beefit.api.domain.User;
 import com.beefit.api.domain.enums.WorkoutStatus;
 import com.beefit.api.dto.hive.HiveRankingDTO;
+import com.beefit.api.dto.hive.HiveCreationDTO;
+import com.beefit.api.exception.hive.InvalidTimePeriodException;
 import com.beefit.api.exception.user.PermissionException;
+import com.beefit.api.mapper.HiveMapper;
 import com.beefit.api.repository.HiveRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -32,8 +38,46 @@ class HiveServiceTest {
     @Mock
     private HiveRepository hiveRepository;
 
+    @Mock
+    private Clock businessClock;
+
+    @Mock
+    private HiveMapper hiveMapper;
+
     @InjectMocks
     private HiveService hiveService;
+
+    @Test
+    void createNewHiveUsesBusinessClockToValidateCurrentDate() {
+        LocalDate businessDate = LocalDate.of(2026, 8, 18);
+        when(businessClock.instant()).thenReturn(Instant.parse("2026-08-19T01:30:00Z"));
+        when(businessClock.getZone()).thenReturn(ZoneId.of("America/Sao_Paulo"));
+
+        User creator = new User();
+        HiveCreationDTO dto = new HiveCreationDTO("Colmeia", businessDate, businessDate.plusDays(7));
+        Hive mappedHive = new Hive();
+        when(hiveMapper.toEntity(dto)).thenReturn(mappedHive);
+        when(hiveRepository.save(mappedHive)).thenReturn(mappedHive);
+
+        Hive created = hiveService.createNewHive(creator, dto);
+
+        assertEquals(mappedHive, created);
+        assertEquals(creator, created.getCreator());
+        verify(hiveRepository).save(mappedHive);
+    }
+
+    @Test
+    void createNewHiveRejectsDateBeforeBusinessDate() {
+        LocalDate businessDate = LocalDate.of(2026, 8, 18);
+        when(businessClock.instant()).thenReturn(Instant.parse("2026-08-18T15:00:00Z"));
+        when(businessClock.getZone()).thenReturn(ZoneId.of("America/Sao_Paulo"));
+
+        HiveCreationDTO dto = new HiveCreationDTO(
+                "Colmeia", businessDate.minusDays(1), businessDate.plusDays(7));
+
+        assertThrows(InvalidTimePeriodException.class,
+                () -> hiveService.createNewHive(new User(), dto));
+    }
 
     @Test
     void leaveHive_OnlyMember_DeletesHive() {

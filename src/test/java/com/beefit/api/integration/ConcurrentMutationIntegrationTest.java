@@ -1,6 +1,7 @@
 package com.beefit.api.integration;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -32,6 +33,7 @@ import com.beefit.api.domain.enums.FriendshipStatus;
 import com.beefit.api.domain.enums.UserRole;
 import com.beefit.api.domain.enums.WorkoutStatus;
 import com.beefit.api.exception.user.InvalidSessionException;
+import com.beefit.api.exception.friendship.FriendshipAlreadyExistException;
 import com.beefit.api.repository.AuthSessionRepository;
 import com.beefit.api.repository.FriendshipRepository;
 import com.beefit.api.repository.LikeRepository;
@@ -39,6 +41,7 @@ import com.beefit.api.repository.PostRepository;
 import com.beefit.api.repository.UserRepository;
 import com.beefit.api.repository.WorkoutSessionRepository;
 import com.beefit.api.service.AuthService;
+import com.beefit.api.service.FriendshipService;
 import com.beefit.api.service.PostService;
 import com.beefit.api.support.PostgreSqlTestSupport;
 
@@ -57,6 +60,7 @@ class ConcurrentMutationIntegrationTest {
     }
 
     @Autowired private AuthService authService;
+    @Autowired private FriendshipService friendshipService;
     @Autowired private PostService postService;
     @Autowired private AuthSessionRepository authSessionRepository;
     @Autowired private FriendshipRepository friendshipRepository;
@@ -161,6 +165,36 @@ class ConcurrentMutationIntegrationTest {
         assertEquals(likerCount, likeRepository.countByPost(updatedPost));
     }
 
+    @Test
+    void concurrentOppositeFriendRequestsCreateOnlyOneRelationship() throws Exception {
+        User first = userRepository.saveAndFlush(newUser("friend-first"));
+        User second = userRepository.saveAndFlush(newUser("friend-second"));
+
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        List<Future<Boolean>> attempts = new ArrayList<>();
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            attempts.add(executor.submit(() -> createFriendshipAfterGate(
+                    first.getId(), second.getId(), ready, start)));
+            attempts.add(executor.submit(() -> createFriendshipAfterGate(
+                    second.getId(), first.getId(), ready, start)));
+            ready.await();
+            start.countDown();
+
+            int successes = 0;
+            for (Future<Boolean> attempt : attempts) {
+                if (attempt.get()) successes++;
+            }
+            assertEquals(1, successes);
+        }
+
+        long relationships = friendshipRepository.findAll().stream()
+                .filter(friendship -> connects(friendship, first.getId(), second.getId()))
+                .count();
+        assertEquals(1, relationships);
+        assertTrue(friendshipRepository.findFriendshipBetween(first, second).isPresent());
+    }
+
     private boolean refreshAfterGate(String refreshToken, String deviceId,
             CountDownLatch ready, CountDownLatch start) throws InterruptedException {
         ready.countDown();
@@ -183,6 +217,26 @@ class ConcurrentMutationIntegrationTest {
             throw new IllegalStateException(interrupted);
         }
         postService.toggleLike(userId, postId);
+    }
+
+    private boolean createFriendshipAfterGate(UUID requesterId, UUID addresseeId,
+            CountDownLatch ready, CountDownLatch start) throws InterruptedException {
+        User requester = userRepository.findById(requesterId).orElseThrow();
+        ready.countDown();
+        start.await();
+        try {
+            friendshipService.createFriendship(requester, addresseeId);
+            return true;
+        } catch (FriendshipAlreadyExistException expected) {
+            return false;
+        }
+    }
+
+    private boolean connects(Friendship friendship, UUID firstId, UUID secondId) {
+        UUID requesterId = friendship.getRequester().getId();
+        UUID addresseeId = friendship.getAddressee().getId();
+        return requesterId.equals(firstId) && addresseeId.equals(secondId)
+                || requesterId.equals(secondId) && addresseeId.equals(firstId);
     }
 
     private String sha256(String value) throws Exception {

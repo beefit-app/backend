@@ -16,8 +16,8 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.Clock;
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 
@@ -27,6 +27,7 @@ public class HiveService {
 
     private final HiveRepository hiveRepository;
     private final HiveMapper hiveMapper;
+    private final Clock businessClock;
 
     @Transactional
     public Hive createNewHive(User user, HiveCreationDTO hiveCreationDTO) {
@@ -155,7 +156,7 @@ public class HiveService {
 
     private void validateHiveDate(HiveCreationDTO dto){
 
-        LocalDate hoje = LocalDate.now(ZoneId.of("America/Sao_Paulo"));
+        LocalDate hoje = LocalDate.now(businessClock);
 
         if(dto.startDate().isAfter(dto.endDate()) || dto.startDate().isBefore(hoje)){
             throw new InvalidTimePeriodException();

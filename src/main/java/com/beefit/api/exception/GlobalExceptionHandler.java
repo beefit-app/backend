@@ -226,15 +226,25 @@ public class GlobalExceptionHandler {
                 request.getRequestURI());
     }
 
-    @ExceptionHandler({FriendshipNotAcceptedException.class,
-            FriendshipNotPendingException.class,
-            FriendshipNotFound.class})
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public ErrorResponse handleFriendshipException(RuntimeException e,
+    @ExceptionHandler({FriendshipNotAcceptedException.class, FriendshipNotPendingException.class})
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleFriendshipStateException(RuntimeException e,
                                                  HttpServletRequest request) {
         return new ErrorResponse(LocalDateTime.now(),
                 HttpStatus.CONFLICT.value(),
                 "Não é possível essa ação para a solicitação de amizade",
+                e.getMessage(),
+                List.of(),
+                request.getRequestURI());
+    }
+
+    @ExceptionHandler(FriendshipNotFound.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public ErrorResponse handleFriendshipNotFound(FriendshipNotFound e,
+            HttpServletRequest request) {
+        return new ErrorResponse(LocalDateTime.now(),
+                HttpStatus.NOT_FOUND.value(),
+                "Amizade não encontrada",
                 e.getMessage(),
                 List.of(),
                 request.getRequestURI());
