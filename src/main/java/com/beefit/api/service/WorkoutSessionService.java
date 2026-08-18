@@ -112,6 +112,7 @@ public class WorkoutSessionService {
                         session.getUser().getId(),
                         session.getUser().getUsername(),
                         session.getUser().getFullName(),
+                        session.getUser().getProfilePicture(),
                         session.getStatus().getStatus(),
                         session.getStartedAt(),
                         workoutMuscleGroupMapper.toApi(session.getMuscleGroupsList())))
@@ -644,6 +645,7 @@ public class WorkoutSessionService {
                 user.getId(),
                 user.getUsername(),
                 user.getFullName(),
+                user.getProfilePicture(),
                 session.getStatus().getStatus(),
                 occurredAt,
                 workoutMuscleGroupMapper.toApi(session.getMuscleGroupsList()));

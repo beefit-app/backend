@@ -1,0 +1,54 @@
+name: beefit-local-application
+
+# Ambiente reproduzivel para validacao local. Nao representa a topologia de producao.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: beefit
+      POSTGRES_USER: beefit
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-locally}
+    volumes:
+      - application_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U beefit -d beefit"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  backend:
+    build:
+      context: .
+    environment:
+      SPRING_PROFILES_ACTIVE: container
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/beefit
+      SPRING_DATASOURCE_USERNAME: beefit
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-change-me-locally}
+      JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET com pelo menos 32 caracteres}
+      BEEFIT_SECURITY_CORS_ALLOWED_ORIGINS: http://localhost:4173
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/actuator/health/readiness"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 30s
+
+  frontend:
+    build:
+      context: ../frontend
+      args:
+        VITE_API_URL: http://localhost:8080
+        VITE_ALLOW_INSECURE_LOCAL_API: "true"
+    ports:
+      - "4173:8080"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  application_postgres_data:

@@ -20,6 +20,10 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
+import org.springframework.beans.factory.annotation.Value;
+import com.beefit.api.dto.auth.LegalVersionsResponseDTO;
+import com.beefit.api.exception.user.PermissionException;
+import com.beefit.api.service.LegalConsentService;
 
 @RestController
 @RequestMapping("/auth")
@@ -30,6 +34,10 @@ public class AuthController implements GenericController {
     private final RegisterMapper registerMapper;
     private final UserResponseMapper userResponseMapper;
     private final RateLimitService rateLimitService;
+    private final LegalConsentService legalConsentService;
+
+    @Value("${beefit.registration.enabled:true}")
+    private boolean registrationEnabled;
 
     // Endpoint de Login
     @PostMapping("/login")
@@ -48,9 +56,14 @@ public class AuthController implements GenericController {
     public ResponseEntity<LoginResponseDTO> register(@RequestBody @Valid RegisterDTO data,
             HttpServletRequest request) {
 
+        if (!registrationEnabled) {
+            throw new PermissionException("O cadastro de novas contas está temporariamente fechado.");
+        }
+
         rateLimitService.checkRegistration(request.getRemoteAddr());
 
         User registered = registerMapper.toEntity(data);
+        authService.recordLegalConsent(registered, data.acceptedTermsVersion(), data.acceptedPrivacyVersion());
 
         // Chama o service passando os dados de cadastro
         this.authService.register(registered);
@@ -62,9 +75,16 @@ public class AuthController implements GenericController {
         return ResponseEntity.created(location).body(login);
     }
 
+    @GetMapping("/legal-versions")
+    public ResponseEntity<LegalVersionsResponseDTO> legalVersions() {
+        return ResponseEntity.ok(new LegalVersionsResponseDTO(
+                legalConsentService.termsVersion(), legalConsentService.privacyVersion()));
+    }
+
     @PostMapping("/refresh")
-    public ResponseEntity<RefreshTokenResponseDTO> refresh(@RequestBody @Valid RefreshTokenRequestDTO data) {
-        rateLimitService.checkRefresh(data.deviceId());
+    public ResponseEntity<RefreshTokenResponseDTO> refresh(@RequestBody @Valid RefreshTokenRequestDTO data,
+            HttpServletRequest request) {
+        rateLimitService.checkRefresh(request.getRemoteAddr(), data.deviceId());
         return ResponseEntity.ok(authService.refreshSession(data.refreshToken(), data.deviceId()));
     }
 

@@ -12,4 +12,5 @@ public interface WorkoutMediaRepository extends JpaRepository<WorkoutMedia, UUID
     Optional<WorkoutMedia> findByIdAndOwnerId(UUID id, UUID ownerId);
     List<WorkoutMedia> findByConsumedFalseAndCreatedAtBefore(LocalDateTime cutoff);
     void deleteByOwnerId(UUID ownerId);
+    long countByOwnerId(UUID ownerId);
 }

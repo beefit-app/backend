@@ -35,6 +35,11 @@ spring:
     baseline-version: 1
 
 beefit:
+  registration:
+    enabled: ${BEEFIT_REGISTRATION_ENABLED:true}
+  legal:
+    terms-version: ${BEEFIT_TERMS_VERSION:2026-08-18}
+    privacy-version: ${BEEFIT_PRIVACY_VERSION:2026-08-18}
   security:
     cors:
       allowed-origins: ""

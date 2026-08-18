@@ -35,6 +35,11 @@ spring:
         wait: always
 
 beefit:
+  registration:
+    enabled: ${BEEFIT_REGISTRATION_ENABLED:true}
+  legal:
+    terms-version: ${BEEFIT_TERMS_VERSION:2026-08-18}
+    privacy-version: ${BEEFIT_PRIVACY_VERSION:2026-08-18}
   business:
     time-zone: ${BEEFIT_BUSINESS_TIME_ZONE:America/Sao_Paulo}
   security:
@@ -44,5 +49,25 @@ beefit:
       registration-maximum: ${BEEFIT_SECURITY_RATE_LIMIT_REGISTRATION_MAXIMUM:5}
     token:
       secret: ${JWT_SECRET}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+  health:
+    readiness-state:
+      enabled: true
+    liveness-state:
+      enabled: true
+
+logging:
+  pattern:
+    level: "%5p [requestId:%X{requestId:-none}]"
 
 # Lembrar de Adicionar Configurações para o Módulo de Segurança (JWT)

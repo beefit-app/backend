@@ -38,7 +38,7 @@ class AuthDtoValidationTest {
                 "senha123",
                 80F,
                 4,
-                "device-1");
+                "device-1", "terms-v1", "privacy-v1");
 
         assertTrue(validator.validate(dto).isEmpty());
     }
@@ -52,7 +52,7 @@ class AuthDtoValidationTest {
                 "12345",
                 80F,
                 4,
-                "d".repeat(256));
+                "d".repeat(256), "terms-v1", "privacy-v1");
 
         Set<ConstraintViolation<RegisterDTO>> violations = validator.validate(dto);
 
@@ -72,7 +72,7 @@ class AuthDtoValidationTest {
                 "somenteletras",
                 80F,
                 4,
-                "device-1");
+                "device-1", "terms-v1", "privacy-v1");
 
         assertHasViolationFor(validator.validate(dto), "password");
     }

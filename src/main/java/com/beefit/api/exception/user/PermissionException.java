@@ -4,4 +4,8 @@ public class PermissionException extends RuntimeException {
     public PermissionException() {
         super("O usuário não tem permissão para essa ação.");
     }
+
+    public PermissionException(String message) {
+        super(message);
+    }
 }

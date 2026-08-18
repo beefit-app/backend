@@ -23,6 +23,8 @@ import javax.imageio.stream.ImageInputStream;
 import java.util.Iterator;
 import java.util.Locale;
 import java.util.UUID;
+import java.io.ByteArrayOutputStream;
+import java.awt.Graphics2D;
 
 @Service
 @RequiredArgsConstructor
@@ -30,6 +32,7 @@ public class WorkoutMediaService {
     private static final long MAX_FILE_SIZE = 10 * 1024 * 1024;
     private static final int MAX_IMAGE_DIMENSION = 4096;
     private static final long MAX_IMAGE_PIXELS = 16_000_000;
+    private static final long MAX_MEDIA_PER_USER = 100;
     private final WorkoutMediaRepository repository;
     private final PostRepository postRepository;
     private final UserRepository userRepository;
@@ -38,13 +41,17 @@ public class WorkoutMediaService {
         if (file.isEmpty() || file.getSize() > MAX_FILE_SIZE) {
             throw new IllegalArgumentException("Envie uma imagem de até 10 MB.");
         }
-        byte[] content = file.getBytes();
-        String contentType = inspectImage(content);
+        if (repository.countByOwnerId(user.getId()) >= MAX_MEDIA_PER_USER) {
+            throw new IllegalArgumentException("Limite de mídias atingido. Exclua mídias antigas antes de enviar outra.");
+        }
+        ProcessedImage processed = inspectAndNormalizeImage(file.getBytes());
+        byte[] content = processed.content();
+        String contentType = processed.contentType();
         WorkoutMedia media = new WorkoutMedia();
         media.setOwner(user);
         media.setContent(content);
         media.setContentType(contentType);
-        media.setFileName(file.getOriginalFilename() == null ? "workout-photo" : file.getOriginalFilename());
+        media.setFileName(contentType.equals("image/png") ? "image.png" : "image.jpg");
         WorkoutMedia saved = repository.save(media);
         return new WorkoutMediaResponseDTO(saved.getId(), "/api/media/" + saved.getId());
     }
@@ -70,12 +77,24 @@ public class WorkoutMediaService {
 
     public void deleteAllForOwner(UUID userId) { repository.deleteByOwnerId(userId); }
 
+    public void releasePreviousProfileMedia(String previousPath, String newPath, UUID userId) {
+        if (previousPath == null || previousPath.equals(newPath) || !previousPath.startsWith("/api/media/")) return;
+        try {
+            UUID mediaId = UUID.fromString(previousPath.substring(previousPath.lastIndexOf('/') + 1));
+            if (!postRepository.existsByPhotoMediaId(mediaId)) {
+                repository.findByIdAndOwnerId(mediaId, userId).ifPresent(repository::delete);
+            }
+        } catch (IllegalArgumentException ignored) {
+            // Referências legadas ou externas não pertencem ao armazenamento interno.
+        }
+    }
+
     @Scheduled(fixedDelay = 3_600_000)
     public void cleanupOrphanedMedia() {
         repository.deleteAll(repository.findByConsumedFalseAndCreatedAtBefore(java.time.LocalDateTime.now().minusHours(24)));
     }
 
-    private String inspectImage(byte[] content) throws IOException {
+    private ProcessedImage inspectAndNormalizeImage(byte[] content) throws IOException {
         try (ImageInputStream input = ImageIO.createImageInputStream(new ByteArrayInputStream(content))) {
             Iterator<ImageReader> readers = ImageIO.getImageReaders(input);
             if (!readers.hasNext()) throw new IllegalArgumentException("Envie uma imagem JPEG ou PNG válida.");
@@ -94,12 +113,24 @@ public class WorkoutMediaService {
                 }
                 BufferedImage image = reader.read(0);
                 if (image == null) throw new IllegalArgumentException("Imagem inválida.");
-                return format.equals("png") ? "image/png" : "image/jpeg";
+                String outputFormat = format.equals("png") ? "png" : "jpeg";
+                BufferedImage normalized = image;
+                if (outputFormat.equals("jpeg") && image.getColorModel().hasAlpha()) {
+                    normalized = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+                    Graphics2D graphics = normalized.createGraphics();
+                    graphics.drawImage(image, 0, 0, null);
+                    graphics.dispose();
+                }
+                ByteArrayOutputStream output = new ByteArrayOutputStream();
+                if (!ImageIO.write(normalized, outputFormat, output)) throw new IllegalArgumentException("Imagem inválida.");
+                return new ProcessedImage(output.toByteArray(), outputFormat.equals("png") ? "image/png" : "image/jpeg");
             } finally {
                 reader.dispose();
             }
         }
     }
+
+    private record ProcessedImage(byte[] content, String contentType) {}
 
     @Transactional(readOnly = true)
     public WorkoutMedia getVisible(UUID mediaId, User viewer) {
@@ -109,7 +140,11 @@ public class WorkoutMediaService {
         }
 
         String mediaPath = "/api/media/" + mediaId;
-        if (userRepository.existsByProfilePicture(mediaPath)) {
+        if (viewer.getRole() == UserRole.ADMIN && userRepository.existsByProfilePicture(mediaPath)) {
+            return media;
+        }
+
+        if (userRepository.existsVisibleProfilePicture(mediaPath, viewer.getId())) {
             return media;
         }
 

@@ -8,7 +8,6 @@ public record PublicUserProfileResponseDTO(
         String username,
         String biography,
         String profilePicture,
-        Float bodyWeight,
         Integer offensiveHoneys,
         Integer cardsCount,
         Integer totalWorkouts,

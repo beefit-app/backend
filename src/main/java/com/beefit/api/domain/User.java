@@ -94,6 +94,18 @@ public class User implements UserDetails {
     @Column(name = "banned_until")
     private LocalDateTime bannedUntil;
 
+    @Column(name = "accepted_terms_version", length = 64)
+    private String acceptedTermsVersion;
+
+    @Column(name = "terms_accepted_at")
+    private LocalDateTime termsAcceptedAt;
+
+    @Column(name = "accepted_privacy_version", length = 64)
+    private String acceptedPrivacyVersion;
+
+    @Column(name = "privacy_accepted_at")
+    private LocalDateTime privacyAcceptedAt;
+
     public boolean isBanned() {
         return this.bannedUntil != null && this.bannedUntil.isAfter(LocalDateTime.now());
     }

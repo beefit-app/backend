@@ -12,6 +12,9 @@ spring:
       enabled: false
 
 server:
+  # O proxy de produção deve remover headers Forwarded/X-Forwarded-* recebidos
+  # do cliente e escrever os valores confiáveis. A API não deve ficar acessível
+  # diretamente, pois HTTPS obrigatório e rate limit por IP dependem disso.
   forward-headers-strategy: framework
 
 springdoc:
@@ -19,6 +22,11 @@ springdoc:
     enabled: false
 
 beefit:
+  registration:
+    enabled: ${BEEFIT_REGISTRATION_ENABLED:false}
+  legal:
+    terms-version: ${BEEFIT_TERMS_VERSION}
+    privacy-version: ${BEEFIT_PRIVACY_VERSION}
   security:
     cors:
       allowed-origins: ${BEEFIT_SECURITY_CORS_ALLOWED_ORIGINS}

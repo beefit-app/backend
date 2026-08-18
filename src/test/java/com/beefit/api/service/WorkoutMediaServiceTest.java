@@ -21,6 +21,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.lenient;
+import org.springframework.mock.web.MockMultipartFile;
 
 @ExtendWith(MockitoExtension.class)
 class WorkoutMediaServiceTest {
@@ -49,7 +51,7 @@ class WorkoutMediaServiceTest {
         media = new WorkoutMedia();
         media.setId(mediaId);
         media.setOwner(owner);
-        when(mediaRepository.findById(mediaId)).thenReturn(Optional.of(media));
+        lenient().when(mediaRepository.findById(mediaId)).thenReturn(Optional.of(media));
     }
 
     @Test
@@ -59,9 +61,14 @@ class WorkoutMediaServiceTest {
     }
 
     @Test
-    void anyAuthenticatedUserCanReadAnAssignedProfilePicture() {
-        when(userRepository.existsByProfilePicture("/api/media/" + mediaId)).thenReturn(true);
+    void acceptedFriendCanReadAnAssignedVisibleProfilePicture() {
+        when(userRepository.existsVisibleProfilePicture("/api/media/" + mediaId, viewer.getId())).thenReturn(true);
         assertSame(media, service.getVisible(mediaId, viewer));
+    }
+
+    @Test
+    void unrelatedUserCannotReadAnAssignedProfilePicture() {
+        assertThrows(MediaNotFoundException.class, () -> service.getVisible(mediaId, viewer));
     }
 
     @Test
@@ -80,6 +87,13 @@ class WorkoutMediaServiceTest {
     @Test
     void unrelatedUserCannotReadMedia() {
         assertThrows(MediaNotFoundException.class, () -> service.getVisible(mediaId, viewer));
+    }
+
+    @Test
+    void rejectsUploadWhenPerUserMediaQuotaIsReached() {
+        when(mediaRepository.countByOwnerId(owner.getId())).thenReturn(100L);
+        MockMultipartFile upload = new MockMultipartFile("file", "photo.jpg", "image/jpeg", new byte[] {1});
+        assertThrows(IllegalArgumentException.class, () -> service.upload(owner, upload));
     }
 
     private User user(UserRole role) {

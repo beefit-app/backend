@@ -132,7 +132,7 @@ class PostServiceTest {
         User target = new User();
         target.setId(UUID.randomUUID());
         target.setGhostMode(false);
-        when(userRepository.findByUsername("target")).thenReturn(Optional.of(target));
+        when(userRepository.findByUsernameIgnoreCase("target")).thenReturn(Optional.of(target));
         when(friendshipRepository.existsAcceptedFriendshipBetween(userId, target.getId())).thenReturn(false);
 
         assertThrows(UserNotFoundException.class,

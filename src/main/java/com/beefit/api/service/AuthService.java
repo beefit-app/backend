@@ -45,12 +45,13 @@ public class AuthService implements UserDetailsService {
     private final PasswordEncoder passwordEncoder;
     private final UserResponseMapper userResponseMapper;
     private final TokenService tokenService;
+    private final LegalConsentService legalConsentService;
     private final AuthenticationConfiguration authenticationConfiguration;
     private final SecureRandom secureRandom = new SecureRandom();
 
     @Override
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
-        UserDetails user = userRepository.findByEmail(email);
+        UserDetails user = userRepository.findByEmailIgnoreCase(normalizeEmail(email));
 
         if(user == null){
             throw new UsernameNotFoundException("Usuário não encontrado");
@@ -61,8 +62,7 @@ public class AuthService implements UserDetailsService {
 
     @Transactional
     public LoginResponseDTO login(String email, String password, String deviceId) {
-
-        var usernamePassword = new UsernamePasswordAuthenticationToken(email, password);
+        var usernamePassword = new UsernamePasswordAuthenticationToken(normalizeEmail(email), password);
 
         var authenticationManager = authenticationConfiguration.getAuthenticationManager();
         var auth = authenticationManager.authenticate(usernamePassword);
@@ -73,11 +73,14 @@ public class AuthService implements UserDetailsService {
     @Transactional
     public void register(User registered) throws UsernameAlreadyInUse, EmailAlreadyInUse {
 
-        if(userRepository.findByUsername(registered.getUsername()).isPresent()){
+        registered.setEmail(normalizeEmail(registered.getEmail()));
+        registered.setUsername(normalizeUsername(registered.getUsername()));
+
+        if(userRepository.findByUsernameIgnoreCase(registered.getUsername()).isPresent()){
             throw new UsernameAlreadyInUse("Esse nome de usuário já está em uso.");
         };
 
-        if(userRepository.findByEmail(registered.getEmail()) != null){
+        if(userRepository.findByEmailIgnoreCase(registered.getEmail()) != null){
             throw new EmailAlreadyInUse("Esse email já está em uso.");
         };
 
@@ -171,6 +174,18 @@ public class AuthService implements UserDetailsService {
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException("SHA-256 não disponível para hash de refresh token.", e);
         }
+    }
+
+    public void recordLegalConsent(User user, String termsVersion, String privacyVersion) {
+        legalConsentService.recordConsent(user, termsVersion, privacyVersion);
+    }
+
+    private String normalizeEmail(String email) {
+        return email == null ? null : email.trim().toLowerCase(java.util.Locale.ROOT);
+    }
+
+    private String normalizeUsername(String username) {
+        return username == null ? null : username.trim().toLowerCase(java.util.Locale.ROOT);
     }
 
     private record SessionTokens(String accessToken, String refreshToken) {
