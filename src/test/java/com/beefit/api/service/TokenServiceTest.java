@@ -3,6 +3,7 @@ package com.beefit.api.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -90,5 +91,13 @@ class TokenServiceTest {
     void missingTokenIsReportedAsMissing() {
         assertEquals(TokenService.TokenValidationStatus.MISSING, tokenService().validateToken(null).status());
         assertEquals(TokenService.TokenValidationStatus.MISSING, tokenService().validateToken("  ").status());
+    }
+
+    @Test
+    void rejectsWeakJwtSecretAtStartup() {
+        TokenService service = new TokenService();
+        ReflectionTestUtils.setField(service, "secret", "weak-secret");
+        ReflectionTestUtils.setField(service, "accessTokenDurationMinutes", 15);
+        assertThrows(IllegalStateException.class, service::validateConfiguration);
     }
 }

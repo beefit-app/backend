@@ -23,6 +23,7 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import com.beefit.api.domain.AuthSession;
+import com.beefit.api.domain.Inventory;
 import com.beefit.api.domain.User;
 import com.beefit.api.domain.enums.UserRole;
 import com.beefit.api.dto.auth.LoginResponseDTO;
@@ -69,14 +70,14 @@ class AuthServiceTest {
     @Test
     void loadUserByUsernameReturnsUserWhenEmailExists() {
         User user = user();
-        when(userRepository.findByEmail(user.getEmail())).thenReturn(user);
+        when(userRepository.findByEmailIgnoreCase(user.getEmail())).thenReturn(user);
 
         assertSame(user, authService.loadUserByUsername(user.getEmail()));
     }
 
     @Test
     void loadUserByUsernameThrowsWhenEmailDoesNotExist() {
-        when(userRepository.findByEmail("missing@example.com")).thenReturn(null);
+        when(userRepository.findByEmailIgnoreCase("missing@example.com")).thenReturn(null);
 
         assertThrows(UsernameNotFoundException.class,
                 () -> authService.loadUserByUsername("missing@example.com"));
@@ -91,7 +92,8 @@ class AuthServiceTest {
                 user.getUsername(),
                 user.getEmail(),
                 user.getBodyWeight(),
-                user.getWeeklyGoal());
+                user.getWeeklyGoal(),
+                user.getRole());
         UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                 user,
                 null,
@@ -127,8 +129,8 @@ class AuthServiceTest {
         User user = user();
         user.setPasswordHash("plain");
 
-        when(userRepository.findByUsername(user.getUsername())).thenReturn(Optional.empty());
-        when(userRepository.findByEmail(user.getEmail())).thenReturn(null);
+        when(userRepository.findByUsernameIgnoreCase(user.getUsername())).thenReturn(Optional.empty());
+        when(userRepository.findByEmailIgnoreCase(user.getEmail())).thenReturn(null);
         when(passwordEncoder.encode("plain")).thenReturn("hashed");
 
         authService.register(user);
@@ -139,9 +141,26 @@ class AuthServiceTest {
     }
 
     @Test
+    void registerCanonicalizesEmailAndUsernameBeforeCheckingAndSaving() {
+        User user = user();
+        user.setEmail("  Test@Example.COM ");
+        user.setUsername("  TestUser ");
+        user.setPasswordHash("plain");
+        when(userRepository.findByUsernameIgnoreCase("testuser")).thenReturn(Optional.empty());
+        when(userRepository.findByEmailIgnoreCase("test@example.com")).thenReturn(null);
+        when(passwordEncoder.encode("plain")).thenReturn("hashed");
+
+        authService.register(user);
+
+        assertEquals("test@example.com", user.getEmail());
+        assertEquals("testuser", user.getUsername());
+        verify(userRepository).save(user);
+    }
+
+    @Test
     void registerThrowsWhenUsernameAlreadyExists() {
         User user = user();
-        when(userRepository.findByUsername(user.getUsername())).thenReturn(Optional.of(user));
+        when(userRepository.findByUsernameIgnoreCase(user.getUsername())).thenReturn(Optional.of(user));
 
         assertThrows(UsernameAlreadyInUse.class, () -> authService.register(user));
     }
@@ -149,8 +168,8 @@ class AuthServiceTest {
     @Test
     void registerThrowsWhenEmailAlreadyExists() {
         User user = user();
-        when(userRepository.findByUsername(user.getUsername())).thenReturn(Optional.empty());
-        when(userRepository.findByEmail(user.getEmail())).thenReturn(user);
+        when(userRepository.findByUsernameIgnoreCase(user.getUsername())).thenReturn(Optional.empty());
+        when(userRepository.findByEmailIgnoreCase(user.getEmail())).thenReturn(user);
 
         assertThrows(EmailAlreadyInUse.class, () -> authService.register(user));
     }
@@ -214,6 +233,38 @@ class AuthServiceTest {
         assertNotNull(currentSession.getLastUsedAt());
     }
 
+    @Test
+    void registerThrowsWhenBetaEnabledAndEmailNotInAllowlist() {
+        org.springframework.test.util.ReflectionTestUtils.setField(authService, "betaEnabled", true);
+        org.springframework.test.util.ReflectionTestUtils.setField(authService, "allowedEmails", new String[]{"allowed@example.com"});
+
+        User user = user();
+        user.setEmail("unauthorized@example.com");
+
+        var ex = assertThrows(com.beefit.api.exception.user.RegistrationRestrictedException.class,
+                () -> authService.register(user));
+        org.junit.jupiter.api.Assertions.assertTrue(ex.getMessage().contains("restrito"));
+    }
+
+    @Test
+    void registerSucceedsWhenBetaEnabledAndEmailInAllowlist() {
+        org.springframework.test.util.ReflectionTestUtils.setField(authService, "betaEnabled", true);
+        org.springframework.test.util.ReflectionTestUtils.setField(authService, "allowedEmails", new String[]{"allowed@example.com"});
+
+        User user = user();
+        user.setEmail("ALLOWED@EXAMPLE.COM");
+
+        when(userRepository.findByUsernameIgnoreCase(user.getUsername())).thenReturn(Optional.empty());
+        when(userRepository.findByEmailIgnoreCase("allowed@example.com")).thenReturn(null);
+        when(passwordEncoder.encode(user.getPasswordHash())).thenReturn("encoded-password");
+        when(userRepository.save(user)).thenReturn(user);
+
+        authService.register(user);
+
+        verify(userRepository).save(user);
+        verify(inventoryRepository).save(org.mockito.ArgumentMatchers.any(Inventory.class));
+    }
+
     private User user() {
         User user = new User();
         user.setId(UUID.randomUUID());
@@ -227,3 +278,4 @@ class AuthServiceTest {
         return user;
     }
 }
+

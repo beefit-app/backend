@@ -1,0 +1,16 @@
+spring:
+  config:
+    activate:
+      on-profile: container
+  docker:
+    compose:
+      enabled: false
+  jpa:
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+
+springdoc:
+  api-docs:
+    enabled: false

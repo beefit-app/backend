@@ -35,10 +35,41 @@ spring:
         wait: always
 
 beefit:
+  beta:
+    enabled: ${BEEFIT_BETA_MODE:false}
+    allowed-emails: ${BEEFIT_BETA_ALLOWED_EMAILS:}
+  registration:
+    enabled: ${BEEFIT_REGISTRATION_ENABLED:true}
+  legal:
+    terms-version: ${BEEFIT_TERMS_VERSION:2026-08-18}
+    privacy-version: ${BEEFIT_PRIVACY_VERSION:2026-08-18}
+  business:
+    time-zone: ${BEEFIT_BUSINESS_TIME_ZONE:America/Sao_Paulo}
   security:
     cors:
       allowed-origins: ${BEEFIT_SECURITY_CORS_ALLOWED_ORIGINS:http://localhost:*,http://127.0.0.1:*,http://10.0.2.2:*}
+    rate-limit:
+      registration-maximum: ${BEEFIT_SECURITY_RATE_LIMIT_REGISTRATION_MAXIMUM:5}
     token:
       secret: ${JWT_SECRET}
 
-# Lembrar de Adicionar Configurações para o Módulo de Segurança (JWT)
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+  health:
+    readiness-state:
+      enabled: true
+    liveness-state:
+      enabled: true
+
+logging:
+  pattern:
+    level: "%5p [requestId:%X{requestId:-none}]"
+

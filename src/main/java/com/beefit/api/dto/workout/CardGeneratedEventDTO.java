@@ -6,9 +6,13 @@ import java.util.UUID;
 public record CardGeneratedEventDTO(
         UUID workoutId,
         UUID cardId,
-        Double attackPower,
+        UUID exerciseId,
+        String exerciseName,
+        Double bestSetWeightKg,
+        Integer bestSetReps,
+        Double estimatedOneRepMax,
+        Double improvementPercentage,
         String rarity,
         String muscleGroup,
-        Map<String, Integer> muscleIntensities,
-        Boolean isPersonalRecord
+        Map<String, Integer> muscleIntensities
 ) {}

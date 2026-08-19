@@ -77,7 +77,6 @@ public class UserService {
                 user.getUsername(),
                 user.getBiography(),
                 user.getProfilePicture(),
-                user.getBodyWeight(),
                 user.getOffensiveHoneys(),
                 user.getCardsCount(),
                 user.getWorkoutsCount(),
@@ -96,7 +95,7 @@ public class UserService {
     }
 
     private User findVisibleUserByUsername(String username) {
-        User user = userRepository.findByUsername(username).orElseThrow(UserNotFoundException::new);
+        User user = userRepository.findByUsernameIgnoreCase(username.trim()).orElseThrow(UserNotFoundException::new);
 
         if (user.getGhostMode()) {
             throw new UserNotFoundException();
@@ -116,8 +115,10 @@ public class UserService {
             // Altera os dados permitidos com base no DTO recebido
             user.setFullName(request.fullName());
             user.setBiography(request.biography());
+            String previousProfilePicture = user.getProfilePicture();
             consumeProfileMedia(request.profilePicture(), user.getId());
             user.setProfilePicture(request.profilePicture());
+            workoutMediaService.releasePreviousProfileMedia(previousProfilePicture, request.profilePicture(), user.getId());
             user.setBodyWeight(request.bodyWeight());
             // O Spring Data JPA salva automaticamente no final do metodo devido ao
             // @Transactional

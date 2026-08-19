@@ -1,12 +1,21 @@
 package com.beefit.api.exception;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.util.List;
 
 import com.beefit.api.exception.user.EmailAlreadyInUse;
+import com.beefit.api.exception.friendship.FriendshipNotFound;
+import com.beefit.api.exception.friendship.FriendshipNotPendingException;
 import com.beefit.api.exception.security.RateLimitExceededException;
 import com.beefit.api.exception.user.InvalidPasswordException;
+import com.beefit.api.exception.user.UserNotFoundException;
+import com.beefit.api.exception.hive.HiveNotFoundException;
+import com.beefit.api.exception.hive.UserAlreadyInHiveException;
+import com.beefit.api.exception.workout.InventoryNotFoundException;
 import com.beefit.api.exception.workout.InvalidMuscleGroupException;
 import com.beefit.api.exception.workout.WorkoutSessionNotFoundException;
 import org.junit.jupiter.api.Test;
@@ -14,6 +23,10 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.http.HttpHeaders;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 class GlobalExceptionHandlerTest {
 
@@ -122,6 +135,84 @@ class GlobalExceptionHandlerTest {
         assertEquals(403, response.status());
         assertEquals("ACCOUNT_BANNED", response.error());
         assertEquals("Esta conta está temporariamente bloqueada.", response.message());
+    }
+
+    @Test
+    void hiveNotFoundUsesHttpNotFoundStatus() throws Exception {
+        exceptionStatusClient().perform(get("/test-errors/hive-not-found"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void userAlreadyInHiveUsesHttpConflictStatus() throws Exception {
+        exceptionStatusClient().perform(get("/test-errors/user-already-in-hive"))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void inventoryNotFoundUsesHttpNotFoundStatus() throws Exception {
+        exceptionStatusClient().perform(get("/test-errors/inventory-not-found"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void userNotFoundUsesHttpNotFoundStatus() throws Exception {
+        exceptionStatusClient().perform(get("/test-errors/user-not-found"))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void friendshipNotFoundUsesHttpNotFoundStatus() throws Exception {
+        exceptionStatusClient().perform(get("/test-errors/friendship-not-found"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404));
+    }
+
+    @Test
+    void friendshipInvalidStateUsesHttpConflictStatus() throws Exception {
+        exceptionStatusClient().perform(get("/test-errors/friendship-invalid-state"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value(409));
+    }
+
+    private MockMvc exceptionStatusClient() {
+        return MockMvcBuilders.standaloneSetup(new ExceptionStatusController())
+                .setControllerAdvice(handler)
+                .build();
+    }
+
+    @RestController
+    private static class ExceptionStatusController {
+
+        @GetMapping("/test-errors/hive-not-found")
+        void hiveNotFound() {
+            throw new HiveNotFoundException();
+        }
+
+        @GetMapping("/test-errors/user-already-in-hive")
+        void userAlreadyInHive() {
+            throw new UserAlreadyInHiveException();
+        }
+
+        @GetMapping("/test-errors/inventory-not-found")
+        void inventoryNotFound() {
+            throw new InventoryNotFoundException();
+        }
+
+        @GetMapping("/test-errors/user-not-found")
+        void userNotFound() {
+            throw new UserNotFoundException();
+        }
+
+        @GetMapping("/test-errors/friendship-not-found")
+        void friendshipNotFound() {
+            throw new FriendshipNotFound();
+        }
+
+        @GetMapping("/test-errors/friendship-invalid-state")
+        void friendshipInvalidState() {
+            throw new FriendshipNotPendingException();
+        }
     }
 
     private MockHttpServletRequest request(String uri) {

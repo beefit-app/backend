@@ -11,5 +11,8 @@ import java.util.List;
 public interface WorkoutMediaRepository extends JpaRepository<WorkoutMedia, UUID> {
     Optional<WorkoutMedia> findByIdAndOwnerId(UUID id, UUID ownerId);
     List<WorkoutMedia> findByConsumedFalseAndCreatedAtBefore(LocalDateTime cutoff);
+    long countByOwnerIdAndConsumedFalse(UUID ownerId);
     void deleteByOwnerId(UUID ownerId);
+    long countByOwnerId(UUID ownerId);
 }
+

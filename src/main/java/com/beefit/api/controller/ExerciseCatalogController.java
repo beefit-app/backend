@@ -1,7 +1,7 @@
 package com.beefit.api.controller;
 
-import com.beefit.api.domain.CatalogExercise;
-import com.beefit.api.repository.CatalogExerciseRepository;
+import com.beefit.api.dto.exercise.CatalogExerciseResponseDTO;
+import com.beefit.api.service.ExerciseCatalogService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -16,22 +16,20 @@ import java.util.UUID;
 @RequestMapping("/api/exercises")
 public class ExerciseCatalogController {
 
-    private final CatalogExerciseRepository catalogExerciseRepository;
+    private final ExerciseCatalogService exerciseCatalogService;
 
     @GetMapping
-    public ResponseEntity<Page<CatalogExercise>> listExercises(
+    public ResponseEntity<Page<CatalogExerciseResponseDTO>> listExercises(
             @RequestParam(required = false, defaultValue = "") String search,
             @PageableDefault(size = 20, sort = "name") Pageable pageable) {
 
         // Se o usuário passar ?search=supino, filtra. Se não passar nada, traz todos paginados.
-        Page<CatalogExercise> exercises = catalogExerciseRepository.findByNameContainingIgnoreCase(search, pageable);
+        Page<CatalogExerciseResponseDTO> exercises = exerciseCatalogService.list(search, pageable);
         return ResponseEntity.ok(exercises);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<CatalogExercise> getExerciseById(@PathVariable UUID id) {
-        return catalogExerciseRepository.findById(id)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+    public ResponseEntity<CatalogExerciseResponseDTO> getExerciseById(@PathVariable UUID id) {
+        return ResponseEntity.ok(exerciseCatalogService.get(id));
     }
 }

@@ -27,6 +27,13 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.bind.MissingRequestHeaderException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.dao.DataIntegrityViolationException;
+import jakarta.validation.ConstraintViolationException;
+import java.time.format.DateTimeParseException;
+import java.io.IOException;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -50,6 +57,19 @@ public class GlobalExceptionHandler {
                 "Dados inválidos",
                 e.getMessage(),
                 List.of(new ErrorCampo(field, e.getMessage())),
+                request.getRequestURI()
+        );
+    }
+
+    @ExceptionHandler(RegistrationRestrictedException.class)
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    public ErrorResponse handleRegistrationRestricted(RegistrationRestrictedException e, HttpServletRequest request) {
+        return new ErrorResponse(
+                LocalDateTime.now(),
+                HttpStatus.FORBIDDEN.value(),
+                "REGISTRATION_RESTRICTED",
+                e.getMessage(),
+                List.of(new ErrorCampo("email", e.getMessage())),
                 request.getRequestURI()
         );
     }
@@ -198,6 +218,35 @@ public class GlobalExceptionHandler {
                 e.getMessage(), List.of(), request.getRequestURI());
     }
 
+    @ExceptionHandler({ DateTimeParseException.class, MethodArgumentTypeMismatchException.class,
+            MissingRequestHeaderException.class, ConstraintViolationException.class })
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleInvalidRequest(Exception e, HttpServletRequest request) {
+        return new ErrorResponse(LocalDateTime.now(), HttpStatus.BAD_REQUEST.value(), "Requisição inválida",
+                "Parâmetro ausente ou em formato inválido.", List.of(), request.getRequestURI());
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    @ResponseStatus(HttpStatus.PAYLOAD_TOO_LARGE)
+    public ErrorResponse handleUploadTooLarge(MaxUploadSizeExceededException e, HttpServletRequest request) {
+        return new ErrorResponse(LocalDateTime.now(), HttpStatus.PAYLOAD_TOO_LARGE.value(), "Arquivo muito grande",
+                "Envie uma imagem de até 10 MB.", List.of(), request.getRequestURI());
+    }
+
+    @ExceptionHandler(IOException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleIo(IOException e, HttpServletRequest request) {
+        return new ErrorResponse(LocalDateTime.now(), HttpStatus.BAD_REQUEST.value(), "Arquivo inválido",
+                "Não foi possível processar o arquivo enviado.", List.of(), request.getRequestURI());
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleDataIntegrity(DataIntegrityViolationException e, HttpServletRequest request) {
+        return new ErrorResponse(LocalDateTime.now(), HttpStatus.CONFLICT.value(), "Conflito de dados",
+                "A operação conflita com dados já existentes.", List.of(), request.getRequestURI());
+    }
+
     @ExceptionHandler(RateLimitExceededException.class)
     public ResponseEntity<ErrorResponse> handleRateLimitExceeded(
             RateLimitExceededException e,
@@ -226,15 +275,25 @@ public class GlobalExceptionHandler {
                 request.getRequestURI());
     }
 
-    @ExceptionHandler({FriendshipNotAcceptedException.class,
-            FriendshipNotPendingException.class,
-            FriendshipNotFound.class})
-    @ResponseStatus(HttpStatus.BAD_REQUEST)
-    public ErrorResponse handleFriendshipException(RuntimeException e,
+    @ExceptionHandler({FriendshipNotAcceptedException.class, FriendshipNotPendingException.class})
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleFriendshipStateException(RuntimeException e,
                                                  HttpServletRequest request) {
         return new ErrorResponse(LocalDateTime.now(),
                 HttpStatus.CONFLICT.value(),
                 "Não é possível essa ação para a solicitação de amizade",
+                e.getMessage(),
+                List.of(),
+                request.getRequestURI());
+    }
+
+    @ExceptionHandler(FriendshipNotFound.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public ErrorResponse handleFriendshipNotFound(FriendshipNotFound e,
+            HttpServletRequest request) {
+        return new ErrorResponse(LocalDateTime.now(),
+                HttpStatus.NOT_FOUND.value(),
+                "Amizade não encontrada",
                 e.getMessage(),
                 List.of(),
                 request.getRequestURI());
@@ -285,7 +344,8 @@ public class GlobalExceptionHandler {
     // Abaixo estão algumas funções "genéricas" para agrupar exceções de mesmo HttpStatus
 
     // Trata erros de recurso não encontrado (Status 404)
-    @ExceptionHandler({HiveNotFoundException.class})
+    @ExceptionHandler({HiveNotFoundException.class, UserNotFoundException.class})
+    @ResponseStatus(HttpStatus.NOT_FOUND)
     public ErrorResponse handleNotFound(RuntimeException e, HttpServletRequest request) {
         return new ErrorResponse(
                 LocalDateTime.now(),
@@ -299,6 +359,7 @@ public class GlobalExceptionHandler {
 
     // Trata erros de conflito (Status 409)
     @ExceptionHandler({UserAlreadyInHiveException.class})
+    @ResponseStatus(HttpStatus.CONFLICT)
     public ErrorResponse handleUserAlreadyInHiveException(RuntimeException e, HttpServletRequest request) {
         return new ErrorResponse(
                 LocalDateTime.now(),
@@ -317,8 +378,7 @@ public class GlobalExceptionHandler {
             InvalidCardRarityException.class,
             InvalidMuscleGroupException.class,
             InvalidTimePeriodException.class,
-            ExceededHiveLimitException.class,
-            PermissionException.class
+            ExceededHiveLimitException.class
     })
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ErrorResponse handleBadRequestRules(RuntimeException e, HttpServletRequest request) {
@@ -332,7 +392,15 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(PermissionException.class)
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    public ErrorResponse handlePermission(PermissionException e, HttpServletRequest request) {
+        return new ErrorResponse(LocalDateTime.now(), HttpStatus.FORBIDDEN.value(), "Forbidden",
+                e.getMessage(), List.of(), request.getRequestURI());
+    }
+
     @ExceptionHandler(InventoryNotFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
     public ErrorResponse handleNotFoundInventory(RuntimeException e, HttpServletRequest request) {
         return new ErrorResponse(
                 LocalDateTime.now(),

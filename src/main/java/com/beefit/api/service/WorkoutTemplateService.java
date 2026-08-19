@@ -141,6 +141,9 @@ public class WorkoutTemplateService {
     }
 
     public WorkoutTemplateResponseDTO importTemplateFromPost(UUID postId, String name, UUID currentUserId) {
+        if (name != null && name.trim().length() > 255) {
+            throw new IllegalArgumentException("O nome do treino deve ter no máximo 255 caracteres.");
+        }
 
         Post post = postRepository.findVisibleById(postId, currentUserId)
                 .orElseThrow(PostNotFoundException::new);

@@ -32,12 +32,16 @@ public class InventoryService {
         return new InventoryCardResponseDTO(
                 card.getId(),
                 card.getWorkoutSession().getId(),
-                card.getAttackPower(),
+                card.getExercise().getId(),
+                card.getExercise().getName(),
+                card.getBestSetWeightKg(),
+                card.getBestSetReps(),
+                card.getEstimatedOneRepMax(),
+                card.getImprovementPercentage(),
                 card.getCardRarity().name(),
                 card.getCardRarity().getRarity(),
                 workoutMuscleGroupMapper.toApi(card.getMuscleGroup()),
                 card.getMuscleIntensities(),
-                card.getIsPersonalRecord(),
                 card.getBodyWeightAtGeneration(),
                 card.getGeneratedAt());
     }

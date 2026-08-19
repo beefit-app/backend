@@ -12,6 +12,7 @@ public record UpdateProfileRequestDTO(
         @Size(max = 500, message = "A biografia deve ter no máximo 500 caracteres.")
         String biography,
 
+        @Size(max = 255, message = "A referência da foto de perfil é inválida.")
         String profilePicture,
 
         @NotNull(message = "Informe seu peso.")

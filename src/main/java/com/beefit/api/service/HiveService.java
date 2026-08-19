@@ -2,6 +2,7 @@ package com.beefit.api.service;
 
 import com.beefit.api.domain.Hive;
 import com.beefit.api.domain.User;
+import com.beefit.api.domain.enums.WorkoutStatus;
 import com.beefit.api.dto.hive.HiveCreationDTO;
 import com.beefit.api.dto.hive.HiveRankingDTO;
 import com.beefit.api.exception.hive.ExceededHiveLimitException;
@@ -15,8 +16,8 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.Clock;
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 
@@ -26,6 +27,7 @@ public class HiveService {
 
     private final HiveRepository hiveRepository;
     private final HiveMapper hiveMapper;
+    private final Clock businessClock;
 
     @Transactional
     public Hive createNewHive(User user, HiveCreationDTO hiveCreationDTO) {
@@ -69,8 +71,8 @@ public class HiveService {
     }
 
     public List<HiveRankingDTO> getHiveRanking(UUID hiveId){
-
-        return hiveRepository.getRankingForHive(hiveId);
+        Hive hive = hiveRepository.findById(hiveId).orElseThrow(HiveNotFoundException::new);
+        return getRankingForHive(hive);
     }
 
     @Transactional
@@ -87,7 +89,7 @@ public class HiveService {
             if (hive.getMembers().size() <= 1) {
                 hiveRepository.delete(hive);
             } else {
-                List<HiveRankingDTO> ranking = hiveRepository.getRankingForHive(hiveId);
+                List<HiveRankingDTO> ranking = getRankingForHive(hive);
                 
                 UUID newCreatorId = ranking.stream()
                         .map(HiveRankingDTO::userId)
@@ -130,6 +132,14 @@ public class HiveService {
         }
     }
 
+    private List<HiveRankingDTO> getRankingForHive(Hive hive) {
+        return hiveRepository.getRankingForHive(
+                hive.getId(),
+                WorkoutStatus.FINISHED,
+                hive.getStartDate().atStartOfDay(),
+                hive.getEndDate().plusDays(1).atStartOfDay());
+    }
+
     private void validateHiveOwnership(User user, Hive hive){
 
         if(!hive.getCreator().getId().equals(user.getId())){
@@ -146,7 +156,7 @@ public class HiveService {
 
     private void validateHiveDate(HiveCreationDTO dto){
 
-        LocalDate hoje = LocalDate.now(ZoneId.of("America/Sao_Paulo"));
+        LocalDate hoje = LocalDate.now(businessClock);
 
         if(dto.startDate().isAfter(dto.endDate()) || dto.startDate().isBefore(hoje)){
             throw new InvalidTimePeriodException();

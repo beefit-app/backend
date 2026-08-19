@@ -18,6 +18,8 @@ import com.beefit.api.exception.user.UserNotFoundException;
 import com.beefit.api.repository.FriendshipRepository;
 import com.beefit.api.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.hibernate.exception.ConstraintViolationException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -57,7 +59,15 @@ public class FriendshipService {
         friendship.setAddressee(addressee);
         friendship.setStatus(FriendshipStatus.PENDING);
 
-        Friendship saved = friendshipRepository.saveAndFlush(friendship);
+        Friendship saved;
+        try {
+            saved = friendshipRepository.saveAndFlush(friendship);
+        } catch (DataIntegrityViolationException exception) {
+            if (isUnorderedPairConstraintViolation(exception)) {
+                throw new FriendshipAlreadyExistException();
+            }
+            throw exception;
+        }
 
         FriendRequestEventDTO friendRequestEventDTO = new FriendRequestEventDTO(
                 saved.getId(),
@@ -218,6 +228,18 @@ public class FriendshipService {
 
     private SocialUserResponseDTO toSocialUser(User user) {
         return new SocialUserResponseDTO(user.getId(), user.getFullName(), user.getUsername(), user.getProfilePicture());
+    }
+
+    private boolean isUnorderedPairConstraintViolation(Throwable exception) {
+        Throwable current = exception;
+        while (current != null) {
+            if (current instanceof ConstraintViolationException violation
+                    && "friendship_users_unordered_key".equals(violation.getConstraintName())) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     public record FriendshipRelation(String status, UUID friendshipId) {

@@ -1,9 +1,14 @@
 beefit:
+  registration:
+    enabled: true
+  legal:
+    terms-version: test-terms-v1
+    privacy-version: test-privacy-v1
   seed:
     enabled: false
   security:
     token:
-      secret: test-secret
+      secret: test-secret-with-at-least-32-random-bytes
     cors:
       allowed-origins: http://localhost:3000
 

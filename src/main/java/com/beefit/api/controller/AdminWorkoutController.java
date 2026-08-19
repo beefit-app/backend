@@ -12,6 +12,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
+import jakarta.validation.Valid;
 
 
 // Controlador administrativo para inspeção e moderação de treinos publicados.
@@ -40,7 +41,7 @@ public class AdminWorkoutController {
         return ResponseEntity.noContent().build();
     }
     @PatchMapping("/{id}")
-    public ResponseEntity<Void> editPost(@PathVariable UUID id, @RequestBody UpdatePostMetadataDTO dto) {
+    public ResponseEntity<Void> editPost(@PathVariable UUID id, @Valid @RequestBody UpdatePostMetadataDTO dto) {
         moderationService.editPostMetadata(id, dto);
         return ResponseEntity.noContent().build();
     }

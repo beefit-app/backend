@@ -1,21 +1,36 @@
 package com.beefit.api.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.beefit.api.domain.Card;
 import com.beefit.api.domain.CatalogExercise;
+import com.beefit.api.domain.Inventory;
 import com.beefit.api.domain.SessionExercise;
+import com.beefit.api.domain.User;
 import com.beefit.api.domain.WorkoutSession;
-import com.beefit.api.domain.enums.MuscleGroups;
 import com.beefit.api.domain.enums.AnatomicalMuscle;
+import com.beefit.api.domain.enums.CardRarity;
+import com.beefit.api.domain.enums.MuscleGroups;
 import com.beefit.api.repository.CardRepository;
 import com.beefit.api.repository.InventoryRepository;
 import com.beefit.api.repository.WorkoutSessionRepository;
@@ -23,91 +38,165 @@ import com.beefit.api.repository.WorkoutSessionRepository;
 @ExtendWith(MockitoExtension.class)
 class CardServiceTest {
 
-    @Mock
-    private InventoryRepository inventoryRepository;
+    @Mock private InventoryRepository inventoryRepository;
+    @Mock private CardRepository cardRepository;
+    @Mock private WorkoutSessionRepository workoutSessionRepository;
+    @InjectMocks private CardService cardService;
 
-    @Mock
-    private CardRepository cardRepository;
+    private User user;
+    private WorkoutSession workout;
+    private Inventory inventory;
 
-    @Mock
-    private WorkoutSessionRepository workoutSessionRepository;
+    @BeforeEach
+    void setUp() {
+        user = new User();
+        user.setId(UUID.randomUUID());
+        user.setBodyWeight(80.0F);
+        user.setCardsCount(0);
 
-    @InjectMocks
-    private CardService cardService;
+        workout = new WorkoutSession();
+        workout.setId(UUID.randomUUID());
+        workout.setMuscleGroupsList(List.of(MuscleGroups.CHEST));
 
-    @Test
-    void calculatesPrimaryAndSecondaryMuscleIntensityFromCompletedSets() {
-        CatalogExercise inclineBenchPress = new CatalogExercise();
-        inclineBenchPress.setPrimaryMuscleGroupsList(List.of(MuscleGroups.CHEST));
-        inclineBenchPress.setSecondaryMuscleGroupsList(List.of(MuscleGroups.SHOULDERS, MuscleGroups.ARMS));
-        inclineBenchPress.setPrimaryMusclesList(List.of(AnatomicalMuscle.CHEST));
-        inclineBenchPress.setSecondaryMusclesList(List.of(AnatomicalMuscle.DELTOIDS, AnatomicalMuscle.TRICEPS));
-
-        SessionExercise sessionExercise = new SessionExercise();
-        sessionExercise.setExercise(inclineBenchPress);
-        sessionExercise.setSets(List.of(completedSet(), completedSet(), completedSet(), completedSet()));
-
-        WorkoutSession workout = new WorkoutSession();
-        workout.setExercises(List.of(sessionExercise));
-
-        Map<String, Integer> intensities = cardService.calculateMuscleIntensities(workout, MuscleGroups.CHEST);
-
-        assertEquals(4, intensities.get("chest"));
-        assertEquals(2, intensities.get("deltoids"));
-        assertEquals(2, intensities.get("triceps"));
-        assertEquals(null, intensities.get("biceps"));
-        assertEquals(null, intensities.get("forearm"));
+        inventory = new Inventory();
+        inventory.setUser(user);
+        inventory.setTotalCards(0);
     }
 
     @Test
-    void accumulatesContributionsAndIgnoresSetsWithoutRepetitions() {
-        CatalogExercise chestExercise = new CatalogExercise();
-        chestExercise.setPrimaryMuscleGroupsList(List.of(MuscleGroups.CHEST));
-        chestExercise.setSecondaryMuscleGroupsList(List.of(MuscleGroups.ARMS));
-        chestExercise.setPrimaryMusclesList(List.of(AnatomicalMuscle.CHEST));
-        chestExercise.setSecondaryMusclesList(List.of(AnatomicalMuscle.TRICEPS));
+    void firstPerformanceOnlyEstablishesBaselineAndDoesNotGenerateCard() {
+        SessionExercise benchPress = weightedExercise("Supino", 1, 100.0, 5);
+        workout.setExercises(List.of(benchPress));
+        when(workoutSessionRepository.findBestEstimatedOneRepMaxBeforeWorkout(
+                user.getId(), benchPress.getExercise().getId(), workout.getId()))
+                .thenReturn(Optional.empty());
 
-        SessionExercise firstExercise = new SessionExercise();
-        firstExercise.setExercise(chestExercise);
-        firstExercise.setSets(List.of(completedSet(), completedSet(), emptySet()));
+        assertNull(cardService.generateCard(user, workout));
 
-        CatalogExercise armExercise = new CatalogExercise();
-        armExercise.setPrimaryMuscleGroupsList(List.of(MuscleGroups.ARMS));
-        armExercise.setSecondaryMuscleGroupsList(List.of());
-        armExercise.setPrimaryMusclesList(List.of(AnatomicalMuscle.TRICEPS));
-        armExercise.setSecondaryMusclesList(List.of());
-
-        SessionExercise secondExercise = new SessionExercise();
-        secondExercise.setExercise(armExercise);
-        secondExercise.setSets(List.of(completedSet(), completedSet()));
-
-        WorkoutSession workout = new WorkoutSession();
-        workout.setExercises(List.of(firstExercise, secondExercise));
-
-        Map<String, Integer> intensities = cardService.calculateMuscleIntensities(workout, MuscleGroups.CHEST);
-
-        assertEquals(3, intensities.get("chest"));
-        assertEquals(4, intensities.get("triceps"));
+        verify(cardRepository, never()).save(any());
+        assertEquals(0, user.getCardsCount());
     }
 
     @Test
-    void fallsBackToCardMuscleGroupWhenCatalogHasNoUsableData() {
-        WorkoutSession workout = new WorkoutSession();
+    void improvementBelowThreePercentDoesNotGenerateCard() {
+        SessionExercise benchPress = weightedExercise("Supino", 1, 100.0, 1);
+        workout.setExercises(List.of(benchPress));
+        when(workoutSessionRepository.findBestEstimatedOneRepMaxBeforeWorkout(
+                user.getId(), benchPress.getExercise().getId(), workout.getId()))
+                .thenReturn(Optional.of(102.0));
+
+        assertNull(cardService.generateCard(user, workout));
+
+        verify(inventoryRepository, never()).findByUserIdWithCards(any());
+    }
+
+    @Test
+    void selectsExerciseWithLargestRelativeImprovementAndPersistsItsBestSet() {
+        SessionExercise benchPress = weightedExercise("Supino", 1, 100.0, 5);
+        SessionExercise row = weightedExercise("Remada", 2, 60.0, 1);
+        workout.setExercises(List.of(benchPress, row));
+        when(workoutSessionRepository.findBestEstimatedOneRepMaxBeforeWorkout(
+                user.getId(), benchPress.getExercise().getId(), workout.getId()))
+                .thenReturn(Optional.of(100.0));
+        when(workoutSessionRepository.findBestEstimatedOneRepMaxBeforeWorkout(
+                user.getId(), row.getExercise().getId(), workout.getId()))
+                .thenReturn(Optional.of(50.0));
+        prepareCardPersistence();
+
+        Card card = cardService.generateCard(user, workout);
+
+        assertSame(row.getExercise(), card.getExercise());
+        assertEquals(60.0, card.getBestSetWeightKg());
+        assertEquals(1, card.getBestSetReps());
+        assertEquals(62.0, card.getEstimatedOneRepMax(), 0.001);
+        assertEquals(24.0, card.getImprovementPercentage(), 0.001);
+        assertEquals(CardRarity.EPIC, card.getCardRarity());
+        assertEquals(1, user.getCardsCount());
+    }
+
+    @Test
+    void bodyweightExerciseUsesRepetitionsAndCanGenerateRareCard() {
+        SessionExercise pullUp = bodyweightExercise("Barra fixa", 1, 20);
+        workout.setExercises(List.of(pullUp));
+        when(workoutSessionRepository.findBestBodyweightRepsBeforeWorkout(
+                user.getId(), pullUp.getExercise().getId(), workout.getId()))
+                .thenReturn(Optional.of(18));
+        prepareCardPersistence();
+
+        Card card = cardService.generateCard(user, workout);
+
+        assertEquals(CardRarity.RARE, card.getCardRarity());
+        assertEquals(0.0, card.getBestSetWeightKg());
+        assertEquals(20, card.getBestSetReps());
+        assertNull(card.getEstimatedOneRepMax());
+        assertEquals(11.111, card.getImprovementPercentage(), 0.001);
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "4.0, COMMON",
+            "8.0, RARE",
+            "16.0, EPIC",
+            "26.0, LEGENDARY"
+    })
+    void assignsRarityFromImprovementPercentage(double improvement, CardRarity expectedRarity) {
+        double targetOneRepMax = 100.0 * (1.0 + improvement / 100.0);
+        double weightForOneRep = targetOneRepMax / (1.0 + 1.0 / 30.0);
+        SessionExercise exercise = weightedExercise("Desenvolvimento", 1, weightForOneRep, 1);
+        workout.setExercises(List.of(exercise));
+        when(workoutSessionRepository.findBestEstimatedOneRepMaxBeforeWorkout(
+                user.getId(), exercise.getExercise().getId(), workout.getId()))
+                .thenReturn(Optional.of(100.0));
+        prepareCardPersistence();
+
+        assertEquals(expectedRarity, cardService.generateCard(user, workout).getCardRarity());
+    }
+
+    @Test
+    void muscleMapContainsOnlySelectedExerciseMuscles() {
+        CatalogExercise exercise = catalogExercise("Supino inclinado");
+        exercise.setPrimaryMusclesList(List.of(AnatomicalMuscle.CHEST));
+        exercise.setSecondaryMusclesList(List.of(AnatomicalMuscle.DELTOIDS, AnatomicalMuscle.TRICEPS));
 
         assertEquals(
-                Map.of("abs", 4),
-                cardService.calculateMuscleIntensities(workout, MuscleGroups.CORE));
+                Map.of("chest", 4, "deltoids", 2, "triceps", 2),
+                cardService.calculateMuscleIntensities(exercise));
     }
 
-    private com.beefit.api.domain.Set completedSet() {
-        com.beefit.api.domain.Set set = new com.beefit.api.domain.Set();
-        set.setReps(10);
-        return set;
+    private void prepareCardPersistence() {
+        when(inventoryRepository.findByUserIdWithCards(user.getId())).thenReturn(Optional.of(inventory));
+        when(cardRepository.save(any(Card.class))).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
-    private com.beefit.api.domain.Set emptySet() {
+    private SessionExercise weightedExercise(String name, int order, double weight, int reps) {
+        return sessionExercise(name, order, weight, reps);
+    }
+
+    private SessionExercise bodyweightExercise(String name, int order, int reps) {
+        return sessionExercise(name, order, 0.0, reps);
+    }
+
+    private SessionExercise sessionExercise(String name, int order, double weight, int reps) {
+        SessionExercise sessionExercise = new SessionExercise();
+        sessionExercise.setExercise(catalogExercise(name));
+        sessionExercise.setOrder(order);
+
         com.beefit.api.domain.Set set = new com.beefit.api.domain.Set();
-        set.setReps(0);
-        return set;
+        set.setWeightKg(weight);
+        set.setReps(reps);
+        set.setOrder(1);
+        sessionExercise.setSets(List.of(set));
+        return sessionExercise;
+    }
+
+    private CatalogExercise catalogExercise(String name) {
+        CatalogExercise exercise = new CatalogExercise();
+        exercise.setId(UUID.randomUUID());
+        exercise.setName(name);
+        exercise.setPrimaryMuscleGroupsList(List.of(MuscleGroups.CHEST));
+        exercise.setSecondaryMuscleGroupsList(List.of());
+        exercise.setPrimaryMusclesList(List.of(AnatomicalMuscle.CHEST));
+        exercise.setSecondaryMusclesList(List.of());
+        return exercise;
     }
 }

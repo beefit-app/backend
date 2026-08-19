@@ -61,7 +61,7 @@ public class PostService {
 
     @Transactional
     public Page<FeedPostResponseDTO> getPostsByUsername(User currentUser, String username, Pageable pageable) {
-        User target = userRepository.findByUsername(username).orElseThrow(UserNotFoundException::new);
+        User target = userRepository.findByUsernameIgnoreCase(username.trim()).orElseThrow(UserNotFoundException::new);
         if (!target.getId().equals(currentUser.getId()) && (target.getGhostMode()
                 || !friendshipRepository.existsAcceptedFriendshipBetween(currentUser.getId(), target.getId()))) {
             throw new UserNotFoundException();
@@ -111,7 +111,7 @@ public class PostService {
                 post.getId(),
                 author.getId(),
                 author.getUsername(),
-                null, // Caso o time adicione link de foto de perfil no futuro, o gancho está aqui
+                author.getProfilePicture(),
                 post.getPublishedAt(),
                 post.getTotalLikes(),
                 likeRepository.existsByLikedByAndPost(currentUser, post),
@@ -126,7 +126,7 @@ public class PostService {
 
     @Transactional
     public PostLikeDTO toggleLike(UUID userId, UUID postId) {
-        Post post = postRepository.findVisibleById(postId, userId).orElseThrow(PostNotFoundException::new);
+        Post post = postRepository.findVisibleByIdForUpdate(postId, userId).orElseThrow(PostNotFoundException::new);
         User user = userRepository.findById(userId).orElseThrow(UserNotFoundException::new);
 
         Boolean isPostLikedAlready = likeRepository.existsByLikedByAndPost(user, post);

@@ -35,10 +35,18 @@ spring:
     baseline-version: 1
 
 beefit:
+  beta:
+    # Ative true para restringir novos cadastros aos e-mails autorizados durante o beta
+    enabled: ${BEEFIT_BETA_MODE:false}
+    allowed-emails: ${BEEFIT_BETA_ALLOWED_EMAILS:}
+  registration:
+    enabled: ${BEEFIT_REGISTRATION_ENABLED:true}
+  legal:
+    terms-version: ${BEEFIT_TERMS_VERSION:2026-08-18}
+    privacy-version: ${BEEFIT_PRIVACY_VERSION:2026-08-18}
   security:
     cors:
       allowed-origins: ""
     token:
       secret: ${JWT_SECRET}
 
-# Lembrar de Adicionar Configurações para o Módulo de Segurança (JWT)

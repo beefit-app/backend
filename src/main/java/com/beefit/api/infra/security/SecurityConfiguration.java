@@ -81,6 +81,18 @@ public class SecurityConfiguration {
                                           "message": "%s"
                                       }
                                     """.formatted(response.getStatus(), errorCode, message));
+                        })
+                        .accessDeniedHandler((request, response, accessDeniedException) -> {
+                            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                            response.setContentType("application/json");
+                            response.setCharacterEncoding("UTF-8");
+                            response.getWriter().write("""
+                                      {
+                                          "status": 403,
+                                          "error": "ACCESS_DENIED",
+                                          "message": "Você não tem permissão para executar esta operação."
+                                      }
+                                    """);
                         }))
 
                 .headers(headers -> headers
@@ -96,8 +108,10 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/login").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/register").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/auth/legal-versions").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/refresh").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/logout").permitAll()
+                        .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .addFilterBefore(securityFilter, UsernamePasswordAuthenticationFilter.class)
@@ -118,8 +132,8 @@ public class SecurityConfiguration {
         }
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of(
-                "Authorization", "Content-Type", "Accept", "Idempotency-Key", "X-Confirm-Password"));
-        configuration.setExposedHeaders(List.of("Retry-After"));
+                "Authorization", "Content-Type", "Accept", "Idempotency-Key", "X-Request-ID"));
+        configuration.setExposedHeaders(List.of("Retry-After", "X-Request-ID"));
         configuration.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

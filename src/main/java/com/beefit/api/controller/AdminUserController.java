@@ -12,6 +12,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -52,11 +53,12 @@ public class AdminUserController {
     @PreAuthorize("hasRole('ADMIN')")
     @PatchMapping("/{id}/ban")
     public ResponseEntity<BannedUserResponseDTO> banUser(
+            @AuthenticationPrincipal User admin,
             @PathVariable("id") UUID userId,
             @RequestParam(required = false) Integer banDays
             ){
 
-        BannedUserResponseDTO response = adminUserService.banUserForDays(userId, banDays);
+        BannedUserResponseDTO response = adminUserService.banUserForDays(admin.getId(), userId, banDays);
 
         return ResponseEntity.ok(response);
 

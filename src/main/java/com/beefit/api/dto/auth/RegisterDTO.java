@@ -4,20 +4,24 @@ import jakarta.validation.constraints.*;
 
 // As mensagens vao para ErrorResponse.fields e sao exibidas embaixo do campo
 // correspondente na tela de cadastro, entao sao escritas para o usuario final.
-public record RegisterDTO(@NotBlank(message = "Informe seu nome completo.") String fullName,
+public record RegisterDTO(@NotBlank(message = "Informe seu nome completo.")
+                          @Size(min = 4, max = 100, message = "O nome deve ter de 4 a 100 caracteres.")
+                          String fullName,
 
-                          @NotBlank(message = "Escolha um nome de usuário.") String username,
+                          @NotBlank(message = "Escolha um nome de usuário.")
+                          @Size(max = 255, message = "O nome de usuário deve ter no máximo 255 caracteres.")
+                          String username,
 
                           @NotBlank(message = "Informe seu e-mail.")
                           @Email(message = "Informe um e-mail válido, como nome@email.com.")
+                          @Size(max = 255, message = "O e-mail deve ter no máximo 255 caracteres.")
                           String email,
 
-                          // Lembrar de mexer depois
-                          /*@Pattern(
-                                regexp = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[\\W_]).{8,}$",
-                                message = "A senha deve ter no mínimo 8 caracteres, incluindo 1 maiúscula, 1 minúscula, 1 número e 1 caractere especial."
-                          )*/
                           @NotBlank(message = "Crie uma senha.")
+                          @Size(min = 8, max = 64, message = "A senha deve ter de 8 a 64 caracteres.")
+                          @Pattern(
+                                  regexp = "^(?=.*\\p{L})(?=.*\\d).+$",
+                                  message = "A senha deve incluir pelo menos uma letra e um número.")
                           String password,
 
                           @NotNull(message = "Informe seu peso.")
@@ -33,5 +37,14 @@ public record RegisterDTO(@NotBlank(message = "Informe seu nome completo.") Stri
                           // Preenchido pelo app, nao pelo usuario: se falhar, nao ha campo
                           // na tela para marcar e a mensagem cai no aviso geral.
                           @NotBlank(message = "Requisição sem identificação do dispositivo.")
-                          String deviceId) {
+                          @Size(max = 255, message = "A identificação do dispositivo deve ter no máximo 255 caracteres.")
+                          String deviceId,
+
+                          @NotBlank(message = "Aceite os Termos de Uso vigentes.")
+                          @Size(max = 64, message = "A versão dos Termos de Uso é inválida.")
+                          String acceptedTermsVersion,
+
+                          @NotBlank(message = "Aceite a Política de Privacidade vigente.")
+                          @Size(max = 64, message = "A versão da Política de Privacidade é inválida.")
+                          String acceptedPrivacyVersion) {
 }

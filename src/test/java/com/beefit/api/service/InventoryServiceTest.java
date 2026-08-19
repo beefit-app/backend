@@ -20,6 +20,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 
 import com.beefit.api.domain.Card;
+import com.beefit.api.domain.CatalogExercise;
 import com.beefit.api.domain.Inventory;
 import com.beefit.api.domain.User;
 import com.beefit.api.domain.WorkoutSession;
@@ -61,14 +62,20 @@ class InventoryServiceTest {
         workoutSession.setId(workoutSessionId);
 
         Card card = new Card();
+        CatalogExercise exercise = new CatalogExercise();
+        exercise.setId(UUID.randomUUID());
+        exercise.setName("Supino reto");
         card.setId(cardId);
         card.setInventory(inventory);
         card.setWorkoutSession(workoutSession);
-        card.setAttackPower(120.0);
+        card.setExercise(exercise);
+        card.setBestSetWeightKg(100.0);
+        card.setBestSetReps(5);
+        card.setEstimatedOneRepMax(116.67);
+        card.setImprovementPercentage(26.0);
         card.setCardRarity(CardRarity.LEGENDARY);
         card.setMuscleGroup(MuscleGroups.CHEST);
         card.setMuscleIntensities(Map.of("chest", 4, "deltoids", 2, "triceps", 2));
-        card.setIsPersonalRecord(Boolean.TRUE);
         card.setBodyWeightAtGeneration(80.0);
         card.setGeneratedAt(LocalDateTime.of(2026, 6, 18, 10, 30));
 
@@ -89,12 +96,16 @@ class InventoryServiceTest {
         assertEquals(userId, userIdCaptor.getValue());
         assertEquals(cardId, response.id());
         assertEquals(workoutSessionId, response.workoutSessionId());
-        assertEquals(120.0, response.attackPower());
+        assertEquals(exercise.getId(), response.exerciseId());
+        assertEquals("Supino reto", response.exerciseName());
+        assertEquals(100.0, response.bestSetWeightKg());
+        assertEquals(5, response.bestSetReps());
+        assertEquals(116.67, response.estimatedOneRepMax());
+        assertEquals(26.0, response.improvementPercentage());
         assertEquals("LEGENDARY", response.rarity());
         assertEquals("Lendário", response.rarityLabel());
         assertEquals("peito", response.muscleGroup());
         assertEquals(Map.of("chest", 4, "deltoids", 2, "triceps", 2), response.muscleIntensities());
-        assertEquals(Boolean.TRUE, response.isPersonalRecord());
         assertEquals(80.0, response.bodyWeightAtGeneration());
         assertEquals(LocalDateTime.of(2026, 6, 18, 10, 30), response.generatedAt());
     }

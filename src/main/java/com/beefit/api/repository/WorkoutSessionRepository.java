@@ -13,7 +13,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import java.time.LocalDate;
 
 public interface WorkoutSessionRepository extends JpaRepository<WorkoutSession, UUID> {
 
@@ -38,10 +37,17 @@ public interface WorkoutSessionRepository extends JpaRepository<WorkoutSession, 
     JOIN FETCH w.user
     WHERE w.status = :status
       AND w.isPrivate = false
+      AND w.user.ghostMode = false
       AND w.user.id <> :currentUserId
+      AND EXISTS (
+          SELECT 1 FROM Friendship f
+          WHERE f.status = com.beefit.api.domain.enums.FriendshipStatus.ACCEPTED
+            AND ((f.requester.id = :currentUserId AND f.addressee.id = w.user.id)
+              OR (f.addressee.id = :currentUserId AND f.requester.id = w.user.id))
+      )
     ORDER BY w.startedAt DESC
     """)
-    List<WorkoutSession> findAllPublicByStatusExcludingUser(
+    List<WorkoutSession> findAllVisibleToFriendByStatusExcludingUser(
             @Param("status") WorkoutStatus status,
             @Param("currentUserId") UUID currentUserId
     );
@@ -53,15 +59,61 @@ public interface WorkoutSessionRepository extends JpaRepository<WorkoutSession, 
 
     List<WorkoutSession> findTop10ByUserIdAndStatusOrderByFinishedAtDesc(UUID userId, WorkoutStatus status);
 
-     // [RF-011] Validação de Dia Civil para a Ofensiva (Honey)
-     // Esta query conta se o usuário já possui algum treino finalizado no intervalo de tempo fornecido.
-     // Será utilizada para garantir que o usuário só ganhe +1 Honey no primeiro treino do dia.
-
-    @Query("SELECT COUNT(w) > 0 FROM WorkoutSession w WHERE w.user.id = :userId " +
-            "AND w.status = :status AND w.finishedAt >= :startOfDay AND w.finishedAt <= :endOfDay")
-    boolean existsFinishedWorkoutToday(
+    @Query(value = """
+            SELECT MAX(s.weight_kg * (1.0 + LEAST(s.reps, 10) / 30.0))
+            FROM sets s
+            JOIN session_exercises se ON se.id = s.exercise_id
+            JOIN workout_sessions ws ON ws.id = se.workout_id
+            WHERE ws.user_id = :userId
+              AND se.exercise_id = :exerciseId
+              AND ws.id <> :currentWorkoutId
+              AND ws.status = 'FINISHED'
+              AND s.weight_kg > 0
+              AND s.reps > 0
+            """, nativeQuery = true)
+    Optional<Double> findBestEstimatedOneRepMaxBeforeWorkout(
             @Param("userId") UUID userId,
+            @Param("exerciseId") UUID exerciseId,
+            @Param("currentWorkoutId") UUID currentWorkoutId);
+
+    @Query(value = """
+            SELECT MAX(s.reps)
+            FROM sets s
+            JOIN session_exercises se ON se.id = s.exercise_id
+            JOIN workout_sessions ws ON ws.id = se.workout_id
+            WHERE ws.user_id = :userId
+              AND se.exercise_id = :exerciseId
+              AND ws.id <> :currentWorkoutId
+              AND ws.status = 'FINISHED'
+              AND s.weight_kg = 0
+              AND s.reps > 0
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM sets weighted_set
+                  WHERE weighted_set.exercise_id = se.id
+                    AND weighted_set.weight_kg > 0
+                    AND weighted_set.reps > 0
+              )
+            """, nativeQuery = true)
+    Optional<Integer> findBestBodyweightRepsBeforeWorkout(
+            @Param("userId") UUID userId,
+            @Param("exerciseId") UUID exerciseId,
+            @Param("currentWorkoutId") UUID currentWorkoutId);
+
+    // Um Honey representa um dia com pelo menos um treino elegivel. O treino que
+    // esta sendo finalizado e excluido porque a query pode provocar flush antes
+    // de ser executada.
+    @Query("SELECT COUNT(w) > 0 FROM WorkoutSession w WHERE w.user.id = :userId " +
+            "AND w.id <> :currentWorkoutId AND w.status = :status " +
+            "AND w.durationSeconds >= :minimumDurationSeconds " +
+            "AND w.finishedAt >= :startOfDay AND w.finishedAt < :endOfDay " +
+            "AND EXISTS (SELECT 1 FROM SessionExercise se JOIN se.sets s " +
+            "WHERE se.workoutSession = w AND s.reps > 0)")
+    boolean existsEligibleFinishedWorkoutOnDay(
+            @Param("userId") UUID userId,
+            @Param("currentWorkoutId") UUID currentWorkoutId,
             @Param("status") WorkoutStatus status,
+            @Param("minimumDurationSeconds") int minimumDurationSeconds,
             @Param("startOfDay") LocalDateTime startOfDay,
             @Param("endOfDay") LocalDateTime endOfDay
     );

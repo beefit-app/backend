@@ -5,6 +5,7 @@ import com.beefit.api.domain.User;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -12,6 +13,8 @@ import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
 import java.util.UUID;
+
+import jakarta.persistence.LockModeType;
 
 @Repository
 public interface PostRepository extends JpaRepository<Post, UUID> {
@@ -55,6 +58,15 @@ public interface PostRepository extends JpaRepository<Post, UUID> {
             "(f.requester.id = :viewerId AND f.addressee = u) OR " +
             "(f.addressee.id = :viewerId AND f.requester = u)))))")
     Optional<Post> findVisibleById(@Param("postId") UUID postId, @Param("viewerId") UUID viewerId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT p FROM Post p JOIN FETCH p.user u JOIN FETCH p.workoutSession w " +
+            "WHERE p.id = :postId AND p.isRemoved = false AND (" +
+            "u.id = :viewerId OR (u.ghostMode = false AND w.isPrivate = false AND EXISTS (" +
+            "SELECT 1 FROM Friendship f WHERE f.status = com.beefit.api.domain.enums.FriendshipStatus.ACCEPTED AND (" +
+            "(f.requester.id = :viewerId AND f.addressee = u) OR " +
+            "(f.addressee.id = :viewerId AND f.requester = u)))))")
+    Optional<Post> findVisibleByIdForUpdate(@Param("postId") UUID postId, @Param("viewerId") UUID viewerId);
 
     @Query("SELECT CASE WHEN COUNT(p) > 0 THEN true ELSE false END FROM Post p " +
             "JOIN p.user u JOIN p.workoutSession w " +

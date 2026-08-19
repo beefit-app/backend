@@ -12,6 +12,8 @@ import java.util.Set;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 public class SseService {
@@ -27,13 +29,16 @@ public class SseService {
     }
 
     public void broadcastToFriend(SocialEventDTO<?> socialEventDTO, UUID userId){
+        afterCommit(() -> dispatchToUser(socialEventDTO, userId));
+    }
+
+    private void dispatchToUser(SocialEventDTO<?> socialEventDTO, UUID userId) {
         emitters.getOrDefault(userId, Set.of()).forEach(emitter -> sendEvent(socialEventDTO, emitter));
     }
 
     public void broadcastToFriends(SocialEventDTO<?> socialEventDTO, List<User> friends){
-        for(User friend:friends){
-            emitters.getOrDefault(friend.getId(), Set.of()).forEach(emitter -> sendEvent(socialEventDTO, emitter));
-        }
+        List<UUID> friendIds = friends.stream().map(User::getId).toList();
+        afterCommit(() -> friendIds.forEach(id -> dispatchToUser(socialEventDTO, id)));
     }
 
     @Scheduled(fixedRate = 25000)
@@ -57,6 +62,20 @@ public class SseService {
         if (userEmitters == null) return;
         userEmitters.remove(emitter);
         if (userEmitters.isEmpty()) emitters.remove(userId, userEmitters);
+    }
+
+    private void afterCommit(Runnable action) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()
+                || !TransactionSynchronizationManager.isActualTransactionActive()) {
+            action.run();
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                action.run();
+            }
+        });
     }
 
 }
