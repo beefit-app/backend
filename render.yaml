@@ -1,0 +1,62 @@
+# Blueprint do ambiente de validacao no Render. Os valores marcados com
+# `sync: false` sao preenchidos no dashboard e nunca versionados aqui.
+services:
+  - type: web
+    name: beefit-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: oregon
+    branch: feat/deploy-render
+    # Sem healthCheckPath de proposito: o Render cai no probe TCP da porta.
+    # ProductionHttpsFilter responde 426 a qualquer requisicao sem
+    # X-Forwarded-Proto: https, e o probe HTTP interno do Render nao garante
+    # esse header, o que marcaria o servico como nao saudavel para sempre.
+    autoDeployTrigger: commit
+    envVars:
+      - key: PORT
+        value: "8080"
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+
+      # Definidos a mao no dashboard.
+      # JWT_SECRET precisa de no minimo 32 bytes; DB_HOST e o hostname da
+      # Internal Database URL do beefit-db, sem esquema, credencial ou path.
+      # O perfil prod recusa origens vazias ou com curinga e nao sobe.
+      - key: JWT_SECRET
+        sync: false
+      - key: DB_HOST
+        sync: false
+      - key: BEEFIT_SECURITY_CORS_ALLOWED_ORIGINS
+        sync: false
+
+      - key: DB_NAME
+        fromDatabase:
+          name: beefit-db
+          property: database
+      - key: SPRING_DATASOURCE_USERNAME
+        fromDatabase:
+          name: beefit-db
+          property: user
+      - key: SPRING_DATASOURCE_PASSWORD
+        fromDatabase:
+          name: beefit-db
+          property: password
+
+      - key: BEEFIT_TERMS_VERSION
+        value: "2026-08-18"
+      - key: BEEFIT_PRIVACY_VERSION
+        value: "2026-08-18"
+      - key: BEEFIT_REGISTRATION_ENABLED
+        value: "true"
+
+      # A instancia free tem 512 MB; o Postgres free tem poucas conexoes.
+      - key: SERVER_TOMCAT_THREADS_MAX
+        value: "20"
+
+databases:
+  - name: beefit-db
+    databaseName: beefit
+    user: beefit
+    plan: free
+    region: oregon
