@@ -12,8 +12,18 @@ services:
         value: prod
       - key: JWT_SECRET
         generateValue: true
-      - key: SPRING_DATASOURCE_URL
-        value: jdbc:postgresql://beefit-db:5432/beefit
+      - key: DB_HOST
+        fromDatabase:
+          name: beefit-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: beefit-db
+          property: port
+      - key: DB_NAME
+        fromDatabase:
+          name: beefit-db
+          property: database
       - key: SPRING_DATASOURCE_USERNAME
         fromDatabase:
           name: beefit-db
