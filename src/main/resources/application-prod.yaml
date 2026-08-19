@@ -3,7 +3,6 @@ spring:
     activate:
       on-profile: prod
   datasource:
-    driver-class-name: org.postgresql.Driver
     url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:beefit}
     username: ${SPRING_DATASOURCE_USERNAME:beefit}
     password: ${SPRING_DATASOURCE_PASSWORD:change-me-locally}
