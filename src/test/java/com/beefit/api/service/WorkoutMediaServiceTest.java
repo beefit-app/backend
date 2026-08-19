@@ -49,7 +49,7 @@ class WorkoutMediaServiceTest {
         media = new WorkoutMedia();
         media.setId(mediaId);
         media.setOwner(owner);
-        when(mediaRepository.findById(mediaId)).thenReturn(Optional.of(media));
+        org.mockito.Mockito.lenient().when(mediaRepository.findById(mediaId)).thenReturn(Optional.of(media));
     }
 
     @Test
@@ -82,6 +82,64 @@ class WorkoutMediaServiceTest {
         assertThrows(MediaNotFoundException.class, () -> service.getVisible(mediaId, viewer));
     }
 
+    @Test
+    void uploadSavesSanitizedPngSuccessfully() throws Exception {
+        java.awt.image.BufferedImage img = new java.awt.image.BufferedImage(10, 10, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+        javax.imageio.ImageIO.write(img, "png", baos);
+        byte[] bytes = baos.toByteArray();
+
+        org.springframework.mock.web.MockMultipartFile file = new org.springframework.mock.web.MockMultipartFile(
+                "file", "my-photo.png", "image/png", bytes);
+
+        when(mediaRepository.countByOwnerIdAndConsumedFalse(owner.getId())).thenReturn(0L);
+        when(mediaRepository.save(org.mockito.ArgumentMatchers.any(WorkoutMedia.class)))
+                .thenAnswer(invocation -> {
+                    WorkoutMedia m = invocation.getArgument(0);
+                    m.setId(UUID.randomUUID());
+                    return m;
+                });
+
+        var response = service.upload(owner, file);
+        org.junit.jupiter.api.Assertions.assertNotNull(response);
+        org.junit.jupiter.api.Assertions.assertNotNull(response.mediaId());
+    }
+
+    @Test
+    void uploadSavesSanitizedJpegSuccessfully() throws Exception {
+        java.awt.image.BufferedImage img = new java.awt.image.BufferedImage(10, 10, java.awt.image.BufferedImage.TYPE_INT_RGB);
+        java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+        javax.imageio.ImageIO.write(img, "jpeg", baos);
+        byte[] bytes = baos.toByteArray();
+
+        org.springframework.mock.web.MockMultipartFile file = new org.springframework.mock.web.MockMultipartFile(
+                "file", "../../../unsafe/path.jpg", "image/jpeg", bytes);
+
+        when(mediaRepository.countByOwnerIdAndConsumedFalse(owner.getId())).thenReturn(0L);
+        when(mediaRepository.save(org.mockito.ArgumentMatchers.any(WorkoutMedia.class)))
+                .thenAnswer(invocation -> {
+                    WorkoutMedia m = invocation.getArgument(0);
+                    m.setId(UUID.randomUUID());
+                    org.junit.jupiter.api.Assertions.assertFalse(m.getFileName().contains("/"));
+                    org.junit.jupiter.api.Assertions.assertTrue(m.getFileName().endsWith(".jpg"));
+                    return m;
+                });
+
+        var response = service.upload(owner, file);
+        org.junit.jupiter.api.Assertions.assertNotNull(response);
+    }
+
+    @Test
+    void uploadThrowsWhenQuotaExceeded() {
+        when(mediaRepository.countByOwnerIdAndConsumedFalse(owner.getId())).thenReturn(15L);
+
+        org.springframework.mock.web.MockMultipartFile file = new org.springframework.mock.web.MockMultipartFile(
+                "file", "photo.jpg", "image/jpeg", new byte[100]);
+
+        var ex = assertThrows(IllegalArgumentException.class, () -> service.upload(owner, file));
+        org.junit.jupiter.api.Assertions.assertTrue(ex.getMessage().contains("limite de fotos pendentes"));
+    }
+
     private User user(UserRole role) {
         User user = new User();
         user.setId(UUID.randomUUID());
@@ -89,3 +147,4 @@ class WorkoutMediaServiceTest {
         return user;
     }
 }
+

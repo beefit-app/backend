@@ -30,6 +30,7 @@ public class WorkoutMediaService {
     private static final long MAX_FILE_SIZE = 10 * 1024 * 1024;
     private static final int MAX_IMAGE_DIMENSION = 4096;
     private static final long MAX_IMAGE_PIXELS = 16_000_000;
+    private static final int MAX_PENDING_UPLOADS = 15;
     private final WorkoutMediaRepository repository;
     private final PostRepository postRepository;
     private final UserRepository userRepository;
@@ -38,13 +39,16 @@ public class WorkoutMediaService {
         if (file.isEmpty() || file.getSize() > MAX_FILE_SIZE) {
             throw new IllegalArgumentException("Envie uma imagem de até 10 MB.");
         }
-        byte[] content = file.getBytes();
-        String contentType = inspectImage(content);
+        long pendingCount = repository.countByOwnerIdAndConsumedFalse(user.getId());
+        if (pendingCount >= MAX_PENDING_UPLOADS) {
+            throw new IllegalArgumentException("Você atingiu o limite de fotos pendentes. Finalize ou descarte as anteriores antes de novos envios.");
+        }
+        CleanImageData cleanImage = processAndSanitizeImage(file.getBytes());
         WorkoutMedia media = new WorkoutMedia();
         media.setOwner(user);
-        media.setContent(content);
-        media.setContentType(contentType);
-        media.setFileName(file.getOriginalFilename() == null ? "workout-photo" : file.getOriginalFilename());
+        media.setContent(cleanImage.content());
+        media.setContentType(cleanImage.contentType());
+        media.setFileName(sanitizeFileName(file.getOriginalFilename(), cleanImage.format()));
         WorkoutMedia saved = repository.save(media);
         return new WorkoutMediaResponseDTO(saved.getId(), "/api/media/" + saved.getId());
     }
@@ -75,8 +79,10 @@ public class WorkoutMediaService {
         repository.deleteAll(repository.findByConsumedFalseAndCreatedAtBefore(java.time.LocalDateTime.now().minusHours(24)));
     }
 
-    private String inspectImage(byte[] content) throws IOException {
-        try (ImageInputStream input = ImageIO.createImageInputStream(new ByteArrayInputStream(content))) {
+    private record CleanImageData(byte[] content, String contentType, String format) {}
+
+    private CleanImageData processAndSanitizeImage(byte[] rawContent) throws IOException {
+        try (ImageInputStream input = ImageIO.createImageInputStream(new ByteArrayInputStream(rawContent))) {
             Iterator<ImageReader> readers = ImageIO.getImageReaders(input);
             if (!readers.hasNext()) throw new IllegalArgumentException("Envie uma imagem JPEG ou PNG válida.");
             ImageReader reader = readers.next();
@@ -94,11 +100,49 @@ public class WorkoutMediaService {
                 }
                 BufferedImage image = reader.read(0);
                 if (image == null) throw new IllegalArgumentException("Imagem inválida.");
-                return format.equals("png") ? "image/png" : "image/jpeg";
+
+                boolean isPng = format.equals("png");
+                String canonicalFormat = isPng ? "png" : "jpeg";
+                String contentType = isPng ? "image/png" : "image/jpeg";
+
+                java.io.ByteArrayOutputStream outputStream = new java.io.ByteArrayOutputStream();
+                if (isPng) {
+                    ImageIO.write(image, "png", outputStream);
+                } else {
+                    BufferedImage rgbImage;
+                    if (image.getType() == BufferedImage.TYPE_INT_RGB || image.getType() == BufferedImage.TYPE_3BYTE_BGR) {
+                        rgbImage = image;
+                    } else {
+                        rgbImage = new BufferedImage(image.getWidth(), image.getHeight(), BufferedImage.TYPE_INT_RGB);
+                        var g = rgbImage.createGraphics();
+                        g.drawImage(image, 0, 0, java.awt.Color.WHITE, null);
+                        g.dispose();
+                    }
+                    ImageIO.write(rgbImage, "jpeg", outputStream);
+                }
+                return new CleanImageData(outputStream.toByteArray(), contentType, canonicalFormat);
             } finally {
                 reader.dispose();
             }
         }
+    }
+
+    private String sanitizeFileName(String originalFilename, String format) {
+        String ext = "png".equalsIgnoreCase(format) ? "png" : "jpg";
+        if (originalFilename == null || originalFilename.isBlank()) {
+            return "photo-" + UUID.randomUUID() + "." + ext;
+        }
+        String base = originalFilename.replaceAll("^.*[\\\\/]", "").replaceAll("[^a-zA-Z0-9._-]", "_");
+        if (base.isBlank() || base.equals(".")) {
+            base = "photo-" + UUID.randomUUID();
+        }
+        if (base.length() > 50) {
+            base = base.substring(0, 50);
+        }
+        if (!base.toLowerCase(Locale.ROOT).endsWith("." + ext)) {
+            base = base + "." + ext;
+        }
+        return base;
     }
 
     @Transactional(readOnly = true)
