@@ -2,13 +2,6 @@ spring:
   config:
     activate:
       on-profile: prod
-  datasource:
-    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:beefit}
-    username: ${SPRING_DATASOURCE_USERNAME:beefit}
-    password: ${SPRING_DATASOURCE_PASSWORD:change-me-locally}
-    hikari:
-      maximum-pool-size: 5
-      minimum-idle: 2
   jpa:
     show-sql: false
     properties:
@@ -19,10 +12,6 @@ spring:
       enabled: false
 
 server:
-  tomcat:
-    threads:
-      max: 20
-      min-spare: 2
   # O proxy de produção deve remover headers Forwarded/X-Forwarded-* recebidos
   # do cliente e escrever os valores confiáveis. A API não deve ficar acessível
   # diretamente, pois HTTPS obrigatório e rate limit por IP dependem disso.
