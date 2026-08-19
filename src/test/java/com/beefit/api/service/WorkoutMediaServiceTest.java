@@ -21,6 +21,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.lenient;
+import org.springframework.mock.web.MockMultipartFile;
 
 @ExtendWith(MockitoExtension.class)
 class WorkoutMediaServiceTest {
@@ -49,7 +51,11 @@ class WorkoutMediaServiceTest {
         media = new WorkoutMedia();
         media.setId(mediaId);
         media.setOwner(owner);
+<<<<<<< HEAD
         org.mockito.Mockito.lenient().when(mediaRepository.findById(mediaId)).thenReturn(Optional.of(media));
+=======
+        lenient().when(mediaRepository.findById(mediaId)).thenReturn(Optional.of(media));
+>>>>>>> origin/feat/app-refining
     }
 
     @Test
@@ -59,9 +65,14 @@ class WorkoutMediaServiceTest {
     }
 
     @Test
-    void anyAuthenticatedUserCanReadAnAssignedProfilePicture() {
-        when(userRepository.existsByProfilePicture("/api/media/" + mediaId)).thenReturn(true);
+    void acceptedFriendCanReadAnAssignedVisibleProfilePicture() {
+        when(userRepository.existsVisibleProfilePicture("/api/media/" + mediaId, viewer.getId())).thenReturn(true);
         assertSame(media, service.getVisible(mediaId, viewer));
+    }
+
+    @Test
+    void unrelatedUserCannotReadAnAssignedProfilePicture() {
+        assertThrows(MediaNotFoundException.class, () -> service.getVisible(mediaId, viewer));
     }
 
     @Test
@@ -83,6 +94,14 @@ class WorkoutMediaServiceTest {
     }
 
     @Test
+    void rejectsUploadWhenPerUserMediaQuotaIsReached() {
+        when(mediaRepository.countByOwnerId(owner.getId())).thenReturn(100L);
+        org.springframework.mock.web.MockMultipartFile upload = new org.springframework.mock.web.MockMultipartFile(
+                "file", "photo.jpg", "image/jpeg", new byte[] {1});
+        assertThrows(IllegalArgumentException.class, () -> service.upload(owner, upload));
+    }
+
+    @Test
     void uploadSavesSanitizedPngSuccessfully() throws Exception {
         java.awt.image.BufferedImage img = new java.awt.image.BufferedImage(10, 10, java.awt.image.BufferedImage.TYPE_INT_ARGB);
         java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
@@ -92,6 +111,7 @@ class WorkoutMediaServiceTest {
         org.springframework.mock.web.MockMultipartFile file = new org.springframework.mock.web.MockMultipartFile(
                 "file", "my-photo.png", "image/png", bytes);
 
+        when(mediaRepository.countByOwnerId(owner.getId())).thenReturn(0L);
         when(mediaRepository.countByOwnerIdAndConsumedFalse(owner.getId())).thenReturn(0L);
         when(mediaRepository.save(org.mockito.ArgumentMatchers.any(WorkoutMedia.class)))
                 .thenAnswer(invocation -> {
@@ -115,6 +135,7 @@ class WorkoutMediaServiceTest {
         org.springframework.mock.web.MockMultipartFile file = new org.springframework.mock.web.MockMultipartFile(
                 "file", "../../../unsafe/path.jpg", "image/jpeg", bytes);
 
+        when(mediaRepository.countByOwnerId(owner.getId())).thenReturn(0L);
         when(mediaRepository.countByOwnerIdAndConsumedFalse(owner.getId())).thenReturn(0L);
         when(mediaRepository.save(org.mockito.ArgumentMatchers.any(WorkoutMedia.class)))
                 .thenAnswer(invocation -> {
@@ -131,6 +152,7 @@ class WorkoutMediaServiceTest {
 
     @Test
     void uploadThrowsWhenQuotaExceeded() {
+        when(mediaRepository.countByOwnerId(owner.getId())).thenReturn(0L);
         when(mediaRepository.countByOwnerIdAndConsumedFalse(owner.getId())).thenReturn(15L);
 
         org.springframework.mock.web.MockMultipartFile file = new org.springframework.mock.web.MockMultipartFile(

@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
+import com.beefit.api.utils.log.LogAudit;
 
 // Serviço responsável por gerenciar a moderação de conteúdo gerado pelos usuários. Focado na remoção de posts ofensivos ou com métricas fraudulentas.
 @Service
@@ -27,6 +28,7 @@ public class WorkoutModerationService {
     }
 
     @Transactional
+    @LogAudit(action = "REMOVE_POST", description = "Remove publicação por moderação.")
     public void removeInappropriatePost(UUID postId) {
         // Verifica se o post existe antes de processar a remoção para evitar erros
         if (!postRepository.existsById(postId)) {
@@ -37,6 +39,7 @@ public class WorkoutModerationService {
         postRepository.softDeletePost(postId);
     }
     @Transactional
+    @LogAudit(action = "EDIT_POST", description = "Edita título de publicação por moderação.")
     public void editPostMetadata(UUID postId, UpdatePostMetadataDTO dto) {
         // Busca o post no repositório; se não achar, dispara a exceção existente
         Post post = postRepository.findById(postId)
@@ -44,12 +47,9 @@ public class WorkoutModerationService {
 
         // Atualiza os metadados da sessão de treino vinculada ao post
         var session = post.getWorkoutSession();
-        if (dto.newTitle() != null) {
-            post.setTitle(dto.newTitle());
-            session.setTitle(dto.newTitle());
-        }
-        // Exemplo: se houver campo de observação na sessão, atualize aqui
-        // session.setObservation(dto.observation());
+        String title = dto.newTitle().trim();
+        post.setTitle(title);
+        session.setTitle(title);
 
         postRepository.save(post);
     }

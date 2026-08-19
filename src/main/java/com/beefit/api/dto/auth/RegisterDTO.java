@@ -38,5 +38,13 @@ public record RegisterDTO(@NotBlank(message = "Informe seu nome completo.")
                           // na tela para marcar e a mensagem cai no aviso geral.
                           @NotBlank(message = "Requisição sem identificação do dispositivo.")
                           @Size(max = 255, message = "A identificação do dispositivo deve ter no máximo 255 caracteres.")
-                          String deviceId) {
+                          String deviceId,
+
+                          @NotBlank(message = "Aceite os Termos de Uso vigentes.")
+                          @Size(max = 64, message = "A versão dos Termos de Uso é inválida.")
+                          String acceptedTermsVersion,
+
+                          @NotBlank(message = "Aceite a Política de Privacidade vigente.")
+                          @Size(max = 64, message = "A versão da Política de Privacidade é inválida.")
+                          String acceptedPrivacyVersion) {
 }

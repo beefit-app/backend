@@ -9,6 +9,8 @@ import com.auth0.jwt.interfaces.DecodedJWT;
 import com.beefit.api.domain.User;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import jakarta.annotation.PostConstruct;
+import java.nio.charset.StandardCharsets;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -36,6 +38,16 @@ public class TokenService {
 
     @Value("${beefit.security.token.access-token-minutes:15}")
     Integer accessTokenDurationMinutes;
+
+    @PostConstruct
+    void validateConfiguration() {
+        if (secret == null || secret.isBlank() || secret.getBytes(StandardCharsets.UTF_8).length < 32) {
+            throw new IllegalStateException("JWT_SECRET deve conter pelo menos 32 bytes aleatórios.");
+        }
+        if (accessTokenDurationMinutes == null || accessTokenDurationMinutes < 1 || accessTokenDurationMinutes > 60) {
+            throw new IllegalStateException("A validade do access token deve estar entre 1 e 60 minutos.");
+        }
+    }
 
     public String generateToken(User user, UUID sessionId){
         try {

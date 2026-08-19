@@ -118,11 +118,9 @@ public class ProfileController {
 
     @DeleteMapping("/me")
     public ResponseEntity<Void> deleteAccount(@AuthenticationPrincipal User user,
-            @RequestHeader(value = "X-Confirm-Password", required = false) String password) {
-        if (password == null || password.isBlank()) {
-            throw new IllegalArgumentException("Confirme sua senha.");
-        }
-        userService.deleteAccount(user.getId(), new DeleteUserRequestDTO(password));
+            @Valid @RequestBody DeleteUserRequestDTO request) {
+        rateLimitService.checkAccountDeletion(user.getId());
+        userService.deleteAccount(user.getId(), request);
         return ResponseEntity.noContent().build();
     }
 }

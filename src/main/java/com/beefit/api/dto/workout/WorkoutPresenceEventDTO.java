@@ -10,6 +10,7 @@ public record WorkoutPresenceEventDTO(
         UUID userId,
         String username,
         String fullName,
+        String profilePicture,
         String status,
         LocalDateTime occurredAt,
         List<String> muscleGroups) {

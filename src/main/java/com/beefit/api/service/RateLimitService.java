@@ -47,8 +47,17 @@ public class RateLimitService {
         check("refresh-device", deviceId, 30, REFRESH_WINDOW);
     }
 
+    public void checkRefresh(String remoteAddress, String deviceId) {
+        check("refresh-ip", remoteAddress, 60, REFRESH_WINDOW);
+        checkRefresh(deviceId);
+    }
+
     public void checkPasswordChange(UUID userId) {
         check("password-user", userId.toString(), 5, PASSWORD_WINDOW);
+    }
+
+    public void checkAccountDeletion(UUID userId) {
+        check("delete-account-user", userId.toString(), 5, PASSWORD_WINDOW);
     }
 
     public void checkUpload(UUID userId) {

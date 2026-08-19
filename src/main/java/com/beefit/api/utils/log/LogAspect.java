@@ -33,7 +33,12 @@ public class LogAspect {
             adminUsername = auth.getPrincipal() instanceof User user ? user.getUsername() : "ADMIN";
         }
 
-        String details = "Method: " + joinPoint.getSignature().toShortString();
+        String identifiers = java.util.Arrays.stream(joinPoint.getArgs())
+                .filter(arg -> arg instanceof java.util.UUID || arg instanceof Number)
+                .map(String::valueOf)
+                .collect(java.util.stream.Collectors.joining(","));
+        String details = "Method: " + joinPoint.getSignature().toShortString()
+                + (identifiers.isBlank() ? "" : "; identifiers: " + identifiers);
 
         AuditLog auditLog = new AuditLog();
         auditLog.setAdminUsername(adminUsername);

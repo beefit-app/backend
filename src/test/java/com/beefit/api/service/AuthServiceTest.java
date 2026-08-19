@@ -70,14 +70,14 @@ class AuthServiceTest {
     @Test
     void loadUserByUsernameReturnsUserWhenEmailExists() {
         User user = user();
-        when(userRepository.findByEmail(user.getEmail())).thenReturn(user);
+        when(userRepository.findByEmailIgnoreCase(user.getEmail())).thenReturn(user);
 
         assertSame(user, authService.loadUserByUsername(user.getEmail()));
     }
 
     @Test
     void loadUserByUsernameThrowsWhenEmailDoesNotExist() {
-        when(userRepository.findByEmail("missing@example.com")).thenReturn(null);
+        when(userRepository.findByEmailIgnoreCase("missing@example.com")).thenReturn(null);
 
         assertThrows(UsernameNotFoundException.class,
                 () -> authService.loadUserByUsername("missing@example.com"));
@@ -92,7 +92,8 @@ class AuthServiceTest {
                 user.getUsername(),
                 user.getEmail(),
                 user.getBodyWeight(),
-                user.getWeeklyGoal());
+                user.getWeeklyGoal(),
+                user.getRole());
         UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                 user,
                 null,
@@ -128,8 +129,8 @@ class AuthServiceTest {
         User user = user();
         user.setPasswordHash("plain");
 
-        when(userRepository.findByUsername(user.getUsername())).thenReturn(Optional.empty());
-        when(userRepository.findByEmail(user.getEmail())).thenReturn(null);
+        when(userRepository.findByUsernameIgnoreCase(user.getUsername())).thenReturn(Optional.empty());
+        when(userRepository.findByEmailIgnoreCase(user.getEmail())).thenReturn(null);
         when(passwordEncoder.encode("plain")).thenReturn("hashed");
 
         authService.register(user);
@@ -140,9 +141,26 @@ class AuthServiceTest {
     }
 
     @Test
+    void registerCanonicalizesEmailAndUsernameBeforeCheckingAndSaving() {
+        User user = user();
+        user.setEmail("  Test@Example.COM ");
+        user.setUsername("  TestUser ");
+        user.setPasswordHash("plain");
+        when(userRepository.findByUsernameIgnoreCase("testuser")).thenReturn(Optional.empty());
+        when(userRepository.findByEmailIgnoreCase("test@example.com")).thenReturn(null);
+        when(passwordEncoder.encode("plain")).thenReturn("hashed");
+
+        authService.register(user);
+
+        assertEquals("test@example.com", user.getEmail());
+        assertEquals("testuser", user.getUsername());
+        verify(userRepository).save(user);
+    }
+
+    @Test
     void registerThrowsWhenUsernameAlreadyExists() {
         User user = user();
-        when(userRepository.findByUsername(user.getUsername())).thenReturn(Optional.of(user));
+        when(userRepository.findByUsernameIgnoreCase(user.getUsername())).thenReturn(Optional.of(user));
 
         assertThrows(UsernameAlreadyInUse.class, () -> authService.register(user));
     }
@@ -150,8 +168,8 @@ class AuthServiceTest {
     @Test
     void registerThrowsWhenEmailAlreadyExists() {
         User user = user();
-        when(userRepository.findByUsername(user.getUsername())).thenReturn(Optional.empty());
-        when(userRepository.findByEmail(user.getEmail())).thenReturn(user);
+        when(userRepository.findByUsernameIgnoreCase(user.getUsername())).thenReturn(Optional.empty());
+        when(userRepository.findByEmailIgnoreCase(user.getEmail())).thenReturn(user);
 
         assertThrows(EmailAlreadyInUse.class, () -> authService.register(user));
     }

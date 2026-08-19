@@ -27,6 +27,13 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.bind.MissingRequestHeaderException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.dao.DataIntegrityViolationException;
+import jakarta.validation.ConstraintViolationException;
+import java.time.format.DateTimeParseException;
+import java.io.IOException;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -211,6 +218,35 @@ public class GlobalExceptionHandler {
                 e.getMessage(), List.of(), request.getRequestURI());
     }
 
+    @ExceptionHandler({ DateTimeParseException.class, MethodArgumentTypeMismatchException.class,
+            MissingRequestHeaderException.class, ConstraintViolationException.class })
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleInvalidRequest(Exception e, HttpServletRequest request) {
+        return new ErrorResponse(LocalDateTime.now(), HttpStatus.BAD_REQUEST.value(), "Requisição inválida",
+                "Parâmetro ausente ou em formato inválido.", List.of(), request.getRequestURI());
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    @ResponseStatus(HttpStatus.PAYLOAD_TOO_LARGE)
+    public ErrorResponse handleUploadTooLarge(MaxUploadSizeExceededException e, HttpServletRequest request) {
+        return new ErrorResponse(LocalDateTime.now(), HttpStatus.PAYLOAD_TOO_LARGE.value(), "Arquivo muito grande",
+                "Envie uma imagem de até 10 MB.", List.of(), request.getRequestURI());
+    }
+
+    @ExceptionHandler(IOException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handleIo(IOException e, HttpServletRequest request) {
+        return new ErrorResponse(LocalDateTime.now(), HttpStatus.BAD_REQUEST.value(), "Arquivo inválido",
+                "Não foi possível processar o arquivo enviado.", List.of(), request.getRequestURI());
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleDataIntegrity(DataIntegrityViolationException e, HttpServletRequest request) {
+        return new ErrorResponse(LocalDateTime.now(), HttpStatus.CONFLICT.value(), "Conflito de dados",
+                "A operação conflita com dados já existentes.", List.of(), request.getRequestURI());
+    }
+
     @ExceptionHandler(RateLimitExceededException.class)
     public ResponseEntity<ErrorResponse> handleRateLimitExceeded(
             RateLimitExceededException e,
@@ -342,8 +378,7 @@ public class GlobalExceptionHandler {
             InvalidCardRarityException.class,
             InvalidMuscleGroupException.class,
             InvalidTimePeriodException.class,
-            ExceededHiveLimitException.class,
-            PermissionException.class
+            ExceededHiveLimitException.class
     })
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ErrorResponse handleBadRequestRules(RuntimeException e, HttpServletRequest request) {
@@ -355,6 +390,13 @@ public class GlobalExceptionHandler {
                 List.of(),
                 request.getRequestURI()
         );
+    }
+
+    @ExceptionHandler(PermissionException.class)
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    public ErrorResponse handlePermission(PermissionException e, HttpServletRequest request) {
+        return new ErrorResponse(LocalDateTime.now(), HttpStatus.FORBIDDEN.value(), "Forbidden",
+                e.getMessage(), List.of(), request.getRequestURI());
     }
 
     @ExceptionHandler(InventoryNotFoundException.class)

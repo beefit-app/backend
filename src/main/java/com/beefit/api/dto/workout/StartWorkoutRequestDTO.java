@@ -7,10 +7,12 @@ import jakarta.annotation.Nullable;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.NotBlank;
 
 public record StartWorkoutRequestDTO(
-        @NotEmpty List<String> muscleGroups,
+        @NotEmpty @Size(max = 8) List<@NotBlank @Size(max = 50) String> muscleGroups,
         @NotNull Boolean isPrivate,
         @Nullable UUID templateId,
-        @Valid List<StartWorkoutExerciseItemDTO> exercises) {
+        @Valid @Size(max = 20) List<StartWorkoutExerciseItemDTO> exercises) {
 }

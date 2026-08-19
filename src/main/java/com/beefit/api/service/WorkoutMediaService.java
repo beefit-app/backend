@@ -23,6 +23,8 @@ import javax.imageio.stream.ImageInputStream;
 import java.util.Iterator;
 import java.util.Locale;
 import java.util.UUID;
+import java.io.ByteArrayOutputStream;
+import java.awt.Graphics2D;
 
 @Service
 @RequiredArgsConstructor
@@ -30,6 +32,7 @@ public class WorkoutMediaService {
     private static final long MAX_FILE_SIZE = 10 * 1024 * 1024;
     private static final int MAX_IMAGE_DIMENSION = 4096;
     private static final long MAX_IMAGE_PIXELS = 16_000_000;
+    private static final long MAX_MEDIA_PER_USER = 100;
     private static final int MAX_PENDING_UPLOADS = 15;
     private final WorkoutMediaRepository repository;
     private final PostRepository postRepository;
@@ -39,16 +42,18 @@ public class WorkoutMediaService {
         if (file.isEmpty() || file.getSize() > MAX_FILE_SIZE) {
             throw new IllegalArgumentException("Envie uma imagem de até 10 MB.");
         }
-        long pendingCount = repository.countByOwnerIdAndConsumedFalse(user.getId());
-        if (pendingCount >= MAX_PENDING_UPLOADS) {
+        if (repository.countByOwnerId(user.getId()) >= MAX_MEDIA_PER_USER) {
+            throw new IllegalArgumentException("Limite de mídias atingido. Exclua mídias antigas antes de enviar outra.");
+        }
+        if (repository.countByOwnerIdAndConsumedFalse(user.getId()) >= MAX_PENDING_UPLOADS) {
             throw new IllegalArgumentException("Você atingiu o limite de fotos pendentes. Finalize ou descarte as anteriores antes de novos envios.");
         }
-        CleanImageData cleanImage = processAndSanitizeImage(file.getBytes());
+        ProcessedImage processed = inspectAndNormalizeImage(file.getBytes());
         WorkoutMedia media = new WorkoutMedia();
         media.setOwner(user);
-        media.setContent(cleanImage.content());
-        media.setContentType(cleanImage.contentType());
-        media.setFileName(sanitizeFileName(file.getOriginalFilename(), cleanImage.format()));
+        media.setContent(processed.content());
+        media.setContentType(processed.contentType());
+        media.setFileName(sanitizeFileName(file.getOriginalFilename(), processed.format()));
         WorkoutMedia saved = repository.save(media);
         return new WorkoutMediaResponseDTO(saved.getId(), "/api/media/" + saved.getId());
     }
@@ -74,15 +79,27 @@ public class WorkoutMediaService {
 
     public void deleteAllForOwner(UUID userId) { repository.deleteByOwnerId(userId); }
 
+    public void releasePreviousProfileMedia(String previousPath, String newPath, UUID userId) {
+        if (previousPath == null || previousPath.equals(newPath) || !previousPath.startsWith("/api/media/")) return;
+        try {
+            UUID mediaId = UUID.fromString(previousPath.substring(previousPath.lastIndexOf('/') + 1));
+            if (!postRepository.existsByPhotoMediaId(mediaId)) {
+                repository.findByIdAndOwnerId(mediaId, userId).ifPresent(repository::delete);
+            }
+        } catch (IllegalArgumentException ignored) {
+            // Referências legadas ou externas não pertencem ao armazenamento interno.
+        }
+    }
+
     @Scheduled(fixedDelay = 3_600_000)
     public void cleanupOrphanedMedia() {
         repository.deleteAll(repository.findByConsumedFalseAndCreatedAtBefore(java.time.LocalDateTime.now().minusHours(24)));
     }
 
-    private record CleanImageData(byte[] content, String contentType, String format) {}
+    private record ProcessedImage(byte[] content, String contentType, String format) {}
 
-    private CleanImageData processAndSanitizeImage(byte[] rawContent) throws IOException {
-        try (ImageInputStream input = ImageIO.createImageInputStream(new ByteArrayInputStream(rawContent))) {
+    private ProcessedImage inspectAndNormalizeImage(byte[] content) throws IOException {
+        try (ImageInputStream input = ImageIO.createImageInputStream(new ByteArrayInputStream(content))) {
             Iterator<ImageReader> readers = ImageIO.getImageReaders(input);
             if (!readers.hasNext()) throw new IllegalArgumentException("Envie uma imagem JPEG ou PNG válida.");
             ImageReader reader = readers.next();
@@ -101,26 +118,17 @@ public class WorkoutMediaService {
                 BufferedImage image = reader.read(0);
                 if (image == null) throw new IllegalArgumentException("Imagem inválida.");
 
-                boolean isPng = format.equals("png");
-                String canonicalFormat = isPng ? "png" : "jpeg";
-                String contentType = isPng ? "image/png" : "image/jpeg";
-
-                java.io.ByteArrayOutputStream outputStream = new java.io.ByteArrayOutputStream();
-                if (isPng) {
-                    ImageIO.write(image, "png", outputStream);
-                } else {
-                    BufferedImage rgbImage;
-                    if (image.getType() == BufferedImage.TYPE_INT_RGB || image.getType() == BufferedImage.TYPE_3BYTE_BGR) {
-                        rgbImage = image;
-                    } else {
-                        rgbImage = new BufferedImage(image.getWidth(), image.getHeight(), BufferedImage.TYPE_INT_RGB);
-                        var g = rgbImage.createGraphics();
-                        g.drawImage(image, 0, 0, java.awt.Color.WHITE, null);
-                        g.dispose();
-                    }
-                    ImageIO.write(rgbImage, "jpeg", outputStream);
+                String outputFormat = format.equals("png") ? "png" : "jpeg";
+                BufferedImage normalized = image;
+                if (outputFormat.equals("jpeg") && image.getColorModel().hasAlpha()) {
+                    normalized = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+                    Graphics2D graphics = normalized.createGraphics();
+                    graphics.drawImage(image, 0, 0, null);
+                    graphics.dispose();
                 }
-                return new CleanImageData(outputStream.toByteArray(), contentType, canonicalFormat);
+                ByteArrayOutputStream output = new ByteArrayOutputStream();
+                if (!ImageIO.write(normalized, outputFormat, output)) throw new IllegalArgumentException("Imagem inválida.");
+                return new ProcessedImage(output.toByteArray(), outputFormat.equals("png") ? "image/png" : "image/jpeg", outputFormat);
             } finally {
                 reader.dispose();
             }
@@ -153,7 +161,11 @@ public class WorkoutMediaService {
         }
 
         String mediaPath = "/api/media/" + mediaId;
-        if (userRepository.existsByProfilePicture(mediaPath)) {
+        if (viewer.getRole() == UserRole.ADMIN && userRepository.existsByProfilePicture(mediaPath)) {
+            return media;
+        }
+
+        if (userRepository.existsVisibleProfilePicture(mediaPath, viewer.getId())) {
             return media;
         }
 

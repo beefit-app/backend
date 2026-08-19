@@ -4,6 +4,7 @@ import com.beefit.api.controller.AdminDashboardController;
 import com.beefit.api.controller.AdminUserController;
 import com.beefit.api.controller.AdminWorkoutController;
 import com.beefit.api.controller.WorkoutMediaController;
+import com.beefit.api.controller.AuthController;
 import com.beefit.api.domain.AuthSession;
 import com.beefit.api.domain.User;
 import com.beefit.api.domain.enums.UserRole;
@@ -16,6 +17,9 @@ import com.beefit.api.service.TokenService;
 import com.beefit.api.service.WorkoutModerationService;
 import com.beefit.api.service.WorkoutMediaService;
 import com.beefit.api.service.RateLimitService;
+import com.beefit.api.service.AuthService;
+import com.beefit.api.service.LegalConsentService;
+import com.beefit.api.mapper.RegisterMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,12 +39,14 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 
 @WebMvcTest(controllers = {
         AdminDashboardController.class,
         AdminUserController.class,
         AdminWorkoutController.class,
-        WorkoutMediaController.class
+        WorkoutMediaController.class,
+        AuthController.class
 })
 @Import({SecurityConfiguration.class, SecurityFilter.class})
 class AdminEndpointSecurityTest {
@@ -75,6 +81,15 @@ class AdminEndpointSecurityTest {
     @MockitoBean
     private RateLimitService rateLimitService;
 
+    @MockitoBean
+    private AuthService authService;
+
+    @MockitoBean
+    private LegalConsentService legalConsentService;
+
+    @MockitoBean
+    private RegisterMapper registerMapper;
+
     private User commonUser;
     private User bannedAdmin;
 
@@ -91,6 +106,15 @@ class AdminEndpointSecurityTest {
             mockMvc.perform(request.header("Authorization", "Bearer common-token"))
                     .andExpect(status().isForbidden());
         }
+    }
+
+    @Test
+    void authenticatedCommonUserGetsAccessDeniedContractInsteadOfAuthenticationFailure() throws Exception {
+        mockValidToken("common@example.com", commonUser);
+        mockMvc.perform(get("/api/admin/dashboard").header("Authorization", "Bearer common-token"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403))
+                .andExpect(jsonPath("$.error").value("ACCESS_DENIED"));
     }
 
     @Test
@@ -116,6 +140,14 @@ class AdminEndpointSecurityTest {
     void mediaEndpointRequiresAuthentication() throws Exception {
         mockMvc.perform(get("/api/media/{id}", UUID.randomUUID()))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void legalVersionsArePublicForRegistrationScreen() throws Exception {
+        when(legalConsentService.termsVersion()).thenReturn("terms-v1");
+        when(legalConsentService.privacyVersion()).thenReturn("privacy-v1");
+        mockMvc.perform(get("/auth/legal-versions"))
+                .andExpect(status().isOk());
     }
 
     @Test

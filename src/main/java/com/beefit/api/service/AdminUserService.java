@@ -3,6 +3,8 @@ package com.beefit.api.service;
 import com.beefit.api.domain.User;
 import com.beefit.api.dto.user.BannedUserResponseDTO;
 import com.beefit.api.exception.user.UserNotFoundException;
+import com.beefit.api.exception.user.PermissionException;
+import com.beefit.api.domain.enums.UserRole;
 import com.beefit.api.mapper.BanMapper;
 import com.beefit.api.repository.UserRepository;
 import com.beefit.api.utils.log.LogAudit;
@@ -35,9 +37,12 @@ public class AdminUserService {
 
     @Transactional
     @LogAudit(action = "BAN_USER", description = "Banimento de usuário por violação de termos.")
-    public BannedUserResponseDTO banUserForDays(UUID id, Integer banDays){
+    public BannedUserResponseDTO banUserForDays(UUID actingAdminId, UUID id, Integer banDays){
 
         User user = userRepository.findById(id).orElseThrow(UserNotFoundException::new);
+        if (actingAdminId.equals(id) || user.getRole() == UserRole.ADMIN) {
+            throw new PermissionException("Contas administrativas não podem ser banidas por esta operação.");
+        }
         int days = banDays == null || banDays < 1 ? 7 : banDays;
 
         // Pra garantir que ele não tente somar dias em um valor que era nulo

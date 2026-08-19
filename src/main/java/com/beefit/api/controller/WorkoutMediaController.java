@@ -20,6 +20,10 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.util.UUID;
+import java.time.Duration;
+import java.security.MessageDigest;
+import java.util.HexFormat;
+import org.springframework.http.CacheControl;
 
 @RestController
 @RequestMapping("/api/media")
@@ -45,7 +49,18 @@ public class WorkoutMediaController {
     @GetMapping("/{mediaId}")
     public ResponseEntity<ByteArrayResource> get(@AuthenticationPrincipal User user, @PathVariable UUID mediaId) {
         WorkoutMedia media = workoutMediaService.getVisible(mediaId, user);
+        String etag = etag(media.getContent());
         return ResponseEntity.ok().contentType(MediaType.parseMediaType(media.getContentType()))
+                .cacheControl(CacheControl.maxAge(Duration.ofHours(1)).cachePrivate())
+                .eTag(etag)
                 .body(new ByteArrayResource(media.getContent()));
+    }
+
+    private String etag(byte[] content) {
+        try {
+            return "\"" + HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(content)) + "\"";
+        } catch (java.security.NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 indisponível.", exception);
+        }
     }
 }

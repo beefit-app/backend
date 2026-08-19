@@ -67,6 +67,9 @@ import com.beefit.api.service.UserService;
 import com.beefit.api.service.WorkoutModerationService;
 import com.beefit.api.service.WorkoutSessionService;
 import com.beefit.api.service.WorkoutTemplateService;
+import com.beefit.api.service.LegalConsentService;
+import com.beefit.api.service.ExerciseCatalogService;
+import com.beefit.api.dto.exercise.CatalogExerciseResponseDTO;
 
 @ExtendWith(MockitoExtension.class)
 class ControllerUnitTest {
@@ -104,6 +107,12 @@ class ControllerUnitTest {
     @Mock
     private CatalogExerciseRepository catalogExerciseRepository;
 
+    @Mock
+    private LegalConsentService legalConsentService;
+
+    @Mock
+    private ExerciseCatalogService exerciseCatalogService;
+
     @AfterEach
     void tearDown() {
         RequestContextHolder.resetRequestAttributes();
@@ -111,11 +120,11 @@ class ControllerUnitTest {
 
     @Test
     void authLoginReturnsOkWithLoginResponse() {
-        AuthController controller = new AuthController(authService, registerMapper, userResponseMapper, rateLimitService);
+        AuthController controller = new AuthController(authService, registerMapper, userResponseMapper, rateLimitService, legalConsentService);
         LoginResponseDTO loginResponse = new LoginResponseDTO(
                 "token",
                 "refresh-token",
-                new UserResponseDTO(UUID.randomUUID(), "Test User", "testuser", "test@example.com", 80.0f, 4));
+                new UserResponseDTO(UUID.randomUUID(), "Test User", "testuser", "test@example.com", 80.0f, 4, com.beefit.api.domain.enums.UserRole.USER));
 
         when(authService.login("test@example.com", "secret", "device-1")).thenReturn(loginResponse);
 
@@ -129,13 +138,14 @@ class ControllerUnitTest {
 
     @Test
     void authRefreshReturnsNewTokens() {
-        AuthController controller = new AuthController(authService, registerMapper, userResponseMapper, rateLimitService);
+        AuthController controller = new AuthController(authService, registerMapper, userResponseMapper, rateLimitService, legalConsentService);
         RefreshTokenResponseDTO refreshResponse = new RefreshTokenResponseDTO("new-access", "new-refresh");
 
         when(authService.refreshSession("refresh-token", "device-1")).thenReturn(refreshResponse);
 
+        MockHttpServletRequest request = new MockHttpServletRequest();
         ResponseEntity<RefreshTokenResponseDTO> response = controller.refresh(
-                new RefreshTokenRequestDTO("refresh-token", "device-1"));
+                new RefreshTokenRequestDTO("refresh-token", "device-1"), request);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(refreshResponse, response.getBody());
@@ -143,7 +153,7 @@ class ControllerUnitTest {
 
     @Test
     void authLogoutReturnsNoContent() {
-        AuthController controller = new AuthController(authService, registerMapper, userResponseMapper, rateLimitService);
+        AuthController controller = new AuthController(authService, registerMapper, userResponseMapper, rateLimitService, legalConsentService);
 
         ResponseEntity<Void> response = controller.logout(new LogoutRequestDTO("refresh-token", "device-1"));
 
@@ -153,9 +163,9 @@ class ControllerUnitTest {
 
     @Test
     void authMeMapsAuthenticatedUser() {
-        AuthController controller = new AuthController(authService, registerMapper, userResponseMapper, rateLimitService);
+        AuthController controller = new AuthController(authService, registerMapper, userResponseMapper, rateLimitService, legalConsentService);
         User user = user();
-        UserResponseDTO dto = new UserResponseDTO(user.getId(), user.getFullName(), user.getUsername(), user.getEmail(), user.getBodyWeight(), user.getWeeklyGoal());
+        UserResponseDTO dto = new UserResponseDTO(user.getId(), user.getFullName(), user.getUsername(), user.getEmail(), user.getBodyWeight(), user.getWeeklyGoal(), user.getRole());
 
         when(userResponseMapper.toDto(user)).thenReturn(dto);
 
@@ -183,7 +193,7 @@ class ControllerUnitTest {
                 new UpdateAccountSettingsRequestDTO(Boolean.TRUE));
         ResponseEntity<Void> deleteResponse = controller.deleteAccount(
                 user,
-                "current");
+                new DeleteUserRequestDTO("current"));
 
         assertEquals(HttpStatus.NO_CONTENT, updateResponse.getStatusCode());
         assertEquals(HttpStatus.NO_CONTENT, passwordResponse.getStatusCode());
@@ -280,26 +290,24 @@ class ControllerUnitTest {
 
     @Test
     void exerciseCatalogControllerListsAndFetchesExercises() {
-        ExerciseCatalogController controller = new ExerciseCatalogController(catalogExerciseRepository);
+        ExerciseCatalogController controller = new ExerciseCatalogController(exerciseCatalogService);
         CatalogExercise exercise = new CatalogExercise();
         UUID exerciseId = UUID.randomUUID();
         exercise.setId(exerciseId);
         exercise.setName("Supino");
         PageRequest pageable = PageRequest.of(0, 20);
-        Page<CatalogExercise> page = new PageImpl<>(List.of(exercise), pageable, 1);
+        CatalogExerciseResponseDTO exerciseDto = new CatalogExerciseResponseDTO(exerciseId, "Supino", null, null, null, null, null);
+        Page<CatalogExerciseResponseDTO> page = new PageImpl<>(List.of(exerciseDto), pageable, 1);
 
-        when(catalogExerciseRepository.findByNameContainingIgnoreCase("supino", pageable)).thenReturn(page);
-        when(catalogExerciseRepository.findById(exerciseId)).thenReturn(Optional.of(exercise));
-        when(catalogExerciseRepository.findById(UUID.fromString("00000000-0000-0000-0000-000000000000"))).thenReturn(Optional.empty());
+        when(exerciseCatalogService.list("supino", pageable)).thenReturn(page);
+        when(exerciseCatalogService.get(exerciseId)).thenReturn(exerciseDto);
 
-        ResponseEntity<Page<CatalogExercise>> listResponse = controller.listExercises("supino", pageable);
-        ResponseEntity<CatalogExercise> foundResponse = controller.getExerciseById(exerciseId);
-        ResponseEntity<CatalogExercise> missingResponse = controller.getExerciseById(UUID.fromString("00000000-0000-0000-0000-000000000000"));
+        ResponseEntity<Page<CatalogExerciseResponseDTO>> listResponse = controller.listExercises("supino", pageable);
+        ResponseEntity<CatalogExerciseResponseDTO> foundResponse = controller.getExerciseById(exerciseId);
 
         assertEquals(HttpStatus.OK, listResponse.getStatusCode());
         assertEquals(page, listResponse.getBody());
         assertEquals(HttpStatus.OK, foundResponse.getStatusCode());
-        assertEquals(HttpStatus.NOT_FOUND, missingResponse.getStatusCode());
     }
 
     @Test
@@ -386,11 +394,14 @@ class ControllerUnitTest {
         Page<User> users = new PageImpl<>(List.of(user), pageable, 1);
 
         when(adminUserService.searchUsers("test", pageable)).thenReturn(users);
-        when(adminUserService.banUserForDays(user.getId(), 7)).thenReturn(bannedDto);
+        User admin = user();
+        admin.setId(UUID.randomUUID());
+        admin.setRole(com.beefit.api.domain.enums.UserRole.ADMIN);
+        when(adminUserService.banUserForDays(admin.getId(), user.getId(), 7)).thenReturn(bannedDto);
         when(adminUserService.unbanUser(user.getId())).thenReturn(unbannedDto);
 
         ResponseEntity<Page<AdminUserResponseDTO>> searchResponse = controller.searchUsers("test", pageable);
-        ResponseEntity<BannedUserResponseDTO> banResponse = controller.banUser(user.getId(), 7);
+        ResponseEntity<BannedUserResponseDTO> banResponse = controller.banUser(admin, user.getId(), 7);
         ResponseEntity<BannedUserResponseDTO> unbanResponse = controller.unbanUser(user.getId());
 
         assertEquals(HttpStatus.OK, searchResponse.getStatusCode());
@@ -416,7 +427,7 @@ class ControllerUnitTest {
                 1800,
                 1200.0);
         Page<AdminPostResponseDTO> posts = new PageImpl<>(List.of(postDto), pageable, 1);
-        UpdatePostMetadataDTO update = new UpdatePostMetadataDTO("Novo titulo", null);
+        UpdatePostMetadataDTO update = new UpdatePostMetadataDTO("Novo titulo");
 
         when(workoutModerationService.listAllPosts(pageable)).thenReturn(posts);
 
