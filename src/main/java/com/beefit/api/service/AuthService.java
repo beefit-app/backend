@@ -48,6 +48,12 @@ public class AuthService implements UserDetailsService {
     private final AuthenticationConfiguration authenticationConfiguration;
     private final SecureRandom secureRandom = new SecureRandom();
 
+    @org.springframework.beans.factory.annotation.Value("${beefit.beta.enabled:false}")
+    private boolean betaEnabled;
+
+    @org.springframework.beans.factory.annotation.Value("${beefit.beta.allowed-emails:}")
+    private String[] allowedEmails;
+
     @Override
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
         UserDetails user = userRepository.findByEmail(email);
@@ -72,6 +78,23 @@ public class AuthService implements UserDetailsService {
 
     @Transactional
     public void register(User registered) throws UsernameAlreadyInUse, EmailAlreadyInUse {
+
+        if (betaEnabled) {
+            String email = registered.getEmail() == null ? "" : registered.getEmail().trim().toLowerCase(java.util.Locale.ROOT);
+            boolean isAllowed = false;
+            if (allowedEmails != null) {
+                for (String allowed : allowedEmails) {
+                    if (allowed != null && !allowed.isBlank() && allowed.trim().equalsIgnoreCase(email)) {
+                        isAllowed = true;
+                        break;
+                    }
+                }
+            }
+            if (!isAllowed) {
+                throw new com.beefit.api.exception.user.RegistrationRestrictedException(
+                        "O cadastro está restrito a participantes autorizados durante o beta.");
+            }
+        }
 
         if(userRepository.findByUsername(registered.getUsername()).isPresent()){
             throw new UsernameAlreadyInUse("Esse nome de usuário já está em uso.");

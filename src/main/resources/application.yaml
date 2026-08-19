@@ -35,6 +35,9 @@ spring:
         wait: always
 
 beefit:
+  beta:
+    enabled: ${BEEFIT_BETA_MODE:false}
+    allowed-emails: ${BEEFIT_BETA_ALLOWED_EMAILS:}
   business:
     time-zone: ${BEEFIT_BUSINESS_TIME_ZONE:America/Sao_Paulo}
   security:
@@ -45,4 +48,3 @@ beefit:
     token:
       secret: ${JWT_SECRET}
 
-# Lembrar de Adicionar Configurações para o Módulo de Segurança (JWT)

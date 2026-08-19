@@ -23,6 +23,7 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import com.beefit.api.domain.AuthSession;
+import com.beefit.api.domain.Inventory;
 import com.beefit.api.domain.User;
 import com.beefit.api.domain.enums.UserRole;
 import com.beefit.api.dto.auth.LoginResponseDTO;
@@ -214,6 +215,38 @@ class AuthServiceTest {
         assertNotNull(currentSession.getLastUsedAt());
     }
 
+    @Test
+    void registerThrowsWhenBetaEnabledAndEmailNotInAllowlist() {
+        org.springframework.test.util.ReflectionTestUtils.setField(authService, "betaEnabled", true);
+        org.springframework.test.util.ReflectionTestUtils.setField(authService, "allowedEmails", new String[]{"allowed@example.com"});
+
+        User user = user();
+        user.setEmail("unauthorized@example.com");
+
+        var ex = assertThrows(com.beefit.api.exception.user.RegistrationRestrictedException.class,
+                () -> authService.register(user));
+        org.junit.jupiter.api.Assertions.assertTrue(ex.getMessage().contains("restrito"));
+    }
+
+    @Test
+    void registerSucceedsWhenBetaEnabledAndEmailInAllowlist() {
+        org.springframework.test.util.ReflectionTestUtils.setField(authService, "betaEnabled", true);
+        org.springframework.test.util.ReflectionTestUtils.setField(authService, "allowedEmails", new String[]{"allowed@example.com"});
+
+        User user = user();
+        user.setEmail("ALLOWED@EXAMPLE.COM");
+
+        when(userRepository.findByUsername(user.getUsername())).thenReturn(Optional.empty());
+        when(userRepository.findByEmail(user.getEmail())).thenReturn(null);
+        when(passwordEncoder.encode(user.getPasswordHash())).thenReturn("encoded-password");
+        when(userRepository.save(user)).thenReturn(user);
+
+        authService.register(user);
+
+        verify(userRepository).save(user);
+        verify(inventoryRepository).save(org.mockito.ArgumentMatchers.any(Inventory.class));
+    }
+
     private User user() {
         User user = new User();
         user.setId(UUID.randomUUID());
@@ -227,3 +260,4 @@ class AuthServiceTest {
         return user;
     }
 }
+

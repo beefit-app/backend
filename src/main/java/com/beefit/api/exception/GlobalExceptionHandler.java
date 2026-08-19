@@ -54,6 +54,19 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(RegistrationRestrictedException.class)
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    public ErrorResponse handleRegistrationRestricted(RegistrationRestrictedException e, HttpServletRequest request) {
+        return new ErrorResponse(
+                LocalDateTime.now(),
+                HttpStatus.FORBIDDEN.value(),
+                "REGISTRATION_RESTRICTED",
+                e.getMessage(),
+                List.of(new ErrorCampo("email", e.getMessage())),
+                request.getRequestURI()
+        );
+    }
+
     @ExceptionHandler(InvalidSessionException.class)
     @ResponseStatus(HttpStatus.UNAUTHORIZED)
     public ErrorResponse handleInvalidSessionException(InvalidSessionException e, HttpServletRequest request) {
