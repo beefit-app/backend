@@ -16,4 +16,4 @@ WORKDIR /app
 COPY --from=build --chown=beefit:beefit /workspace/target/beefit-api-*.jar app.jar
 USER 10001
 EXPOSE 8080
-ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75.0", "-jar", "/app/app.jar"]
+ENTRYPOINT ["java", "-XX:+UseSerialGC", "-XX:MaxRAMPercentage=50.0", "-XX:MaxMetaspaceSize=128m", "-XX:ReservedCodeCacheSize=64m", "-Xss256k", "-jar", "/app/app.jar"]
