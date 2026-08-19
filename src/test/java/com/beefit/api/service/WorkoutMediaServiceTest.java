@@ -51,11 +51,7 @@ class WorkoutMediaServiceTest {
         media = new WorkoutMedia();
         media.setId(mediaId);
         media.setOwner(owner);
-<<<<<<< HEAD
-        org.mockito.Mockito.lenient().when(mediaRepository.findById(mediaId)).thenReturn(Optional.of(media));
-=======
         lenient().when(mediaRepository.findById(mediaId)).thenReturn(Optional.of(media));
->>>>>>> origin/feat/app-refining
     }
 
     @Test

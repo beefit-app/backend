@@ -254,8 +254,8 @@ class AuthServiceTest {
         User user = user();
         user.setEmail("ALLOWED@EXAMPLE.COM");
 
-        when(userRepository.findByUsername(user.getUsername())).thenReturn(Optional.empty());
-        when(userRepository.findByEmail(user.getEmail())).thenReturn(null);
+        when(userRepository.findByUsernameIgnoreCase(user.getUsername())).thenReturn(Optional.empty());
+        when(userRepository.findByEmailIgnoreCase("allowed@example.com")).thenReturn(null);
         when(passwordEncoder.encode(user.getPasswordHash())).thenReturn("encoded-password");
         when(userRepository.save(user)).thenReturn(user);
 

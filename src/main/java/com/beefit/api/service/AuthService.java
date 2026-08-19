@@ -77,6 +77,7 @@ public class AuthService implements UserDetailsService {
     }
 
     @Transactional
+    public void register(User registered) throws UsernameAlreadyInUse, EmailAlreadyInUse {
         registered.setEmail(normalizeEmail(registered.getEmail()));
         registered.setUsername(normalizeUsername(registered.getUsername()));
 
