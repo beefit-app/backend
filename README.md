@@ -210,16 +210,21 @@ Substitua o valor padrão por uma variável de ambiente real em ambientes além 
 
 As credenciais e volumes persistentes (postgres_data) estão isolados para evitar conflitos de permissões em ambientes Linux, utilizando a propriedade PGDATA apontando para uma subpasta dedicada.
 
-## Integração com o pgAdmin
+## Modo Beta e Restrição de Acesso (Deploy)
 
-O ambiente Docker Compose disponibiliza uma interface gráfica web para administração rápida do banco de dados.
+Para rodar a API em modo de **testes beta restritos** (desenvolvedores e convidados autorizados), utilize as variáveis de ambiente:
 
-### Acesso Local
-URL: http://localhost:8081
-E-mail padrão: admin@beefit.com
-Senha padrão: admin_password
-Host interno Docker: postgres
-Porta interna: 5432
+```bash
+# 1. Ativa a verificação de allowlist no cadastro
+BEEFIT_BETA_MODE=true
+
+# 2. Lista de e-mails autorizados para cadastro (separados por vírgula, sem distinção de maiúsculas/minúsculas)
+BEEFIT_BETA_ALLOWED_EMAILS=dev1@beefit.app,dev2@beefit.app,amigo1@gmail.com,amigo2@gmail.com
+```
+
+### Comportamento no Deploy:
+- **`BEEFIT_BETA_MODE=true`**: O endpoint `POST /auth/register` só aceita requisições com os e-mails informados em `BEEFIT_BETA_ALLOWED_EMAILS`. Qualquer tentativa externa de cadastro recebe resposta `403 FORBIDDEN` (`REGISTRATION_RESTRICTED`).
+- **`BEEFIT_BETA_MODE=false` (ou omitido)**: O cadastro público funciona normalmente e sem restrições (padrão de desenvolvimento e futuro lançamento aberto).
 
 ---
 
