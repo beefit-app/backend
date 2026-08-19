@@ -8,6 +8,12 @@ services:
     plan: free
     region: oregon
     branch: feat/deploy-render
+    # A instancia free tem 512 MB e 0.1 CPU. O MaxRAMPercentage=75 do Dockerfile
+    # nao deixa folga para metaspace e stacks e o container morre com SIGKILL,
+    # entao a JVM e reconfigurada aqui em vez de na imagem, que serve o local.
+    # SerialGC e TieredStopAtLevel=1 trocam vazao por consumo e tempo de boot.
+    dockerCommand: java -XX:MaxRAMPercentage=55.0 -XX:+UseSerialGC -XX:MaxMetaspaceSize=192m -XX:TieredStopAtLevel=1 -Xss512k -jar /app/app.jar
+
     # Sem healthCheckPath de proposito: o Render cai no probe TCP da porta.
     # ProductionHttpsFilter responde 426 a qualquer requisicao sem
     # X-Forwarded-Proto: https, e o probe HTTP interno do Render nao garante
@@ -52,7 +58,9 @@ services:
 
       # A instancia free tem 512 MB; o Postgres free tem poucas conexoes.
       - key: SERVER_TOMCAT_THREADS_MAX
-        value: "20"
+        value: "10"
+      - key: DB_POOL_SIZE
+        value: "3"
 
 databases:
   - name: beefit-db
