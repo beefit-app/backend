@@ -42,7 +42,14 @@ public class TokenService {
     @PostConstruct
     void validateConfiguration() {
         if (secret == null || secret.isBlank() || secret.getBytes(StandardCharsets.UTF_8).length < 32) {
-            throw new IllegalStateException("JWT_SECRET deve conter pelo menos 32 bytes aleatórios.");
+            // Ausente, em branco e curto demais eram indistinguiveis na mensagem, o que
+            // torna impossivel saber se a variavel chegou ao processo. O tamanho nao
+            // revela nada sobre o segredo em si.
+            String observado = secret == null
+                    ? "nenhum valor"
+                    : secret.getBytes(StandardCharsets.UTF_8).length + " bytes";
+            throw new IllegalStateException(
+                    "JWT_SECRET deve conter pelo menos 32 bytes aleatórios; recebido: " + observado + ".");
         }
         if (accessTokenDurationMinutes == null || accessTokenDurationMinutes < 1 || accessTokenDurationMinutes > 60) {
             throw new IllegalStateException("A validade do access token deve estar entre 1 e 60 minutos.");
