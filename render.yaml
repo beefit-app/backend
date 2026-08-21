@@ -1,5 +1,6 @@
-# Blueprint do ambiente de validacao no Render. Os valores marcados com
-# `sync: false` sao preenchidos no dashboard e nunca versionados aqui.
+# Blueprint do ambiente de validacao no Render, alimentado pela develop. Os
+# valores marcados com `sync: false` sao preenchidos no dashboard e nunca
+# versionados aqui.
 services:
   - type: web
     name: beefit-api
@@ -7,7 +8,7 @@ services:
     dockerfilePath: ./Dockerfile
     plan: free
     region: oregon
-    branch: feat/deploy-render
+    branch: develop
     # A instancia free tem 512 MB e 0.1 CPU. O MaxRAMPercentage=75 do Dockerfile
     # nao deixa folga para metaspace e stacks e o container morre com SIGKILL,
     # entao a JVM e reconfigurada aqui em vez de na imagem, que serve o local.
