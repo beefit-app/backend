@@ -35,19 +35,30 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Analisar dependências e filesystem
-        uses: aquasecurity/trivy-action@0.28.0
+      # Sem o scanner `vuln` de proposito: as dependencias Java sao cobertas com
+      # mais fidelidade no scan da imagem abaixo, que le o app.jar que de fato vai
+      # para producao, em vez de inferir do pom.xml.
+      #
+      # TRIVY_OFFLINE_SCAN e obrigatorio, e nao otimizacao: o analisador Java roda
+      # no walk de arquivos mesmo sem o scanner `vuln` e tenta resolver a arvore de
+      # BOMs do Spring Boot no Maven Central, incluindo POMs que o build nunca
+      # baixa. Isso devolve 429 com bloqueio de 30 minutos e derruba o job. A action
+      # nao expoe input para isso, so a variavel.
+      - name: Analisar segredos e configuração
+        uses: aquasecurity/trivy-action@v0.28.0
+        env:
+          TRIVY_OFFLINE_SCAN: "true"
         with:
           scan-type: fs
           scan-ref: .
-          scanners: vuln,secret,misconfig
+          scanners: secret,misconfig
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           exit-code: "1"
       - name: Construir imagem
         run: docker build --tag beefit-api:ci .
       - name: Analisar imagem
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.28.0
         with:
           image-ref: beefit-api:ci
           severity: HIGH,CRITICAL
