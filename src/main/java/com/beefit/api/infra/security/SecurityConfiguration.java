@@ -101,9 +101,10 @@ public class SecurityConfiguration {
                         .referrerPolicy(referrer -> referrer.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER))
                         .permissionsPolicy(permissions -> permissions.policy("camera=(), microphone=(), geolocation=()")))
 
-                .authorizeHttpRequests(authorize -> authorize
+                .authorizeHttpRequests(authorize -> {
                         // .requestMatchers(HttpMethod.POST, "/dashboard").hasRole("ADMIN")
                         // Rotas exclusivas de admin ou de autenticação devem ser adicionadas aqui
+                        authorize
                         .dispatcherTypeMatchers(DispatcherType.ASYNC).permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/login").permitAll()
@@ -112,8 +113,18 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.POST, "/auth/refresh").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/logout").permitAll()
                         .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
-                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
-                        .anyRequest().authenticated())
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN");
+
+                        // O schema OpenAPI alimenta a geracao dos tipos do frontend, que
+                        // transforma divergencia de contrato em erro de compilacao. Fica
+                        // fora de producao por dois motivos independentes: esta guarda e o
+                        // springdoc.api-docs.enabled=false do perfil prod.
+                        if (!isProduction()) {
+                            authorize.requestMatchers("/v3/api-docs", "/v3/api-docs/**").permitAll();
+                        }
+
+                        authorize.anyRequest().authenticated();
+                })
                 .addFilterBefore(securityFilter, UsernamePasswordAuthenticationFilter.class)
                 .build(); // Builda o Security Filter Chain (Cadeia de verificações para a autenticação)
     };
