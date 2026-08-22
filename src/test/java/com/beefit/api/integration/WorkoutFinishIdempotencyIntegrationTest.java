@@ -4,8 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.when;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -70,6 +70,11 @@ class WorkoutFinishIdempotencyIntegrationTest {
     @Autowired private InventoryRepository inventoryRepository;
     @Autowired private PostRepository postRepository;
     @Autowired private EntityManager entityManager;
+    // O servico normaliza o finishedAt recebido para o fuso de negocio antes de
+    // compara-lo com o startedAt gravado. Montar as datas do teste com o relogio
+    // padrao da JVM so funciona em maquina que ja esteja nesse fuso: em runner UTC
+    // o fim caia 3h antes do inicio e a validacao recusava.
+    @Autowired private Clock businessClock;
 
     @MockitoBean private SseService sseService;
     @MockitoBean private FriendshipService friendshipService;
@@ -125,10 +130,7 @@ class WorkoutFinishIdempotencyIntegrationTest {
         workout = workoutSessionRepository.saveAndFlush(workout);
         when(friendshipService.getFriends(user.getId())).thenReturn(Optional.of(List.of()));
 
-        String finishedAt = LocalDateTime.now()
-                .atZone(ZoneId.systemDefault())
-                .toOffsetDateTime()
-                .toString();
+        String finishedAt = agoraNoFusoDeNegocio();
         FinishWorkoutSnapshotRequestDTO request = new FinishWorkoutSnapshotRequestDTO(
                 finishedAt,
                 List.of("peito"),
@@ -205,10 +207,19 @@ class WorkoutFinishIdempotencyIntegrationTest {
         return workout;
     }
 
+    /**
+     * O mesmo instante de agora, com o offset do fuso de negocio. O servico
+     * converte o valor recebido para esse fuso antes de comparar com o startedAt,
+     * entao montar a data com o fuso da JVM tornava o teste dependente da maquina.
+     */
+    private String agoraNoFusoDeNegocio() {
+        return businessClock.instant().atZone(businessClock.getZone()).toOffsetDateTime().toString();
+    }
+
     private WorkoutSession newWorkoutWithoutExercises(User user) {
         WorkoutSession workout = new WorkoutSession();
         workout.setUser(user);
-        workout.setStartedAt(LocalDateTime.now().minusMinutes(35));
+        workout.setStartedAt(LocalDateTime.now(businessClock).minusMinutes(35));
         workout.setMuscleGroupsList(List.of(MuscleGroups.CHEST));
         workout.setShouldPostWorkout(false);
         workout.setIsPrivate(false);
@@ -220,10 +231,7 @@ class WorkoutFinishIdempotencyIntegrationTest {
             WorkoutSession workout, CatalogExercise catalogExercise, String title) {
         SessionExercise exercise = workout.getExercises().getFirst();
         com.beefit.api.domain.Set set = exercise.getSets().getFirst();
-        String finishedAt = LocalDateTime.now()
-                .atZone(ZoneId.systemDefault())
-                .toOffsetDateTime()
-                .toString();
+        String finishedAt = agoraNoFusoDeNegocio();
         return new FinishWorkoutSnapshotRequestDTO(
                 finishedAt,
                 List.of("peito"),
