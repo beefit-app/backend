@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.time.YearMonth;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -218,6 +219,19 @@ class ControllerUnitTest {
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(dto, response.getBody());
+    }
+
+    @Test
+    void profileTrainingDaysPassesAuthenticatedViewerToVisibilityCheck() {
+        ProfileController controller = new ProfileController();
+        ReflectionTestUtils.setField(controller, "userService", userService);
+        User viewer = user();
+        when(userService.getPublicTrainingDays(viewer, "friend", YearMonth.of(2026, 8))).thenReturn(java.util.List.of());
+
+        ResponseEntity<List<Integer>> response = controller.getUserTrainingDays(viewer, "friend", "2026-08");
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        verify(userService).getPublicTrainingDays(viewer, "friend", YearMonth.of(2026, 8));
     }
 
     @Test

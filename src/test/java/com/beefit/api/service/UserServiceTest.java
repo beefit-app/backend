@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 
 import java.util.Optional;
 import java.util.UUID;
+import java.time.YearMonth;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,6 +35,8 @@ import com.beefit.api.repository.UserRepository;
 import com.beefit.api.repository.WorkoutSessionRepository;
 import com.beefit.api.domain.enums.WorkoutStatus;
 import com.beefit.api.dto.social.SocialEventDTO;
+import com.beefit.api.dto.user.PublicUserProfileResponseDTO;
+import com.beefit.api.service.FriendshipService.FriendshipRelation;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
@@ -108,6 +111,56 @@ class UserServiceTest {
         when(userRepository.findById(userId)).thenReturn(Optional.empty());
 
         assertThrows(UserNotFoundException.class, () -> userService.getUserProfile(userId));
+    }
+
+    @Test
+    void getPublicUserProfileUsesTheSameValidWorkoutCountAsTheOwnProfile() {
+        User viewer = user();
+        User target = user();
+        UUID targetId = UUID.randomUUID();
+        target.setId(targetId);
+        target.setUsername("otheruser");
+        when(userRepository.findByUsernameIgnoreCase("otheruser")).thenReturn(Optional.of(target));
+        when(friendshipService.getRelationship(viewer, target)).thenReturn(new FriendshipRelation("FRIEND", UUID.randomUUID()));
+        when(workoutSessionRepository.countValidFinishedWorkoutsByUserId(
+                targetId, WorkoutStatus.FINISHED, 1800)).thenReturn(4L);
+
+        PublicUserProfileResponseDTO response = userService.getPublicUserProfile(viewer, "otheruser");
+
+        assertEquals(4, response.totalWorkouts());
+    }
+
+    @Test
+    void getPublicTrainingDaysRejectsUsersWithoutAnAcceptedFriendship() {
+        User viewer = user();
+        User target = user();
+        target.setId(UUID.randomUUID());
+        target.setUsername("otheruser");
+        when(userRepository.findByUsernameIgnoreCase("otheruser")).thenReturn(Optional.of(target));
+        when(friendshipService.getRelationship(viewer, target)).thenReturn(new FriendshipRelation("REQUEST_SENT", UUID.randomUUID()));
+
+        assertThrows(UserNotFoundException.class,
+                () -> userService.getPublicTrainingDays(viewer, "otheruser", YearMonth.of(2026, 8)));
+        verify(workoutSessionRepository, never()).findFinishedDaysByUserAndMonth(
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void getPublicTrainingDaysAllowsAcceptedFriends() {
+        User viewer = user();
+        User target = user();
+        UUID targetId = UUID.randomUUID();
+        target.setId(targetId);
+        target.setUsername("otheruser");
+        when(userRepository.findByUsernameIgnoreCase("otheruser")).thenReturn(Optional.of(target));
+        when(friendshipService.getRelationship(viewer, target)).thenReturn(new FriendshipRelation("FRIEND", UUID.randomUUID()));
+        when(workoutSessionRepository.findFinishedDaysByUserAndMonth(
+                org.mockito.ArgumentMatchers.eq(targetId), org.mockito.ArgumentMatchers.eq(WorkoutStatus.FINISHED),
+                org.mockito.ArgumentMatchers.eq(1800), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(java.util.List.of());
+
+        assertEquals(java.util.List.of(), userService.getPublicTrainingDays(viewer, "otheruser", YearMonth.of(2026, 8)));
     }
 
     @Test

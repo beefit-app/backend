@@ -87,7 +87,8 @@ public class UserService {
                 user.getProfilePicture(),
                 user.getOffensiveHoneys(),
                 user.getCardsCount(),
-                user.getWorkoutsCount(),
+                Math.toIntExact(workoutSessionRepository.countValidFinishedWorkoutsByUserId(
+                        user.getId(), WorkoutStatus.FINISHED, MIN_VALID_WORKOUT_DURATION_SECONDS)),
                 relationship.status(),
                 relationship.friendshipId(),
                 user.hasDeveloperBadge());
@@ -99,8 +100,14 @@ public class UserService {
                 month.atDay(1).atStartOfDay(), month.plusMonths(1).atDay(1).atStartOfDay());
     }
 
-    public java.util.List<java.time.LocalDateTime> getPublicTrainingDays(String username, YearMonth month) {
+    public java.util.List<java.time.LocalDateTime> getPublicTrainingDays(User viewer, String username, YearMonth month) {
         User user = findVisibleUserByUsername(username);
+        if (!viewer.getId().equals(user.getId())
+                && !"FRIEND".equals(friendshipService.getRelationship(viewer, user).status())) {
+            // Mantém a mesma semântica dos posts: não revelar se o alvo existe
+            // nem seu histórico de atividade fora de uma amizade aceita.
+            throw new UserNotFoundException();
+        }
         return getTrainingDays(user.getId(), month);
     }
 

@@ -41,8 +41,8 @@ public interface HiveRepository extends JpaRepository<Hive, UUID> {
             "LEFT JOIN WorkoutSession ws ON ws.user = m " +
             "   AND ws.status = :status " +
             "   AND ws.durationSeconds >= :minimumDurationSeconds " +
-            "   AND ws.startedAt >= :startInclusive " +
-            "   AND ws.startedAt < :endExclusive " +
+            "   AND ws.finishedAt >= :startInclusive " +
+            "   AND ws.finishedAt < :endExclusive " +
             "   AND EXISTS (SELECT 1 FROM SessionExercise se JOIN se.sets s " +
             "               WHERE se.workoutSession = ws AND s.reps > 0) " +
             "WHERE h.id = :hiveId " +
@@ -64,8 +64,8 @@ public interface HiveRepository extends JpaRepository<Hive, UUID> {
             "LEFT JOIN WorkoutSession ws ON ws.user = m " +
             "   AND ws.status = :status " +
             "   AND ws.durationSeconds >= :minimumDurationSeconds " +
-            "   AND ws.startedAt >= :startInclusive " +
-            "   AND ws.startedAt < :endExclusive " +
+            "   AND ws.finishedAt >= :startInclusive " +
+            "   AND ws.finishedAt < :endExclusive " +
             "   AND EXISTS (SELECT 1 FROM SessionExercise se JOIN se.sets s " +
             "               WHERE se.workoutSession = ws AND s.reps > 0) " +
             "WHERE h.id = :hiveId " +

@@ -46,10 +46,11 @@ public class ProfileController {
     }
 
     @GetMapping("/{username}/training-days")
-    public ResponseEntity<List<Integer>> getUserTrainingDays(@PathVariable String username,
+    public ResponseEntity<List<Integer>> getUserTrainingDays(@AuthenticationPrincipal User user,
+            @PathVariable String username,
             @RequestParam String month) {
         YearMonth target = YearMonth.parse(month);
-        List<java.time.LocalDateTime> rawDays = userService.getPublicTrainingDays(username, target);
+        List<java.time.LocalDateTime> rawDays = userService.getPublicTrainingDays(user, username, target);
         List<Integer> days = rawDays.stream()
                 .map(ldt -> ldt.toLocalDate().getDayOfMonth())
                 .distinct()
