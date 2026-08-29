@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -383,13 +384,11 @@ class WorkoutSessionServiceTest {
         CardGeneratedEventDTO event = (CardGeneratedEventDTO) eventCaptor.getValue().dataSocialEvent();
         assertEquals(workoutId, event.workoutId());
         assertEquals(generatedCard.getId(), event.cardId());
-        assertEquals(newCatalogExercise.getId(), event.exerciseId());
-        assertEquals(newCatalogExercise.getName(), event.exerciseName());
-        assertEquals(80.0, event.bestSetWeightKg());
-        assertEquals(5, event.bestSetReps());
+        assertEquals(93.33, event.attackPower());
         assertEquals("RARE", event.rarity());
         assertEquals("peito", event.muscleGroup());
         assertEquals(Map.of("chest", 4, "deltoids", 2, "triceps", 2), event.muscleIntensities());
+        assertTrue(event.isPersonalRecord());
 
         WorkoutSessionResponseDTO replay = workoutSessionService.finishWorkout(userId, workoutId, "finish-1", request);
         assertEquals(response, replay);

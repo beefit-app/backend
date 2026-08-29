@@ -283,15 +283,13 @@ public class WorkoutSessionService {
                         new CardGeneratedEventDTO(
                                 session.getId(),
                                 card.getId(),
-                                card.getExercise().getId(),
-                                card.getExercise().getName(),
-                                card.getBestSetWeightKg(),
-                                card.getBestSetReps(),
-                                card.getEstimatedOneRepMax(),
-                                card.getImprovementPercentage(),
+                                card.getEstimatedOneRepMax() == null
+                                        ? card.getBestSetReps().doubleValue()
+                                        : card.getEstimatedOneRepMax(),
                                 card.getCardRarity().name(),
                                 workoutMuscleGroupMapper.toApi(card.getMuscleGroup()),
-                                card.getMuscleIntensities()
+                                card.getMuscleIntensities(),
+                                card.getImprovementPercentage() > 0
                         )
                 ),
                 userId
