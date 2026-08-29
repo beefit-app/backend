@@ -7,6 +7,8 @@ import java.util.UUID;
 public record InventoryCardResponseDTO(
         UUID id,
         UUID workoutSessionId,
+        Double attackPower,
+        Boolean isPersonalRecord,
         UUID exerciseId,
         String exerciseName,
         Double bestSetWeightKg,

@@ -32,6 +32,8 @@ public class InventoryService {
         return new InventoryCardResponseDTO(
                 card.getId(),
                 card.getWorkoutSession().getId(),
+                card.getEstimatedOneRepMax() == null ? card.getBestSetReps().doubleValue() : card.getEstimatedOneRepMax(),
+                card.getImprovementPercentage() > 0,
                 card.getExercise().getId(),
                 card.getExercise().getName(),
                 card.getBestSetWeightKg(),

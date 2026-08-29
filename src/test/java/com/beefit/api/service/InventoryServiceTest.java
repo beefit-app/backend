@@ -96,6 +96,8 @@ class InventoryServiceTest {
         assertEquals(userId, userIdCaptor.getValue());
         assertEquals(cardId, response.id());
         assertEquals(workoutSessionId, response.workoutSessionId());
+        assertEquals(116.67, response.attackPower());
+        assertEquals(true, response.isPersonalRecord());
         assertEquals(exercise.getId(), response.exerciseId());
         assertEquals("Supino reto", response.exerciseName());
         assertEquals(100.0, response.bestSetWeightKg());
