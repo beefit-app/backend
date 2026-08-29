@@ -440,7 +440,7 @@ class WorkoutSessionServiceTest {
 
         assertEquals(0, user.getOffensiveHoneys());
         assertEquals(0, user.getWeeklyWorkoutsCount());
-        assertEquals(1, user.getWorkoutsCount());
+        assertEquals(0, user.getWorkoutsCount());
         verify(workoutSessionRepository, never()).existsEligibleFinishedWorkoutOnDay(
                 any(UUID.class),
                 any(UUID.class),
@@ -484,7 +484,7 @@ class WorkoutSessionServiceTest {
 
         assertEquals(0, user.getOffensiveHoneys());
         assertEquals(0, user.getWeeklyWorkoutsCount());
-        assertEquals(1, user.getWorkoutsCount());
+        assertEquals(0, user.getWorkoutsCount());
         verify(workoutSessionRepository, never()).existsEligibleFinishedWorkoutOnDay(
                 any(UUID.class), any(UUID.class), any(WorkoutStatus.class),
                 org.mockito.ArgumentMatchers.anyInt(), any(LocalDateTime.class), any(LocalDateTime.class));

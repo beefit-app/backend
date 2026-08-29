@@ -192,10 +192,11 @@ public class WorkoutSessionService {
         session.setFinishIdempotencyKey(idempotencyKey);
         session.setFinishRequestHash(requestHash);
 
-        session.setMuscleGroupsList(workoutMuscleGroupMapper.toDomain(request.muscleGroups()));
         session.setTitle(request.title());
         session.setShouldPostWorkout(Boolean.TRUE.equals(request.shouldPostWorkout()));
         reconcileExercises(session, request.exercises());
+        session.setMuscleGroupsList(filterMuscleGroupsWithoutExercises(
+                workoutMuscleGroupMapper.toDomain(request.muscleGroups()), session));
 
         session.setFinishedAt(finishedAt);
         int durationSeconds = calculateDurationSeconds(session.getStartedAt(), finishedAt);
@@ -215,9 +216,11 @@ public class WorkoutSessionService {
         session.setStatus(WorkoutStatus.FINISHED);
         session.setCard(card);
 
-        user.setWorkoutsCount(user.getWorkoutsCount() + 1);
         LocalDateTime honeyDayStart = finishedAt.toLocalDate().atStartOfDay();
         boolean eligibleForHoney = isEligibleForHoney(session, durationSeconds);
+        if (eligibleForHoney) {
+            user.setWorkoutsCount(user.getWorkoutsCount() + 1);
+        }
         boolean alreadyEarnedHoneyToday = eligibleForHoney
                 && workoutSessionRepository.existsEligibleFinishedWorkoutOnDay(
                         userId,
@@ -616,6 +619,21 @@ public class WorkoutSessionService {
         return session.getExercises().stream()
                 .flatMap(exercise -> exercise.getSets().stream())
                 .anyMatch(set -> set.getReps() != null && set.getReps() > 0);
+    }
+
+    private List<MuscleGroups> filterMuscleGroupsWithoutExercises(
+            List<MuscleGroups> selectedGroups, WorkoutSession session) {
+        Set<MuscleGroups> exercisedGroups = session.getExercises().stream()
+                .flatMap(exercise -> java.util.stream.Stream.concat(
+                        Optional.ofNullable(exercise.getExercise().getPrimaryMuscleGroupsList()).orElseGet(List::of).stream(),
+                        Optional.ofNullable(exercise.getExercise().getSecondaryMuscleGroupsList()).orElseGet(List::of).stream()))
+                .collect(java.util.stream.Collectors.toSet());
+        // Catálogos legados podem não ter grupos primários/secundários. Nesse
+        // caso não há evidência para excluir um grupo escolhido pelo usuário.
+        if (exercisedGroups.isEmpty()) {
+            return selectedGroups;
+        }
+        return selectedGroups.stream().filter(exercisedGroups::contains).toList();
     }
 
     private Double calculateTotalVolume(WorkoutSession session) {

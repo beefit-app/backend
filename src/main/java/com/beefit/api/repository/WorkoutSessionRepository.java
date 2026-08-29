@@ -119,9 +119,21 @@ public interface WorkoutSessionRepository extends JpaRepository<WorkoutSession, 
     );
 
     @Query("SELECT DISTINCT w.finishedAt FROM WorkoutSession w WHERE w.user.id = :userId " +
-            "AND w.status = :status AND w.finishedAt >= :start AND w.finishedAt < :end")
+            "AND w.status = :status AND w.durationSeconds >= :minimumDurationSeconds " +
+            "AND w.finishedAt >= :start AND w.finishedAt < :end " +
+            "AND EXISTS (SELECT 1 FROM SessionExercise se JOIN se.sets s " +
+            "WHERE se.workoutSession = w AND s.reps > 0)")
     List<LocalDateTime> findFinishedDaysByUserAndMonth(@Param("userId") UUID userId, @Param("status") WorkoutStatus status,
+            @Param("minimumDurationSeconds") int minimumDurationSeconds,
             @Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    @Query("SELECT COUNT(w) FROM WorkoutSession w WHERE w.user.id = :userId " +
+            "AND w.status = :status AND w.durationSeconds >= :minimumDurationSeconds " +
+            "AND EXISTS (SELECT 1 FROM SessionExercise se JOIN se.sets s " +
+            "WHERE se.workoutSession = w AND s.reps > 0)")
+    long countValidFinishedWorkoutsByUserId(@Param("userId") UUID userId,
+            @Param("status") WorkoutStatus status,
+            @Param("minimumDurationSeconds") int minimumDurationSeconds);
 
     @Query("SELECT COUNT(w) FROM WorkoutSession w WHERE w.finishedAt >= :twentyFourHoursAgo AND w.status = 'FINISHED'")
     Long countWorkoutsLast24Hours(@Param("twentyFourHoursAgo") LocalDateTime twentyFourHoursAgo);

@@ -19,6 +19,8 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import com.beefit.api.domain.Friendship;
 import com.beefit.api.domain.Hive;
+import com.beefit.api.domain.CatalogExercise;
+import com.beefit.api.domain.SessionExercise;
 import com.beefit.api.domain.User;
 import com.beefit.api.domain.WorkoutSession;
 import com.beefit.api.domain.enums.FriendshipStatus;
@@ -103,6 +105,7 @@ class SocialVisibilityAndHiveRankingRepositoryTest {
         List<HiveRankingDTO> ranking = hiveRepository.getRankingForHive(
                 hive.getId(),
                 WorkoutStatus.FINISHED,
+                1800,
                 hive.getStartDate().atStartOfDay(),
                 hive.getEndDate().plusDays(1).atStartOfDay());
 
@@ -146,10 +149,30 @@ class SocialVisibilityAndHiveRankingRepositoryTest {
         workout.setUser(user);
         workout.setStartedAt(startedAt);
         workout.setFinishedAt(status == WorkoutStatus.FINISHED ? startedAt.plusHours(1) : null);
+        workout.setDurationSeconds(status == WorkoutStatus.FINISHED ? 3600 : null);
         workout.setStatus(status);
         workout.setShouldPostWorkout(false);
         workout.setIsPrivate(isPrivate);
         entityManager.persist(workout);
+        if (status == WorkoutStatus.FINISHED) {
+            CatalogExercise catalogExercise = new CatalogExercise();
+            catalogExercise.setName("Teste " + UUID.randomUUID());
+            entityManager.persist(catalogExercise);
+
+            SessionExercise sessionExercise = new SessionExercise();
+            sessionExercise.setExercise(catalogExercise);
+            sessionExercise.setOrder(1);
+            workout.addExercise(sessionExercise);
+            entityManager.persist(sessionExercise);
+
+            com.beefit.api.domain.Set set = new com.beefit.api.domain.Set();
+            set.setOrder(1);
+            set.setWeightKg(10.0);
+            set.setReps(8);
+            set.setIsPersonalRecord(false);
+            sessionExercise.addSet(set);
+            entityManager.persist(set);
+        }
         return workout;
     }
 }

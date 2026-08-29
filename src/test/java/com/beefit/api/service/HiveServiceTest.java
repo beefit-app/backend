@@ -137,13 +137,14 @@ class HiveServiceTest {
         // Simula o ranking da colmeia
         // O primeiro colocado é "other", mas o segundo colocado (depois do criador) é "firstPlace"
         List<HiveRankingDTO> ranking = List.of(
-            new HiveRankingDTO(creatorId, "Creator", "creator", null, 10L),
-            new HiveRankingDTO(firstPlaceId, "First Place", "first", null, 8L),
-            new HiveRankingDTO(otherId, "Other", "other", null, 5L)
+            new HiveRankingDTO(creatorId, "Creator", "creator", null, false, 10L, 0),
+            new HiveRankingDTO(firstPlaceId, "First Place", "first", null, false, 8L, 0),
+            new HiveRankingDTO(otherId, "Other", "other", null, false, 5L, 0)
         );
         when(hiveRepository.getRankingForHive(
                 hiveId,
                 WorkoutStatus.FINISHED,
+                1800,
                 LocalDate.of(2026, 8, 1).atStartOfDay(),
                 LocalDate.of(2026, 8, 8).atStartOfDay())).thenReturn(ranking);
 
