@@ -5,6 +5,7 @@ import lombok.Getter;
 @Getter
 public enum UserRole {
     ADMIN("admin"),
+    DEVELOPER("developer"),
     USER("user");
 
     // Estas estruturas extras no enum (atributo role, construtor e getter)

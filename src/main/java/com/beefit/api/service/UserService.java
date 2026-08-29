@@ -8,6 +8,9 @@ import com.beefit.api.dto.user.PublicUserProfileResponseDTO;
 import com.beefit.api.dto.user.UpdateAccountSettingsRequestDTO;
 import com.beefit.api.dto.user.UpdateProfileRequestDTO;
 import com.beefit.api.dto.user.UserProfileResponseDTO;
+import com.beefit.api.dto.social.ProfileUpdatedEventDTO;
+import com.beefit.api.dto.social.SocialEventDTO;
+import com.beefit.api.domain.enums.SocialEvent;
 import com.beefit.api.exception.user.InvalidPasswordException;
 import com.beefit.api.exception.user.UserNotFoundException;
 import com.beefit.api.repository.AuthSessionRepository;
@@ -30,11 +33,14 @@ import jakarta.persistence.EntityManager;
 @RequiredArgsConstructor
 public class UserService {
 
+    private static final int MIN_VALID_WORKOUT_DURATION_SECONDS = 1800;
+
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final WorkoutSessionRepository workoutSessionRepository;
     private final WorkoutMediaService workoutMediaService;
     private final FriendshipService friendshipService;
+    private final SseService sseService;
     private final EntityManager entityManager;
     private final AuthSessionRepository authSessionRepository;
 
@@ -49,8 +55,10 @@ public class UserService {
                 user.getBodyWeight(),
                 user.getOffensiveHoneys(),
                 user.getCardsCount(),
-                user.getWorkoutsCount(),
-                user.getGhostMode());
+                Math.toIntExact(workoutSessionRepository.countValidFinishedWorkoutsByUserId(
+                        user.getId(), WorkoutStatus.FINISHED, MIN_VALID_WORKOUT_DURATION_SECONDS)),
+                user.getGhostMode(),
+                user.hasDeveloperBadge());
     }
 
     // Logica para Visualizar o próprio Perfil (RF-003)
@@ -81,11 +89,13 @@ public class UserService {
                 user.getCardsCount(),
                 user.getWorkoutsCount(),
                 relationship.status(),
-                relationship.friendshipId());
+                relationship.friendshipId(),
+                user.hasDeveloperBadge());
     }
 
     public java.util.List<java.time.LocalDateTime> getTrainingDays(UUID userId, YearMonth month) {
         return workoutSessionRepository.findFinishedDaysByUserAndMonth(userId, WorkoutStatus.FINISHED,
+                MIN_VALID_WORKOUT_DURATION_SECONDS,
                 month.atDay(1).atStartOfDay(), month.plusMonths(1).atDay(1).atStartOfDay());
     }
 
@@ -120,11 +130,19 @@ public class UserService {
             user.setProfilePicture(request.profilePicture());
             workoutMediaService.releasePreviousProfileMedia(previousProfilePicture, request.profilePicture(), user.getId());
             user.setBodyWeight(request.bodyWeight());
+            broadcastProfileUpdated(user);
             // O Spring Data JPA salva automaticamente no final do metodo devido ao
             // @Transactional
         } else {
             throw new UserNotFoundException();
         }
+    }
+
+    private void broadcastProfileUpdated(User user) {
+        var recipients = new java.util.ArrayList<>(friendshipService.getFriends(user.getId()).orElseGet(java.util.List::of));
+        recipients.add(user);
+        var event = new ProfileUpdatedEventDTO(user.getId(), user.getFullName(), user.getUsername(), user.getProfilePicture());
+        sseService.broadcastToFriends(new SocialEventDTO<>(SocialEvent.PROFILE_UPDATED, event), recipients.stream().distinct().toList());
     }
 
     private void consumeProfileMedia(String value, UUID userId) {

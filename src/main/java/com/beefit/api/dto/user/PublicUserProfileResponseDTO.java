@@ -12,5 +12,6 @@ public record PublicUserProfileResponseDTO(
         Integer cardsCount,
         Integer totalWorkouts,
         String relationshipStatus,
-        UUID friendshipId) {
+        UUID friendshipId,
+        Boolean developer) {
 }

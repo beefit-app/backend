@@ -210,7 +210,7 @@ class ControllerUnitTest {
         ProfileController controller = new ProfileController();
         ReflectionTestUtils.setField(controller, "userService", userService);
         User user = user();
-        UserProfileResponseDTO dto = new UserProfileResponseDTO("Test User", "testuser", "bio", "pic", 80.0f, 0, 0, 0, false);
+        UserProfileResponseDTO dto = new UserProfileResponseDTO("Test User", "testuser", "bio", "pic", 80.0f, 0, 0, 0, false, false);
 
         when(userService.getUserProfile(user.getId())).thenReturn(dto);
 

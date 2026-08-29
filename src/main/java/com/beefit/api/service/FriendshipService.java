@@ -227,7 +227,8 @@ public class FriendshipService {
     }
 
     private SocialUserResponseDTO toSocialUser(User user) {
-        return new SocialUserResponseDTO(user.getId(), user.getFullName(), user.getUsername(), user.getProfilePicture());
+        return new SocialUserResponseDTO(
+                user.getId(), user.getFullName(), user.getUsername(), user.getProfilePicture(), user.hasDeveloperBadge());
     }
 
     private boolean isUnorderedPairConstraintViolation(Throwable exception) {

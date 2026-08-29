@@ -9,5 +9,6 @@ public record UserProfileResponseDTO(
         Integer offensiveHoneys,
         Integer cardsCount,
         Integer totalWorkouts,
-        Boolean ghostMode) {
+        Boolean ghostMode,
+        Boolean developer) {
 }

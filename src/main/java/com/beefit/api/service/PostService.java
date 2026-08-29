@@ -16,6 +16,9 @@ import com.beefit.api.dto.feed.FeedPostResponseDTO;
 import com.beefit.api.dto.feed.FeedExerciseDTO;
 import com.beefit.api.dto.feed.FeedSetDTO;
 import com.beefit.api.dto.feed.PostLikeDTO;
+import com.beefit.api.dto.feed.PostLikeEventDTO;
+import com.beefit.api.dto.social.SocialEventDTO;
+import com.beefit.api.domain.enums.SocialEvent;
 import com.beefit.api.exception.friendship.PostNotFoundException;
 import com.beefit.api.exception.user.UserNotFoundException;
 import com.beefit.api.repository.LikeRepository;
@@ -31,13 +34,17 @@ public class PostService {
     private final LikeRepository likeRepository;
     private final UserRepository userRepository;
     private final FriendshipRepository friendshipRepository;
+    private final FriendshipService friendshipService;
+    private final SseService sseService;
 
     public PostService(PostRepository postRepository, LikeRepository likeRepository, UserRepository userRepository,
-            FriendshipRepository friendshipRepository) {
+            FriendshipRepository friendshipRepository, FriendshipService friendshipService, SseService sseService) {
         this.postRepository = postRepository;
         this.likeRepository = likeRepository;
         this.userRepository = userRepository;
         this.friendshipRepository = friendshipRepository;
+        this.friendshipService = friendshipService;
+        this.sseService = sseService;
     }
 
      // Recupera o feed social de forma paginada.
@@ -112,6 +119,7 @@ public class PostService {
                 author.getId(),
                 author.getUsername(),
                 author.getProfilePicture(),
+                author.hasDeveloperBadge(),
                 post.getPublishedAt(),
                 post.getTotalLikes(),
                 likeRepository.existsByLikedByAndPost(currentUser, post),
@@ -145,6 +153,15 @@ public class PostService {
 
             postRepository.save(post);
         }
+
+        // Cada pessoa que pode ver este post recebe o novo contador. A marcação
+        // "curtido por mim" continua local ao usuário que acionou o endpoint.
+        List<User> recipients = new java.util.ArrayList<>(friendshipService.getFriends(post.getUser().getId())
+                .orElseGet(List::of));
+        recipients.add(post.getUser());
+        sseService.broadcastToFriends(
+                new SocialEventDTO<>(SocialEvent.POST_LIKED, new PostLikeEventDTO(post.getId(), post.getTotalLikes())),
+                recipients.stream().distinct().toList());
 
         // retorna o contrário da variável de post já curtido pois o valor foi invertido
         // após o processamento da função

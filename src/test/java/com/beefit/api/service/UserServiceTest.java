@@ -1,8 +1,10 @@
 package com.beefit.api.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -19,6 +21,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import com.beefit.api.domain.User;
+import com.beefit.api.domain.enums.UserRole;
 import com.beefit.api.dto.user.ChangePasswordDTO;
 import com.beefit.api.dto.user.DeleteUserRequestDTO;
 import com.beefit.api.dto.user.UpdateAccountSettingsRequestDTO;
@@ -28,6 +31,9 @@ import com.beefit.api.exception.user.InvalidPasswordException;
 import com.beefit.api.exception.user.UserNotFoundException;
 import com.beefit.api.repository.AuthSessionRepository;
 import com.beefit.api.repository.UserRepository;
+import com.beefit.api.repository.WorkoutSessionRepository;
+import com.beefit.api.domain.enums.WorkoutStatus;
+import com.beefit.api.dto.social.SocialEventDTO;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
@@ -43,6 +49,15 @@ class UserServiceTest {
 
     @Mock
     private WorkoutMediaService workoutMediaService;
+
+    @Mock
+    private WorkoutSessionRepository workoutSessionRepository;
+
+    @Mock
+    private FriendshipService friendshipService;
+
+    @Mock
+    private SseService sseService;
 
     @Mock(answer = org.mockito.Answers.RETURNS_DEEP_STUBS)
     private jakarta.persistence.EntityManager entityManager;
@@ -62,6 +77,8 @@ class UserServiceTest {
     @Test
     void getUserProfileReturnsProfileData() {
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(workoutSessionRepository.countValidFinishedWorkoutsByUserId(
+                userId, WorkoutStatus.FINISHED, 1800)).thenReturn(3L);
 
         UserProfileResponseDTO response = userService.getUserProfile(userId);
 
@@ -69,6 +86,21 @@ class UserServiceTest {
         assertEquals(user.getUsername(), response.username());
         assertEquals(user.getBodyWeight(), response.bodyWeight());
         assertEquals(user.getGhostMode(), response.ghostMode());
+        assertEquals(3, response.totalWorkouts());
+    }
+
+    @Test
+    void getUserProfileMarksDeveloperAccountsWithoutGrantingAdminPrivileges() {
+        user.setRole(UserRole.DEVELOPER);
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(workoutSessionRepository.countValidFinishedWorkoutsByUserId(
+                userId, WorkoutStatus.FINISHED, 1800)).thenReturn(0L);
+
+        UserProfileResponseDTO response = userService.getUserProfile(userId);
+
+        assertTrue(response.developer());
+        assertFalse(user.getAuthorities().stream()
+                .anyMatch(authority -> authority.getAuthority().equals("ROLE_ADMIN")));
     }
 
     @Test
@@ -87,6 +119,7 @@ class UserServiceTest {
                 72.5f);
 
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(friendshipService.getFriends(userId)).thenReturn(Optional.of(java.util.List.of()));
 
         userService.updateUserProfile(userId, request);
 
@@ -94,6 +127,8 @@ class UserServiceTest {
         assertEquals("New bio", user.getBiography());
         assertEquals("https://example.com/avatar.png", user.getProfilePicture());
         assertEquals(72.5f, user.getBodyWeight());
+        verify(sseService).broadcastToFriends(org.mockito.ArgumentMatchers.any(SocialEventDTO.class),
+                org.mockito.ArgumentMatchers.anyList());
     }
 
     @Test
