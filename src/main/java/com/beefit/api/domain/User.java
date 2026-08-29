@@ -116,6 +116,11 @@ public class User implements UserDetails {
         return List.of(new SimpleGrantedAuthority("ROLE_USER"));
     }
 
+    /** A product-facing distinction; it never grants administrative access. */
+    public boolean hasDeveloperBadge() {
+        return this.role == UserRole.DEVELOPER;
+    }
+
     @Override
     public @Nullable String getPassword() {
         return passwordHash;

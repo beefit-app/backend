@@ -3,6 +3,7 @@ package com.beefit.api.service;
 import com.beefit.api.domain.Post;
 import com.beefit.api.domain.User;
 import com.beefit.api.dto.feed.PostLikeDTO;
+import com.beefit.api.dto.social.SocialEventDTO;
 import com.beefit.api.exception.friendship.PostNotFoundException;
 import com.beefit.api.exception.user.UserNotFoundException;
 import com.beefit.api.repository.LikeRepository;
@@ -19,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageRequest;
 
 import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -46,6 +48,12 @@ class PostServiceTest {
     @Mock
     private FriendshipRepository friendshipRepository;
 
+    @Mock
+    private FriendshipService friendshipService;
+
+    @Mock
+    private SseService sseService;
+
     @InjectMocks
     private PostService postService;
 
@@ -71,6 +79,7 @@ class PostServiceTest {
 
     @Test
     void toggleLikeCreatesLikeAndIncrementsCounterWhenPostWasNotLiked() {
+        when(friendshipService.getFriends(userId)).thenReturn(Optional.of(List.of()));
         when(postRepository.findVisibleByIdForUpdate(postId, userId)).thenReturn(Optional.of(post));
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
         when(likeRepository.existsByLikedByAndPost(user, post)).thenReturn(false);
@@ -89,11 +98,16 @@ class PostServiceTest {
         assertEquals(user, savedPost.getLikes().get(0).getLikedBy());
         assertEquals(post, savedPost.getLikes().get(0).getPost());
         assertNotNull(savedPost.getLikes().get(0).getLikedAt());
+        ArgumentCaptor<SocialEventDTO> eventCaptor = ArgumentCaptor.forClass(SocialEventDTO.class);
+        verify(sseService).broadcastToFriends(eventCaptor.capture(), org.mockito.ArgumentMatchers.anyList());
+        assertEquals(postId, ((com.beefit.api.dto.feed.PostLikeEventDTO) eventCaptor.getValue().dataSocialEvent()).postId());
+        assertEquals(1, ((com.beefit.api.dto.feed.PostLikeEventDTO) eventCaptor.getValue().dataSocialEvent()).totalLikes());
     }
 
     @Test
     void toggleLikeRemovesExistingLikeAndDecrementsCounter() {
         post.setTotalLikes(1);
+        when(friendshipService.getFriends(userId)).thenReturn(Optional.of(List.of()));
 
         when(postRepository.findVisibleByIdForUpdate(postId, userId)).thenReturn(Optional.of(post));
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));

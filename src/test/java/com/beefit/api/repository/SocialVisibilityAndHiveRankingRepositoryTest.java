@@ -9,6 +9,7 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -19,6 +20,8 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import com.beefit.api.domain.Friendship;
 import com.beefit.api.domain.Hive;
+import com.beefit.api.domain.CatalogExercise;
+import com.beefit.api.domain.SessionExercise;
 import com.beefit.api.domain.User;
 import com.beefit.api.domain.WorkoutSession;
 import com.beefit.api.domain.enums.FriendshipStatus;
@@ -48,6 +51,9 @@ class SocialVisibilityAndHiveRankingRepositoryTest {
 
     @Autowired
     private HiveRepository hiveRepository;
+
+    @Autowired
+    private UserRepository userRepository;
 
     @Autowired
     private EntityManager entityManager;
@@ -82,7 +88,7 @@ class SocialVisibilityAndHiveRankingRepositoryTest {
     }
 
     @Test
-    void hiveRankingCountsOnlyFinishedWorkoutsThroughTheWholeEndDate() {
+    void hiveRankingUsesTheWorkoutCompletionTimeAcrossTheWholeEndDate() {
         User member = persistUser("member", false);
         Hive hive = new Hive();
         hive.setName("Test Hive");
@@ -96,6 +102,7 @@ class SocialVisibilityAndHiveRankingRepositoryTest {
         persistWorkout(member, WorkoutStatus.FINISHED, LocalDateTime.of(2026, 8, 1, 0, 0), false);
         persistWorkout(member, WorkoutStatus.FINISHED, LocalDateTime.of(2026, 8, 7, 23, 59, 59), false);
         persistWorkout(member, WorkoutStatus.FINISHED, LocalDateTime.of(2026, 8, 8, 0, 0), false);
+        persistWorkout(member, WorkoutStatus.FINISHED, LocalDateTime.of(2026, 7, 31, 23, 30), false);
         persistWorkout(member, WorkoutStatus.IN_PROGRESS, LocalDateTime.of(2026, 8, 3, 12, 0), false);
         entityManager.flush();
         entityManager.clear();
@@ -103,12 +110,33 @@ class SocialVisibilityAndHiveRankingRepositoryTest {
         List<HiveRankingDTO> ranking = hiveRepository.getRankingForHive(
                 hive.getId(),
                 WorkoutStatus.FINISHED,
+                1800,
                 hive.getStartDate().atStartOfDay(),
                 hive.getEndDate().plusDays(1).atStartOfDay());
 
         assertEquals(1, ranking.size());
         assertEquals(member.getId(), ranking.getFirst().userId());
+        // O treino iniciado no dia 31 terminou dentro do período; o iniciado
+        // às 23:59:59 do último dia terminou depois dele.
         assertEquals(2L, ranking.getFirst().score());
+    }
+
+    @Test
+    void socialSearchExcludesGhostModeAccounts() {
+        User viewer = persistUser("viewer", false);
+        User visible = persistUser("searchable-visible", false);
+        User ghost = persistUser("searchable-ghost", true);
+        entityManager.flush();
+        entityManager.clear();
+
+        List<UUID> foundIds = userRepository.searchSocialUsers(
+                        viewer.getId(), "searchable", PageRequest.of(0, 20))
+                .getContent().stream()
+                .map(User::getId)
+                .toList();
+
+        assertEquals(List.of(visible.getId()), foundIds);
+        org.junit.jupiter.api.Assertions.assertFalse(foundIds.contains(ghost.getId()));
     }
 
     private User persistUser(String name, boolean ghostMode) {
@@ -146,10 +174,30 @@ class SocialVisibilityAndHiveRankingRepositoryTest {
         workout.setUser(user);
         workout.setStartedAt(startedAt);
         workout.setFinishedAt(status == WorkoutStatus.FINISHED ? startedAt.plusHours(1) : null);
+        workout.setDurationSeconds(status == WorkoutStatus.FINISHED ? 3600 : null);
         workout.setStatus(status);
         workout.setShouldPostWorkout(false);
         workout.setIsPrivate(isPrivate);
         entityManager.persist(workout);
+        if (status == WorkoutStatus.FINISHED) {
+            CatalogExercise catalogExercise = new CatalogExercise();
+            catalogExercise.setName("Teste " + UUID.randomUUID());
+            entityManager.persist(catalogExercise);
+
+            SessionExercise sessionExercise = new SessionExercise();
+            sessionExercise.setExercise(catalogExercise);
+            sessionExercise.setOrder(1);
+            workout.addExercise(sessionExercise);
+            entityManager.persist(sessionExercise);
+
+            com.beefit.api.domain.Set set = new com.beefit.api.domain.Set();
+            set.setOrder(1);
+            set.setWeightKg(10.0);
+            set.setReps(8);
+            set.setIsPersonalRecord(false);
+            sessionExercise.addSet(set);
+            entityManager.persist(set);
+        }
         return workout;
     }
 }

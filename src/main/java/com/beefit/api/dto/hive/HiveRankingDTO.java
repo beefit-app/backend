@@ -5,5 +5,7 @@ public record HiveRankingDTO(
         String fullName,
         String username,
         String profilePicture,
-        Long score // Pode ser a quantidade de treinos ou a soma de volume/poder
+        Boolean developer,
+        Long score,
+        Integer honeys
 ) {} 

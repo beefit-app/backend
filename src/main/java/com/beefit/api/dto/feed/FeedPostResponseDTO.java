@@ -16,6 +16,7 @@ public record FeedPostResponseDTO(
         // Dados de exibição do Perfil do Usuário
         String username,
         String userProfilePicture,
+        Boolean developer,
 
         // Metadados do Post (Sociais)
         LocalDateTime publishedAt,

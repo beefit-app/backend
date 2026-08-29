@@ -36,6 +36,7 @@ import com.beefit.api.domain.enums.SocialEvent;
 import com.beefit.api.domain.enums.WorkoutStatus;
 import com.beefit.api.dto.social.SocialEventDTO;
 import com.beefit.api.dto.workout.CardGeneratedEventDTO;
+import com.beefit.api.dto.workout.ExerciseHistoryResponseDTO;
 import com.beefit.api.dto.workout.FinishWorkoutExerciseDTO;
 import com.beefit.api.dto.workout.FinishWorkoutSetDTO;
 import com.beefit.api.dto.workout.FinishWorkoutSnapshotRequestDTO;
@@ -100,6 +101,35 @@ public class WorkoutSessionService {
         validateWorkoutOwnership(userId, session);
         initializeWorkoutGraph(session);
         return workoutSessionMapper.toDto(session);
+    }
+
+    @Transactional(readOnly = true)
+    public ExerciseHistoryResponseDTO getExerciseHistory(UUID userId, UUID catalogExerciseId) {
+        List<SessionExercise> exercises = workoutSessionRepository.findFinishedExercisesWithSetsByUserIdAndCatalogExerciseId(
+                userId, catalogExerciseId, WorkoutStatus.FINISHED);
+
+        List<ExerciseSetPerformance> performances = exercises.stream()
+                .flatMap(sessionExercise -> sessionExercise.getSets().stream()
+                        .filter(set -> set.getReps() != null && set.getReps() > 0)
+                        .filter(set -> set.getWeightKg() != null && set.getWeightKg() >= 0)
+                        .map(set -> new ExerciseSetPerformance(
+                                sessionExercise.getWorkoutSession().getFinishedAt(), set.getWeightKg(), set.getReps())))
+                .toList();
+
+        if (performances.isEmpty()) {
+            return new ExerciseHistoryResponseDTO(null, null, null, null, null);
+        }
+
+        ExerciseSetPerformance latest = performances.stream()
+                .max(Comparator.comparing(ExerciseSetPerformance::finishedAt))
+                .orElseThrow();
+        ExerciseSetPerformance best = performances.stream()
+                .max(Comparator.comparingDouble(ExerciseSetPerformance::weightKg)
+                        .thenComparingInt(ExerciseSetPerformance::reps))
+                .orElseThrow();
+
+        return new ExerciseHistoryResponseDTO(
+                latest.finishedAt(), best.weightKg(), best.reps(), latest.weightKg(), latest.reps());
     }
 
     @Transactional(readOnly = true)
@@ -192,10 +222,11 @@ public class WorkoutSessionService {
         session.setFinishIdempotencyKey(idempotencyKey);
         session.setFinishRequestHash(requestHash);
 
-        session.setMuscleGroupsList(workoutMuscleGroupMapper.toDomain(request.muscleGroups()));
         session.setTitle(request.title());
         session.setShouldPostWorkout(Boolean.TRUE.equals(request.shouldPostWorkout()));
         reconcileExercises(session, request.exercises());
+        session.setMuscleGroupsList(filterMuscleGroupsWithoutExercises(
+                workoutMuscleGroupMapper.toDomain(request.muscleGroups()), session));
 
         session.setFinishedAt(finishedAt);
         int durationSeconds = calculateDurationSeconds(session.getStartedAt(), finishedAt);
@@ -215,9 +246,11 @@ public class WorkoutSessionService {
         session.setStatus(WorkoutStatus.FINISHED);
         session.setCard(card);
 
-        user.setWorkoutsCount(user.getWorkoutsCount() + 1);
         LocalDateTime honeyDayStart = finishedAt.toLocalDate().atStartOfDay();
         boolean eligibleForHoney = isEligibleForHoney(session, durationSeconds);
+        if (eligibleForHoney) {
+            user.setWorkoutsCount(user.getWorkoutsCount() + 1);
+        }
         boolean alreadyEarnedHoneyToday = eligibleForHoney
                 && workoutSessionRepository.existsEligibleFinishedWorkoutOnDay(
                         userId,
@@ -280,19 +313,20 @@ public class WorkoutSessionService {
                         new CardGeneratedEventDTO(
                                 session.getId(),
                                 card.getId(),
-                                card.getExercise().getId(),
-                                card.getExercise().getName(),
-                                card.getBestSetWeightKg(),
-                                card.getBestSetReps(),
-                                card.getEstimatedOneRepMax(),
-                                card.getImprovementPercentage(),
+                                card.getEstimatedOneRepMax() == null
+                                        ? card.getBestSetReps().doubleValue()
+                                        : card.getEstimatedOneRepMax(),
                                 card.getCardRarity().name(),
                                 workoutMuscleGroupMapper.toApi(card.getMuscleGroup()),
-                                card.getMuscleIntensities()
+                                card.getMuscleIntensities(),
+                                card.getImprovementPercentage() > 0
                         )
                 ),
                 userId
         );
+    }
+
+    private record ExerciseSetPerformance(LocalDateTime finishedAt, double weightKg, int reps) {
     }
 
     private LocalDateTime parseFinishedAt(String finishedAtValue) {
@@ -616,6 +650,21 @@ public class WorkoutSessionService {
         return session.getExercises().stream()
                 .flatMap(exercise -> exercise.getSets().stream())
                 .anyMatch(set -> set.getReps() != null && set.getReps() > 0);
+    }
+
+    private List<MuscleGroups> filterMuscleGroupsWithoutExercises(
+            List<MuscleGroups> selectedGroups, WorkoutSession session) {
+        Set<MuscleGroups> exercisedGroups = session.getExercises().stream()
+                .flatMap(exercise -> java.util.stream.Stream.concat(
+                        Optional.ofNullable(exercise.getExercise().getPrimaryMuscleGroupsList()).orElseGet(List::of).stream(),
+                        Optional.ofNullable(exercise.getExercise().getSecondaryMuscleGroupsList()).orElseGet(List::of).stream()))
+                .collect(java.util.stream.Collectors.toSet());
+        // Catálogos legados podem não ter grupos primários/secundários. Nesse
+        // caso não há evidência para excluir um grupo escolhido pelo usuário.
+        if (exercisedGroups.isEmpty()) {
+            return selectedGroups;
+        }
+        return selectedGroups.stream().filter(exercisedGroups::contains).toList();
     }
 
     private Double calculateTotalVolume(WorkoutSession session) {

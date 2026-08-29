@@ -25,6 +25,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class HiveService {
 
+    private static final int MIN_VALID_WORKOUT_DURATION_SECONDS = 1800;
+
     private final HiveRepository hiveRepository;
     private final HiveMapper hiveMapper;
     private final Clock businessClock;
@@ -136,6 +138,7 @@ public class HiveService {
         return hiveRepository.getRankingForHive(
                 hive.getId(),
                 WorkoutStatus.FINISHED,
+                MIN_VALID_WORKOUT_DURATION_SECONDS,
                 hive.getStartDate().atStartOfDay(),
                 hive.getEndDate().plusDays(1).atStartOfDay());
     }

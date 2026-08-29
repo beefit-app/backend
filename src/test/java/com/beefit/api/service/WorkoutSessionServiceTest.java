@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -40,6 +41,7 @@ import com.beefit.api.domain.enums.SocialEvent;
 import com.beefit.api.domain.enums.WorkoutStatus;
 import com.beefit.api.dto.social.SocialEventDTO;
 import com.beefit.api.dto.workout.CardGeneratedEventDTO;
+import com.beefit.api.dto.workout.ExerciseHistoryResponseDTO;
 import com.beefit.api.dto.workout.FinishWorkoutExerciseDTO;
 import com.beefit.api.dto.workout.FinishWorkoutSetDTO;
 import com.beefit.api.dto.workout.FinishWorkoutSnapshotRequestDTO;
@@ -296,6 +298,38 @@ class WorkoutSessionServiceTest {
     }
 
     @Test
+    void getExerciseHistoryReturnsLatestAndBestCompletedPerformance() {
+        UUID catalogExerciseId = UUID.randomUUID();
+        CatalogExercise catalogExercise = catalogExercise(catalogExerciseId, "Supino");
+
+        WorkoutSession olderWorkout = inProgressSession(UUID.randomUUID());
+        olderWorkout.setStatus(WorkoutStatus.FINISHED);
+        olderWorkout.setFinishedAt(LocalDateTime.of(2026, 5, 20, 10, 0));
+        SessionExercise olderExercise = sessionExercise(UUID.randomUUID(), catalogExercise, 1);
+        olderExercise.setWorkoutSession(olderWorkout);
+        olderExercise.addSet(set(UUID.randomUUID(), 1, 100.0, 5));
+
+        WorkoutSession latestWorkout = inProgressSession(UUID.randomUUID());
+        latestWorkout.setStatus(WorkoutStatus.FINISHED);
+        latestWorkout.setFinishedAt(LocalDateTime.of(2026, 5, 25, 10, 0));
+        SessionExercise latestExercise = sessionExercise(UUID.randomUUID(), catalogExercise, 1);
+        latestExercise.setWorkoutSession(latestWorkout);
+        latestExercise.addSet(set(UUID.randomUUID(), 1, 90.0, 8));
+
+        when(workoutSessionRepository.findFinishedExercisesWithSetsByUserIdAndCatalogExerciseId(
+                userId, catalogExerciseId, WorkoutStatus.FINISHED))
+                .thenReturn(List.of(latestExercise, olderExercise));
+
+        ExerciseHistoryResponseDTO history = workoutSessionService.getExerciseHistory(userId, catalogExerciseId);
+
+        assertEquals(LocalDateTime.of(2026, 5, 25, 10, 0), history.lastPerformedAt());
+        assertEquals(100.0, history.bestWeightKg());
+        assertEquals(5, history.bestReps());
+        assertEquals(90.0, history.lastWeightKg());
+        assertEquals(8, history.lastReps());
+    }
+
+    @Test
     void finishWorkoutReconcilesExercisesAndUpdatesMetrics() {
         UUID workoutId = UUID.randomUUID();
         UUID existingSetId = UUID.randomUUID();
@@ -383,13 +417,11 @@ class WorkoutSessionServiceTest {
         CardGeneratedEventDTO event = (CardGeneratedEventDTO) eventCaptor.getValue().dataSocialEvent();
         assertEquals(workoutId, event.workoutId());
         assertEquals(generatedCard.getId(), event.cardId());
-        assertEquals(newCatalogExercise.getId(), event.exerciseId());
-        assertEquals(newCatalogExercise.getName(), event.exerciseName());
-        assertEquals(80.0, event.bestSetWeightKg());
-        assertEquals(5, event.bestSetReps());
+        assertEquals(93.33, event.attackPower());
         assertEquals("RARE", event.rarity());
         assertEquals("peito", event.muscleGroup());
         assertEquals(Map.of("chest", 4, "deltoids", 2, "triceps", 2), event.muscleIntensities());
+        assertTrue(event.isPersonalRecord());
 
         WorkoutSessionResponseDTO replay = workoutSessionService.finishWorkout(userId, workoutId, "finish-1", request);
         assertEquals(response, replay);
@@ -440,7 +472,7 @@ class WorkoutSessionServiceTest {
 
         assertEquals(0, user.getOffensiveHoneys());
         assertEquals(0, user.getWeeklyWorkoutsCount());
-        assertEquals(1, user.getWorkoutsCount());
+        assertEquals(0, user.getWorkoutsCount());
         verify(workoutSessionRepository, never()).existsEligibleFinishedWorkoutOnDay(
                 any(UUID.class),
                 any(UUID.class),
@@ -484,7 +516,7 @@ class WorkoutSessionServiceTest {
 
         assertEquals(0, user.getOffensiveHoneys());
         assertEquals(0, user.getWeeklyWorkoutsCount());
-        assertEquals(1, user.getWorkoutsCount());
+        assertEquals(0, user.getWorkoutsCount());
         verify(workoutSessionRepository, never()).existsEligibleFinishedWorkoutOnDay(
                 any(UUID.class), any(UUID.class), any(WorkoutStatus.class),
                 org.mockito.ArgumentMatchers.anyInt(), any(LocalDateTime.class), any(LocalDateTime.class));

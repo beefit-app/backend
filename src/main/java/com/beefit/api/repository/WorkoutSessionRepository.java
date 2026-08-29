@@ -1,6 +1,7 @@
 package com.beefit.api.repository;
 
 import com.beefit.api.domain.WorkoutSession;
+import com.beefit.api.domain.SessionExercise;
 import com.beefit.api.domain.enums.WorkoutStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -58,6 +59,20 @@ public interface WorkoutSessionRepository extends JpaRepository<WorkoutSession, 
     Optional<Double> findMaxTotalVolumeByUserId(@Param("userId") UUID userId, @Param("status") WorkoutStatus status);
 
     List<WorkoutSession> findTop10ByUserIdAndStatusOrderByFinishedAtDesc(UUID userId, WorkoutStatus status);
+
+    @Query("""
+            SELECT sessionExercise FROM SessionExercise sessionExercise
+            JOIN FETCH sessionExercise.workoutSession workout
+            JOIN FETCH sessionExercise.sets
+            WHERE workout.user.id = :userId
+              AND workout.status = :status
+              AND sessionExercise.exercise.id = :catalogExerciseId
+            ORDER BY workout.finishedAt DESC
+            """)
+    List<SessionExercise> findFinishedExercisesWithSetsByUserIdAndCatalogExerciseId(
+            @Param("userId") UUID userId,
+            @Param("catalogExerciseId") UUID catalogExerciseId,
+            @Param("status") WorkoutStatus status);
 
     @Query(value = """
             SELECT MAX(s.weight_kg * (1.0 + LEAST(s.reps, 10) / 30.0))
@@ -119,9 +134,21 @@ public interface WorkoutSessionRepository extends JpaRepository<WorkoutSession, 
     );
 
     @Query("SELECT DISTINCT w.finishedAt FROM WorkoutSession w WHERE w.user.id = :userId " +
-            "AND w.status = :status AND w.finishedAt >= :start AND w.finishedAt < :end")
+            "AND w.status = :status AND w.durationSeconds >= :minimumDurationSeconds " +
+            "AND w.finishedAt >= :start AND w.finishedAt < :end " +
+            "AND EXISTS (SELECT 1 FROM SessionExercise se JOIN se.sets s " +
+            "WHERE se.workoutSession = w AND s.reps > 0)")
     List<LocalDateTime> findFinishedDaysByUserAndMonth(@Param("userId") UUID userId, @Param("status") WorkoutStatus status,
+            @Param("minimumDurationSeconds") int minimumDurationSeconds,
             @Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    @Query("SELECT COUNT(w) FROM WorkoutSession w WHERE w.user.id = :userId " +
+            "AND w.status = :status AND w.durationSeconds >= :minimumDurationSeconds " +
+            "AND EXISTS (SELECT 1 FROM SessionExercise se JOIN se.sets s " +
+            "WHERE se.workoutSession = w AND s.reps > 0)")
+    long countValidFinishedWorkoutsByUserId(@Param("userId") UUID userId,
+            @Param("status") WorkoutStatus status,
+            @Param("minimumDurationSeconds") int minimumDurationSeconds);
 
     @Query("SELECT COUNT(w) FROM WorkoutSession w WHERE w.finishedAt >= :twentyFourHoursAgo AND w.status = 'FINISHED'")
     Long countWorkoutsLast24Hours(@Param("twentyFourHoursAgo") LocalDateTime twentyFourHoursAgo);
