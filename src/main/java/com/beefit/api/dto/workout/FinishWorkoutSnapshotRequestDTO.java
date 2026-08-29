@@ -12,7 +12,7 @@ public record FinishWorkoutSnapshotRequestDTO(
         @NotBlank @Size(max = 64) String finishedAt,
         @NotEmpty @Size(max = 8) List<@NotBlank @Size(max = 50) String> muscleGroups,
         @NotNull @Valid @Size(max = 20) List<FinishWorkoutExerciseDTO> exercises,
-        @Size(max = 255) String title,
+        @Size(max = 80) String title,
         Boolean shouldPostWorkout,
         java.util.UUID photoMediaId) {
 }
