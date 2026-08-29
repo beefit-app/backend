@@ -36,6 +36,7 @@ import com.beefit.api.domain.enums.SocialEvent;
 import com.beefit.api.domain.enums.WorkoutStatus;
 import com.beefit.api.dto.social.SocialEventDTO;
 import com.beefit.api.dto.workout.CardGeneratedEventDTO;
+import com.beefit.api.dto.workout.ExerciseHistoryResponseDTO;
 import com.beefit.api.dto.workout.FinishWorkoutExerciseDTO;
 import com.beefit.api.dto.workout.FinishWorkoutSetDTO;
 import com.beefit.api.dto.workout.FinishWorkoutSnapshotRequestDTO;
@@ -100,6 +101,35 @@ public class WorkoutSessionService {
         validateWorkoutOwnership(userId, session);
         initializeWorkoutGraph(session);
         return workoutSessionMapper.toDto(session);
+    }
+
+    @Transactional(readOnly = true)
+    public ExerciseHistoryResponseDTO getExerciseHistory(UUID userId, UUID catalogExerciseId) {
+        List<SessionExercise> exercises = workoutSessionRepository.findFinishedExercisesWithSetsByUserIdAndCatalogExerciseId(
+                userId, catalogExerciseId, WorkoutStatus.FINISHED);
+
+        List<ExerciseSetPerformance> performances = exercises.stream()
+                .flatMap(sessionExercise -> sessionExercise.getSets().stream()
+                        .filter(set -> set.getReps() != null && set.getReps() > 0)
+                        .filter(set -> set.getWeightKg() != null && set.getWeightKg() >= 0)
+                        .map(set -> new ExerciseSetPerformance(
+                                sessionExercise.getWorkoutSession().getFinishedAt(), set.getWeightKg(), set.getReps())))
+                .toList();
+
+        if (performances.isEmpty()) {
+            return new ExerciseHistoryResponseDTO(null, null, null, null, null);
+        }
+
+        ExerciseSetPerformance latest = performances.stream()
+                .max(Comparator.comparing(ExerciseSetPerformance::finishedAt))
+                .orElseThrow();
+        ExerciseSetPerformance best = performances.stream()
+                .max(Comparator.comparingDouble(ExerciseSetPerformance::weightKg)
+                        .thenComparingInt(ExerciseSetPerformance::reps))
+                .orElseThrow();
+
+        return new ExerciseHistoryResponseDTO(
+                latest.finishedAt(), best.weightKg(), best.reps(), latest.weightKg(), latest.reps());
     }
 
     @Transactional(readOnly = true)
@@ -294,6 +324,9 @@ public class WorkoutSessionService {
                 ),
                 userId
         );
+    }
+
+    private record ExerciseSetPerformance(LocalDateTime finishedAt, double weightKg, int reps) {
     }
 
     private LocalDateTime parseFinishedAt(String finishedAtValue) {

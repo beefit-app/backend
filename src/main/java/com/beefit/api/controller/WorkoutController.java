@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.beefit.api.domain.User;
 import com.beefit.api.dto.workout.FinishWorkoutSnapshotRequestDTO;
+import com.beefit.api.dto.workout.ExerciseHistoryResponseDTO;
 import com.beefit.api.dto.workout.StartWorkoutRequestDTO;
 import com.beefit.api.dto.workout.WorkoutSessionResponseDTO;
 import com.beefit.api.service.WorkoutSessionService;
@@ -41,6 +42,12 @@ public class WorkoutController implements GenericController {
     public ResponseEntity<WorkoutSessionResponseDTO> getWorkout(@AuthenticationPrincipal User user,
             @PathVariable UUID workoutId) {
         return ResponseEntity.ok(workoutSessionService.getWorkout(user.getId(), workoutId));
+    }
+
+    @GetMapping("/exercises/{catalogExerciseId}/history")
+    public ResponseEntity<ExerciseHistoryResponseDTO> getExerciseHistory(@AuthenticationPrincipal User user,
+            @PathVariable UUID catalogExerciseId) {
+        return ResponseEntity.ok(workoutSessionService.getExerciseHistory(user.getId(), catalogExerciseId));
     }
 
     @PostMapping("/start")

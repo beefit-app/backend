@@ -41,6 +41,7 @@ import com.beefit.api.domain.enums.SocialEvent;
 import com.beefit.api.domain.enums.WorkoutStatus;
 import com.beefit.api.dto.social.SocialEventDTO;
 import com.beefit.api.dto.workout.CardGeneratedEventDTO;
+import com.beefit.api.dto.workout.ExerciseHistoryResponseDTO;
 import com.beefit.api.dto.workout.FinishWorkoutExerciseDTO;
 import com.beefit.api.dto.workout.FinishWorkoutSetDTO;
 import com.beefit.api.dto.workout.FinishWorkoutSnapshotRequestDTO;
@@ -294,6 +295,38 @@ class WorkoutSessionServiceTest {
 
         assertThrows(WorkoutSessionNotFoundException.class,
                 () -> workoutSessionService.getWorkout(userId, workoutId));
+    }
+
+    @Test
+    void getExerciseHistoryReturnsLatestAndBestCompletedPerformance() {
+        UUID catalogExerciseId = UUID.randomUUID();
+        CatalogExercise catalogExercise = catalogExercise(catalogExerciseId, "Supino");
+
+        WorkoutSession olderWorkout = inProgressSession(UUID.randomUUID());
+        olderWorkout.setStatus(WorkoutStatus.FINISHED);
+        olderWorkout.setFinishedAt(LocalDateTime.of(2026, 5, 20, 10, 0));
+        SessionExercise olderExercise = sessionExercise(UUID.randomUUID(), catalogExercise, 1);
+        olderExercise.setWorkoutSession(olderWorkout);
+        olderExercise.addSet(set(UUID.randomUUID(), 1, 100.0, 5));
+
+        WorkoutSession latestWorkout = inProgressSession(UUID.randomUUID());
+        latestWorkout.setStatus(WorkoutStatus.FINISHED);
+        latestWorkout.setFinishedAt(LocalDateTime.of(2026, 5, 25, 10, 0));
+        SessionExercise latestExercise = sessionExercise(UUID.randomUUID(), catalogExercise, 1);
+        latestExercise.setWorkoutSession(latestWorkout);
+        latestExercise.addSet(set(UUID.randomUUID(), 1, 90.0, 8));
+
+        when(workoutSessionRepository.findFinishedExercisesWithSetsByUserIdAndCatalogExerciseId(
+                userId, catalogExerciseId, WorkoutStatus.FINISHED))
+                .thenReturn(List.of(latestExercise, olderExercise));
+
+        ExerciseHistoryResponseDTO history = workoutSessionService.getExerciseHistory(userId, catalogExerciseId);
+
+        assertEquals(LocalDateTime.of(2026, 5, 25, 10, 0), history.lastPerformedAt());
+        assertEquals(100.0, history.bestWeightKg());
+        assertEquals(5, history.bestReps());
+        assertEquals(90.0, history.lastWeightKg());
+        assertEquals(8, history.lastReps());
     }
 
     @Test
