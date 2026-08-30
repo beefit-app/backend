@@ -49,7 +49,7 @@ public class DatabaseSeeder implements CommandLineRunner { // Interface faz a cl
             return;
         }
 
-        ClassPathResource resource = new ClassPathResource("seeds/exercises.json");
+        ClassPathResource resource = new ClassPathResource("seeds/exercicesv2.json");
 
         try(InputStream inputStream = resource.getInputStream() /* Passa do Json para bytes */){
                 // Cria lista de ExerciseSeedDTO a partir dos Json

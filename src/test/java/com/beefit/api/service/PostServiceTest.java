@@ -142,12 +142,23 @@ class PostServiceTest {
     }
 
     @Test
-    void profilePostsAreHiddenFromUsersWhoAreNotAcceptedFriends() {
+    void profilePostsReturnEmptyPageForUsersWhoAreNotAcceptedFriends() {
         User target = new User();
         target.setId(UUID.randomUUID());
         target.setGhostMode(false);
         when(userRepository.findByUsernameIgnoreCase("target")).thenReturn(Optional.of(target));
         when(friendshipRepository.existsAcceptedFriendshipBetween(userId, target.getId())).thenReturn(false);
+
+        var result = postService.getPostsByUsername(user, "target", PageRequest.of(0, 10));
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
+    void profilePostsThrowForGhostModeUser() {
+        User target = new User();
+        target.setId(UUID.randomUUID());
+        target.setGhostMode(true);
+        when(userRepository.findByUsernameIgnoreCase("target")).thenReturn(Optional.of(target));
 
         assertThrows(UserNotFoundException.class,
                 () -> postService.getPostsByUsername(user, "target", PageRequest.of(0, 10)));
