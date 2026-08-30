@@ -69,9 +69,12 @@ public class PostService {
     @Transactional
     public Page<FeedPostResponseDTO> getPostsByUsername(User currentUser, String username, Pageable pageable) {
         User target = userRepository.findByUsernameIgnoreCase(username.trim()).orElseThrow(UserNotFoundException::new);
-        if (!target.getId().equals(currentUser.getId()) && (target.getGhostMode()
-                || !friendshipRepository.existsAcceptedFriendshipBetween(currentUser.getId(), target.getId()))) {
+        if (target.getGhostMode() && !target.getId().equals(currentUser.getId())) {
             throw new UserNotFoundException();
+        }
+        if (!target.getId().equals(currentUser.getId())
+                && !friendshipRepository.existsAcceptedFriendshipBetween(currentUser.getId(), target.getId())) {
+            return Page.empty(pageable);
         }
 
         return postRepository.findAllByUserAndIsRemovedFalseOrderByPublishedAtDesc(target, pageable)
