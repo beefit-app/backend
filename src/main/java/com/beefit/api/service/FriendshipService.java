@@ -127,6 +127,21 @@ public class FriendshipService {
     }
 
     @Transactional
+    public void cancelFriendshipRequest(User requester, UUID friendshipId){
+        Friendship friendship = friendshipRepository.findById(friendshipId).orElseThrow(FriendshipNotFound::new);
+
+        if(!requester.getId().equals(friendship.getRequester().getId())){
+            throw new DifferentUserException();
+        }
+
+        if(!FriendshipStatus.PENDING.equals(friendship.getStatus())){
+            throw new FriendshipNotPendingException();
+        }
+
+        friendshipRepository.delete(friendship);
+    }
+
+    @Transactional
     public void removeFriend(User user, UUID friendshipID){
         Friendship friendship = friendshipRepository.findById(friendshipID).orElseThrow(FriendshipNotFound::new);
 

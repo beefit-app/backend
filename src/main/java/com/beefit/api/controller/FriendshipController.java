@@ -38,6 +38,14 @@ public class FriendshipController implements GenericController {
         return ResponseEntity.status(HttpStatus.CREATED).body(friendshipService.createFriendship(user, addresseeId));
     }
 
+    @PostMapping("/{friendshipId}/cancel")
+    public ResponseEntity<Void> cancelFriendRequest(@AuthenticationPrincipal User user, @PathVariable UUID friendshipId) {
+
+        friendshipService.cancelFriendshipRequest(user, friendshipId);
+
+        return ResponseEntity.noContent().build();
+    }
+
     @PostMapping("/{friendshipId}/accept")
     public ResponseEntity<FriendshipResponseDTO> acceptRequest(@AuthenticationPrincipal User user,
             @PathVariable UUID friendshipId) {
