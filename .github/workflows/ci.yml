@@ -23,7 +23,7 @@ jobs:
         run: ./mvnw -B verify
       - name: Gerar SBOM CycloneDX
         run: ./mvnw -B -DskipTests org.cyclonedx:cyclonedx-maven-plugin:makeAggregateBom
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: backend-reports
           path: |
