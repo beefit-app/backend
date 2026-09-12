@@ -13,7 +13,7 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-java@v6
         with:
           distribution: temurin
@@ -34,7 +34,7 @@ jobs:
   supply-chain:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # A v0.36.0 fixa a setup-trivy interna por SHA de commit. A v0.28.0 a fixava
       # por tag (v0.2.1), que foi removida do repositorio e levou junto qualquer
       # versao que dependesse dela — quebra irrecuperavel sem subir de versao.
