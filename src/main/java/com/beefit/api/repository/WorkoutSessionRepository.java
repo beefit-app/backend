@@ -118,7 +118,7 @@ public interface WorkoutSessionRepository extends JpaRepository<WorkoutSession, 
     // Um Honey representa um dia com pelo menos um treino elegivel. O treino que
     // esta sendo finalizado e excluido porque a query pode provocar flush antes
     // de ser executada.
-    @Query("SELECT COUNT(w) > 0 FROM WorkoutSession w WHERE w.user.id = :userId " +
+    @Query("SELECT CASE WHEN COUNT(w) > 0 THEN true ELSE false END FROM WorkoutSession w WHERE w.user.id = :userId " +
             "AND w.id <> :currentWorkoutId AND w.status = :status " +
             "AND w.durationSeconds >= :minimumDurationSeconds " +
             "AND w.finishedAt >= :startOfDay AND w.finishedAt < :endOfDay " +

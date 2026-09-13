@@ -66,7 +66,7 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 public class WorkoutSessionService {
-    private static final int MIN_HONEY_WORKOUT_DURATION_SECONDS = 1800;
+    private static final int MIN_HONEY_WORKOUT_DURATION_SECONDS = 1740;
     private static final Duration MAX_FUTURE_CLOCK_SKEW = Duration.ofMinutes(5);
     private static final Duration MAX_WORKOUT_DURATION = Duration.ofHours(24);
 
@@ -247,10 +247,8 @@ public class WorkoutSessionService {
         session.setCard(card);
 
         LocalDateTime honeyDayStart = finishedAt.toLocalDate().atStartOfDay();
+        user.setWorkoutsCount(user.getWorkoutsCount() + 1);
         boolean eligibleForHoney = isEligibleForHoney(session, durationSeconds);
-        if (eligibleForHoney) {
-            user.setWorkoutsCount(user.getWorkoutsCount() + 1);
-        }
         boolean alreadyEarnedHoneyToday = eligibleForHoney
                 && workoutSessionRepository.existsEligibleFinishedWorkoutOnDay(
                         userId,
@@ -358,6 +356,17 @@ public class WorkoutSessionService {
     }
 
     @Transactional
+    @Transactional
+    public void deleteWorkout(UUID userId, UUID workoutId) {
+        WorkoutSession session = workoutSessionRepository.findById(workoutId).orElseThrow(WorkoutSessionNotFoundException::new);
+        validateWorkoutOwnership(userId, session);
+        postRepository.findByWorkoutSessionId(session.getId()).ifPresent(post -> {
+            post.setIsRemoved(true);
+            postRepository.save(post);
+        });
+        workoutSessionRepository.delete(session);
+    }
+
     public WorkoutSessionResponseDTO cancelWorkout(UUID userId, UUID workoutId) {
         WorkoutSession session = workoutSessionRepository.findById(workoutId)
                 .orElseThrow(WorkoutSessionNotFoundException::new);
