@@ -430,7 +430,7 @@ class WorkoutSessionServiceTest {
                 userId,
                 workoutId,
                 WorkoutStatus.FINISHED,
-                1800,
+                1740,
                 LocalDateTime.of(2026, 5, 26, 0, 0),
                 LocalDateTime.of(2026, 5, 27, 0, 0));
     }
@@ -449,7 +449,7 @@ class WorkoutSessionServiceTest {
                 userId,
                 workoutId,
                 WorkoutStatus.FINISHED,
-                1800,
+                1740,
                 LocalDateTime.of(2026, 5, 26, 0, 0),
                 LocalDateTime.of(2026, 5, 27, 0, 0))).thenReturn(true);
 
@@ -464,7 +464,7 @@ class WorkoutSessionServiceTest {
     void finishWorkoutBelowThirtyMinutesDoesNotIncrementHoneys() {
         UUID workoutId = UUID.randomUUID();
         WorkoutSession session = inProgressSession(workoutId);
-        FinishWorkoutSnapshotRequestDTO request = minimalFinishRequest("2026-05-26T10:29:59-03:00");
+        FinishWorkoutSnapshotRequestDTO request = minimalFinishRequest("2026-05-26T10:28:59-03:00");
 
         prepareMinimalFinish(workoutId, session);
 
@@ -472,7 +472,7 @@ class WorkoutSessionServiceTest {
 
         assertEquals(0, user.getOffensiveHoneys());
         assertEquals(0, user.getWeeklyWorkoutsCount());
-        assertEquals(0, user.getWorkoutsCount());
+        assertEquals(1, user.getWorkoutsCount());
         verify(workoutSessionRepository, never()).existsEligibleFinishedWorkoutOnDay(
                 any(UUID.class),
                 any(UUID.class),
@@ -499,7 +499,7 @@ class WorkoutSessionServiceTest {
                 userId,
                 workoutId,
                 WorkoutStatus.FINISHED,
-                1800,
+                1740,
                 LocalDateTime.of(2026, 5, 26, 0, 0),
                 LocalDateTime.of(2026, 5, 27, 0, 0));
     }
@@ -516,7 +516,7 @@ class WorkoutSessionServiceTest {
 
         assertEquals(0, user.getOffensiveHoneys());
         assertEquals(0, user.getWeeklyWorkoutsCount());
-        assertEquals(0, user.getWorkoutsCount());
+        assertEquals(1, user.getWorkoutsCount());
         verify(workoutSessionRepository, never()).existsEligibleFinishedWorkoutOnDay(
                 any(UUID.class), any(UUID.class), any(WorkoutStatus.class),
                 org.mockito.ArgumentMatchers.anyInt(), any(LocalDateTime.class), any(LocalDateTime.class));
