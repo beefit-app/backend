@@ -68,13 +68,13 @@ public class WorkoutController implements GenericController {
         return ResponseEntity.ok(response);
     }
 
-    @PostMapping("/{workoutId}/cancel")
     @DeleteMapping("/{workoutId}")
     public ResponseEntity<Void> deleteWorkout(@AuthenticationPrincipal User user, @PathVariable UUID workoutId) {
         workoutSessionService.deleteWorkout(user.getId(), workoutId);
         return ResponseEntity.noContent().build();
     }
 
+    @PostMapping("/{workoutId}/cancel")
     public ResponseEntity<WorkoutSessionResponseDTO> cancelWorkout(@AuthenticationPrincipal User user,
             @PathVariable UUID workoutId) {
         WorkoutSessionResponseDTO response = workoutSessionService.cancelWorkout(user.getId(), workoutId);
