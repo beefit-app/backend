@@ -358,6 +358,17 @@ public class WorkoutSessionService {
     }
 
     @Transactional
+    public void deleteWorkout(UUID userId, UUID workoutId) {
+        WorkoutSession session = workoutSessionRepository.findById(workoutId).orElseThrow(WorkoutSessionNotFoundException::new);
+        validateWorkoutOwnership(userId, session);
+        postRepository.findByWorkoutSessionId(session.getId()).ifPresent(post -> {
+            post.setIsRemoved(true);
+            postRepository.save(post);
+        });
+        workoutSessionRepository.delete(session);
+    }
+
+    @Transactional
     public WorkoutSessionResponseDTO cancelWorkout(UUID userId, UUID workoutId) {
         WorkoutSession session = workoutSessionRepository.findById(workoutId)
                 .orElseThrow(WorkoutSessionNotFoundException::new);

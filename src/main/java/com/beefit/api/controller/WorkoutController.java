@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -65,6 +66,12 @@ public class WorkoutController implements GenericController {
             @Valid @RequestBody FinishWorkoutSnapshotRequestDTO request) {
         WorkoutSessionResponseDTO response = workoutSessionService.finishWorkout(user.getId(), workoutId, idempotencyKey, request);
         return ResponseEntity.ok(response);
+    }
+
+    @DeleteMapping("/{workoutId}")
+    public ResponseEntity<Void> deleteWorkout(@AuthenticationPrincipal User user, @PathVariable UUID workoutId) {
+        workoutSessionService.deleteWorkout(user.getId(), workoutId);
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{workoutId}/cancel")
