@@ -50,6 +50,7 @@ public interface PostRepository extends JpaRepository<Post, UUID> {
 
     // Traz o post pelo ID, mas já filtrando para garantir que não foi removido pela moderação
     Optional<Post> findByIdAndIsRemovedFalse(UUID id);
+    Optional<Post> findByWorkoutSessionId(UUID workoutSessionId);
 
     @Query("SELECT p FROM Post p JOIN FETCH p.user u JOIN FETCH p.workoutSession w " +
             "WHERE p.id = :postId AND p.isRemoved = false AND (" +
