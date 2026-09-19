@@ -31,7 +31,8 @@ public class SecurityFilter extends OncePerRequestFilter {
             "/auth/login",
             "/auth/register",
             "/auth/refresh",
-            "/auth/logout"
+            "/auth/logout",
+            "/error"
     };
 
     private final TokenService tokenService;

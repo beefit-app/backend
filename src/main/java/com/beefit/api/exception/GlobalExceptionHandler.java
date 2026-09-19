@@ -34,6 +34,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import jakarta.validation.ConstraintViolationException;
 import java.time.format.DateTimeParseException;
 import java.io.IOException;
+import software.amazon.awssdk.core.exception.SdkException;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -407,6 +408,32 @@ public class GlobalExceptionHandler {
                 HttpStatus.NOT_FOUND.value(),
                 "Erro ao buscar inventário",
                 e.getMessage(),
+                List.of(),
+                request.getRequestURI()
+        );
+    }
+
+    @ExceptionHandler(SdkException.class)
+    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+    public ErrorResponse handleStorageException(SdkException e, HttpServletRequest request) {
+        return new ErrorResponse(
+                LocalDateTime.now(),
+                HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                "Erro no serviço de armazenamento",
+                "Não foi possível processar o upload do arquivo no armazenamento em nuvem.",
+                List.of(),
+                request.getRequestURI()
+        );
+    }
+
+    @ExceptionHandler(Exception.class)
+    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+    public ErrorResponse handleGenericException(Exception e, HttpServletRequest request) {
+        return new ErrorResponse(
+                LocalDateTime.now(),
+                HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                "Erro interno do servidor",
+                "Ocorreu um erro inesperado. Tente novamente mais tarde.",
                 List.of(),
                 request.getRequestURI()
         );
