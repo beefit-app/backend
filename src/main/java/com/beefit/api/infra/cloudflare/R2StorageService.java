@@ -37,6 +37,7 @@ public class R2StorageService {
                 .bucket(bucketName)
                 .key(storageKey)
                 .contentType(contentType)
+                .cacheControl("private, max-age=604800, stale-while-revalidate=86400")
                 .build();
 
         s3Client.putObject(putObjectRequest, RequestBody.fromBytes(bytes));
