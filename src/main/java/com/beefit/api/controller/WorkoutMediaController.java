@@ -6,7 +6,8 @@ import com.beefit.api.dto.media.WorkoutMediaResponseDTO;
 import com.beefit.api.service.WorkoutMediaService;
 import com.beefit.api.service.RateLimitService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.CacheControl;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -19,11 +20,9 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.util.UUID;
+import java.net.URI;
 import java.time.Duration;
-import java.security.MessageDigest;
-import java.util.HexFormat;
-import org.springframework.http.CacheControl;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/media")
@@ -47,20 +46,12 @@ public class WorkoutMediaController {
     }
 
     @GetMapping("/{mediaId}")
-    public ResponseEntity<ByteArrayResource> get(@AuthenticationPrincipal User user, @PathVariable UUID mediaId) {
+    public ResponseEntity<Void> get(@AuthenticationPrincipal User user, @PathVariable UUID mediaId) {
         WorkoutMedia media = workoutMediaService.getVisible(mediaId, user);
-        String etag = etag(media.getContent());
-        return ResponseEntity.ok().contentType(MediaType.parseMediaType(media.getContentType()))
-                .cacheControl(CacheControl.maxAge(Duration.ofHours(1)).cachePrivate())
-                .eTag(etag)
-                .body(new ByteArrayResource(media.getContent()));
-    }
-
-    private String etag(byte[] content) {
-        try {
-            return "\"" + HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(content)) + "\"";
-        } catch (java.security.NoSuchAlgorithmException exception) {
-            throw new IllegalStateException("SHA-256 indisponível.", exception);
-        }
+        String presignedUrl = workoutMediaService.getPresignedUrl(media);
+        return ResponseEntity.status(HttpStatus.FOUND)
+                .location(URI.create(presignedUrl))
+                .cacheControl(CacheControl.maxAge(Duration.ofMinutes(15)).cachePrivate())
+                .build();
     }
 }

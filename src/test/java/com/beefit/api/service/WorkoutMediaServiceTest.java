@@ -36,6 +36,9 @@ class WorkoutMediaServiceTest {
     @Mock
     private UserRepository userRepository;
 
+    @Mock
+    private com.beefit.api.infra.cloudflare.R2StorageService r2StorageService;
+
     private WorkoutMediaService service;
     private UUID mediaId;
     private User owner;
@@ -44,7 +47,7 @@ class WorkoutMediaServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new WorkoutMediaService(mediaRepository, postRepository, userRepository);
+        service = new WorkoutMediaService(mediaRepository, postRepository, userRepository, r2StorageService);
         mediaId = UUID.randomUUID();
         owner = user(UserRole.USER);
         viewer = user(UserRole.USER);
