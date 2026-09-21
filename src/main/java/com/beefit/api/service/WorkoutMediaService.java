@@ -5,6 +5,7 @@ import com.beefit.api.domain.WorkoutMedia;
 import com.beefit.api.dto.media.WorkoutMediaResponseDTO;
 import com.beefit.api.domain.enums.UserRole;
 import com.beefit.api.exception.media.MediaNotFoundException;
+import com.beefit.api.infra.cloudflare.R2StorageService;
 import com.beefit.api.repository.PostRepository;
 import com.beefit.api.repository.UserRepository;
 import com.beefit.api.repository.WorkoutMediaRepository;
@@ -21,6 +22,7 @@ import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
 import javax.imageio.stream.ImageInputStream;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import java.io.ByteArrayOutputStream;
@@ -37,6 +39,7 @@ public class WorkoutMediaService {
     private final WorkoutMediaRepository repository;
     private final PostRepository postRepository;
     private final UserRepository userRepository;
+    private final R2StorageService r2StorageService;
 
     public WorkoutMediaResponseDTO upload(User user, MultipartFile file) throws IOException {
         if (file.isEmpty() || file.getSize() > MAX_FILE_SIZE) {
@@ -49,13 +52,21 @@ public class WorkoutMediaService {
             throw new IllegalArgumentException("Você atingiu o limite de fotos pendentes. Finalize ou descarte as anteriores antes de novos envios.");
         }
         ProcessedImage processed = inspectAndNormalizeImage(file.getBytes());
+        String ext = "png".equalsIgnoreCase(processed.format()) ? "png" : "jpg";
+        String storageKey = "media/" + user.getId() + "/" + UUID.randomUUID() + "." + ext;
+        r2StorageService.upload(storageKey, processed.content(), processed.contentType());
+
         WorkoutMedia media = new WorkoutMedia();
         media.setOwner(user);
-        media.setContent(processed.content());
+        media.setStorageKey(storageKey);
         media.setContentType(processed.contentType());
         media.setFileName(sanitizeFileName(file.getOriginalFilename(), processed.format()));
         WorkoutMedia saved = repository.save(media);
         return new WorkoutMediaResponseDTO(saved.getId(), "/api/media/" + saved.getId());
+    }
+
+    public String getPresignedUrl(WorkoutMedia media) {
+        return r2StorageService.generatePresignedUrl(media.getStorageKey());
     }
 
     public WorkoutMedia consume(UUID mediaId, UUID userId) {
@@ -75,16 +86,30 @@ public class WorkoutMediaService {
         repository.save(media);
     }
 
-    public void delete(UUID mediaId) { repository.deleteById(mediaId); }
+    public void delete(UUID mediaId) {
+        repository.findById(mediaId).ifPresent(media -> {
+            r2StorageService.delete(media.getStorageKey());
+            repository.delete(media);
+        });
+    }
 
-    public void deleteAllForOwner(UUID userId) { repository.deleteByOwnerId(userId); }
+    public void deleteAllForOwner(UUID userId) {
+        List<WorkoutMedia> medias = repository.findByOwnerId(userId);
+        for (WorkoutMedia media : medias) {
+            r2StorageService.delete(media.getStorageKey());
+        }
+        repository.deleteByOwnerId(userId);
+    }
 
     public void releasePreviousProfileMedia(String previousPath, String newPath, UUID userId) {
         if (previousPath == null || previousPath.equals(newPath) || !previousPath.startsWith("/api/media/")) return;
         try {
             UUID mediaId = UUID.fromString(previousPath.substring(previousPath.lastIndexOf('/') + 1));
             if (!postRepository.existsByPhotoMediaId(mediaId)) {
-                repository.findByIdAndOwnerId(mediaId, userId).ifPresent(repository::delete);
+                repository.findByIdAndOwnerId(mediaId, userId).ifPresent(media -> {
+                    r2StorageService.delete(media.getStorageKey());
+                    repository.delete(media);
+                });
             }
         } catch (IllegalArgumentException ignored) {
             // Referências legadas ou externas não pertencem ao armazenamento interno.
@@ -93,7 +118,11 @@ public class WorkoutMediaService {
 
     @Scheduled(fixedDelay = 3_600_000)
     public void cleanupOrphanedMedia() {
-        repository.deleteAll(repository.findByConsumedFalseAndCreatedAtBefore(java.time.LocalDateTime.now().minusHours(24)));
+        List<WorkoutMedia> orphaned = repository.findByConsumedFalseAndCreatedAtBefore(java.time.LocalDateTime.now().minusHours(24));
+        for (WorkoutMedia media : orphaned) {
+            r2StorageService.delete(media.getStorageKey());
+        }
+        repository.deleteAll(orphaned);
     }
 
     private record ProcessedImage(byte[] content, String contentType, String format) {}

@@ -39,7 +39,28 @@
 		<postgresql.version>42.7.13</postgresql.version>
 		<tomcat.version>11.0.24</tomcat.version>
 	</properties>
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>software.amazon.awssdk</groupId>
+				<artifactId>bom</artifactId>
+				<version>2.55.1</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
 	<dependencies>
+		<dependency>
+			<groupId>me.paulschwarz</groupId>
+			<artifactId>springboot3-dotenv</artifactId>
+			<version>5.1.0</version>
+		</dependency>
+		<!-- AWS SDK v2 S3 -->
+		<dependency>
+			<groupId>software.amazon.awssdk</groupId>
+			<artifactId>s3</artifactId>
+		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-docker-compose</artifactId>

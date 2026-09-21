@@ -9,7 +9,7 @@ Este documento lista as melhorias arquiteturais e de banco de dados planejadas p
   - Melhorar as descrições, revisar os mapeamentos anatômicos (músculos sinergistas/alvos) e possivelmente adicionar suporte estrutural para vídeos/GIFs de execução curados.
   - Criar um endpoint de versionamento do catálogo (`/api/catalog/version`) para que o aplicativo saiba quando deve baixar uma base de dados nova.
 
-## 2. Otimização de Mídia e Armazenamento
+## 2. Otimização de Mídia e Armazenamento - Já implementado, mas mantendo o Jpeg
 - **Objetivo:** Suportar a migração do processamento pesado de mídia para o celular do usuário.
 - **Ações:**
   - Preparar o endpoint de upload para aceitar e otimizar nativamente a persistência do formato `WebP` (que o frontend passará a gerar).

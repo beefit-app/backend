@@ -105,8 +105,9 @@ public class SecurityConfiguration {
                         // .requestMatchers(HttpMethod.POST, "/dashboard").hasRole("ADMIN")
                         // Rotas exclusivas de admin ou de autenticação devem ser adicionadas aqui
                         authorize
-                        .dispatcherTypeMatchers(DispatcherType.ASYNC).permitAll()
+                        .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        .requestMatchers("/error").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/login").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/register").permitAll()
                         .requestMatchers(HttpMethod.GET, "/auth/legal-versions").permitAll()

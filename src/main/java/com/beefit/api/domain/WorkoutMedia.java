@@ -31,9 +31,8 @@ public class WorkoutMedia {
     @JoinColumn(name = "owner_id", nullable = false)
     private User owner;
 
-    @Lob
-    @Column(nullable = false)
-    private byte[] content;
+    @Column(name = "storage_key", nullable = false)
+    private String storageKey;
 
     @Column(nullable = false)
     private String contentType;
