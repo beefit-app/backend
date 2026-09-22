@@ -15,3 +15,12 @@ beefit:
 spring:
   jpa:
     show-sql: false
+
+cloudflare:
+  r2:
+    bucket-name: test-bucket
+    account-id: test-account
+    endpoint: https://dummy.r2.cloudflarestorage.com
+    access-key-id: test-access-key-id
+    secret-access-key: test-secret-access-key
+    token-value: test-token-value
