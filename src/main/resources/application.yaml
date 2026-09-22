@@ -52,15 +52,15 @@ beefit:
       registration-maximum: ${BEEFIT_SECURITY_RATE_LIMIT_REGISTRATION_MAXIMUM:5}
     token:
       secret: ${JWT_SECRET}
-# : depois da variável cria um fallback vazio "" caso ela não seja encontrada
+# : depois da variável cria um fallback seguro caso ela não seja encontrada no ambiente/CI
 cloudflare:
   r2:
-    bucket-name: ${BUCKET_NAME:}
-    account-id: ${ACCOUNT_ID:}
-    endpoint: ${ENDPOINT:}
-    access-key-id: ${ACCESS_KEY_ID:}
-    secret-access-key: ${SECRET_ACCESS_KEY:}
-    token-value: ${TOKEN_VALUE:}
+    bucket-name: ${BUCKET_NAME:test-bucket}
+    account-id: ${ACCOUNT_ID:test-account}
+    endpoint: ${ENDPOINT:https://dummy.r2.cloudflarestorage.com}
+    access-key-id: ${ACCESS_KEY_ID:dummy-access-key}
+    secret-access-key: ${SECRET_ACCESS_KEY:dummy-secret-key}
+    token-value: ${TOKEN_VALUE:dummy-token}
 
 management:
   endpoints:
