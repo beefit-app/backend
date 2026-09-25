@@ -23,6 +23,7 @@ public class RateLimitService {
     private static final Duration REFRESH_WINDOW = Duration.ofMinutes(5);
     private static final Duration PASSWORD_WINDOW = Duration.ofHours(1);
     private static final Duration UPLOAD_WINDOW = Duration.ofHours(1);
+    private static final Duration REPORT_WINDOW = Duration.ofHours(1);
 
     private final RateLimitRepository repository;
     private final int registrationMaximum;
@@ -62,6 +63,10 @@ public class RateLimitService {
 
     public void checkUpload(UUID userId) {
         check("upload-user", userId.toString(), 20, UPLOAD_WINDOW);
+    }
+
+    public void checkReport(UUID userId) {
+        check("report-user", userId.toString(), 10, REPORT_WINDOW);
     }
 
     private void check(String scope, String identity, int maximumRequests, Duration window) {

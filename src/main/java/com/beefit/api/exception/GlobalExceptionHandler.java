@@ -7,6 +7,9 @@ import java.util.List;
 import com.beefit.api.exception.exercises.CatalogExerciseNotFound;
 import com.beefit.api.exception.exercises.DatabaseSeederFailException;
 import com.beefit.api.exception.friendship.*;
+import com.beefit.api.exception.report.CannotReportSelfException;
+import com.beefit.api.exception.report.ReportAlreadyExistsException;
+import com.beefit.api.exception.report.ReportTargetNotFoundException;
 import com.beefit.api.exception.hive.ExceededHiveLimitException;
 import com.beefit.api.exception.hive.HiveNotFoundException;
 import com.beefit.api.exception.hive.InvalidTimePeriodException;
@@ -271,6 +274,30 @@ public class GlobalExceptionHandler {
         return new ErrorResponse(LocalDateTime.now(),
                 HttpStatus.CONFLICT.value(),
                 "Solicitação de amizade inválida",
+                e.getMessage(),
+                List.of(),
+                request.getRequestURI());
+    }
+
+    @ExceptionHandler({ReportAlreadyExistsException.class, CannotReportSelfException.class})
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleReportConflictException(RuntimeException e,
+                                                               HttpServletRequest request) {
+        return new ErrorResponse(LocalDateTime.now(),
+                HttpStatus.CONFLICT.value(),
+                "Denúncia inválida",
+                e.getMessage(),
+                List.of(),
+                request.getRequestURI());
+    }
+
+    @ExceptionHandler(ReportTargetNotFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public ErrorResponse handleReportTargetNotFoundException(ReportTargetNotFoundException e,
+                                                               HttpServletRequest request) {
+        return new ErrorResponse(LocalDateTime.now(),
+                HttpStatus.NOT_FOUND.value(),
+                "Conteúdo não encontrado",
                 e.getMessage(),
                 List.of(),
                 request.getRequestURI());
