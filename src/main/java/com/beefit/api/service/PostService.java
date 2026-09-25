@@ -120,6 +120,7 @@ public class PostService {
         return new FeedPostResponseDTO(
                 post.getId(),
                 author.getId(),
+                session.getId(),
                 author.getUsername(),
                 author.getProfilePicture(),
                 author.hasDeveloperBadge(),
