@@ -30,4 +30,8 @@ public interface ReportRepository extends JpaRepository<Report, UUID> {
     @Query("UPDATE Report r SET r.status = :newStatus "
             + "WHERE r.targetUser.id = :userId AND r.status = com.beefit.api.domain.enums.ReportStatus.PENDING")
     int closePendingByTargetUser(@Param("userId") UUID userId, @Param("newStatus") ReportStatus newStatus);
+
+    @Modifying(flushAutomatically = true)
+    @Query("DELETE FROM Report r WHERE r.targetPost.id = :postId")
+    int deleteByTargetPostId(@Param("postId") UUID postId);
 }
