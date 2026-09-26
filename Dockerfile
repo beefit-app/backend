@@ -16,4 +16,7 @@ WORKDIR /app
 COPY --from=build --chown=beefit:beefit /workspace/target/beefit-api-*.jar app.jar
 USER 10001
 EXPOSE 8080
-ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75.0", "-jar", "/app/app.jar"]
+# Datas LocalDateTime (como Post.publishedAt, via @CreationTimestamp) usam o fuso da
+# JVM e vão para o cliente sem offset; em UTC o app mostraria a hora 3h adiantada.
+# Precisa acompanhar beefit.business.time-zone: o ENTRYPOINT exec não expande variável.
+ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75.0", "-Duser.timezone=America/Sao_Paulo", "-jar", "/app/app.jar"]
