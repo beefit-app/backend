@@ -39,6 +39,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -200,7 +201,8 @@ class AdminEndpointSecurityTest {
                 get("/api/admin/posts"),
                 delete("/api/admin/posts/{id}", id),
                 patch("/api/admin/posts/{id}", id),
-                get("/api/admin/reports"));
+                get("/api/admin/reports"),
+                post("/api/admin/reports/{id}/resolve", id));
     }
 
     private User user(UserRole role, LocalDateTime bannedUntil) {

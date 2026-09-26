@@ -9,6 +9,8 @@ import com.beefit.api.exception.exercises.DatabaseSeederFailException;
 import com.beefit.api.exception.friendship.*;
 import com.beefit.api.exception.report.CannotReportSelfException;
 import com.beefit.api.exception.report.ReportAlreadyExistsException;
+import com.beefit.api.exception.report.ReportAlreadyResolvedException;
+import com.beefit.api.exception.report.ReportNotFoundException;
 import com.beefit.api.exception.report.ReportTargetNotFoundException;
 import com.beefit.api.exception.hive.ExceededHiveLimitException;
 import com.beefit.api.exception.hive.HiveNotFoundException;
@@ -279,7 +281,8 @@ public class GlobalExceptionHandler {
                 request.getRequestURI());
     }
 
-    @ExceptionHandler({ReportAlreadyExistsException.class, CannotReportSelfException.class})
+    @ExceptionHandler({ReportAlreadyExistsException.class, CannotReportSelfException.class,
+            ReportAlreadyResolvedException.class})
     @ResponseStatus(HttpStatus.CONFLICT)
     public ErrorResponse handleReportConflictException(RuntimeException e,
                                                                HttpServletRequest request) {
@@ -291,9 +294,9 @@ public class GlobalExceptionHandler {
                 request.getRequestURI());
     }
 
-    @ExceptionHandler(ReportTargetNotFoundException.class)
+    @ExceptionHandler({ReportTargetNotFoundException.class, ReportNotFoundException.class})
     @ResponseStatus(HttpStatus.NOT_FOUND)
-    public ErrorResponse handleReportTargetNotFoundException(ReportTargetNotFoundException e,
+    public ErrorResponse handleReportTargetNotFoundException(RuntimeException e,
                                                                HttpServletRequest request) {
         return new ErrorResponse(LocalDateTime.now(),
                 HttpStatus.NOT_FOUND.value(),
