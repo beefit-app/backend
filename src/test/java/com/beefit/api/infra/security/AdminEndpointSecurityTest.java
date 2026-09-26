@@ -2,6 +2,7 @@ package com.beefit.api.infra.security;
 
 import com.beefit.api.controller.AdminDashboardController;
 import com.beefit.api.controller.AdminUserController;
+import com.beefit.api.controller.AdminReportController;
 import com.beefit.api.controller.AdminWorkoutController;
 import com.beefit.api.controller.WorkoutMediaController;
 import com.beefit.api.controller.AuthController;
@@ -14,6 +15,7 @@ import com.beefit.api.repository.UserRepository;
 import com.beefit.api.service.AdminDashboardService;
 import com.beefit.api.service.AdminUserService;
 import com.beefit.api.service.TokenService;
+import com.beefit.api.service.ReportModerationService;
 import com.beefit.api.service.WorkoutModerationService;
 import com.beefit.api.service.WorkoutMediaService;
 import com.beefit.api.service.RateLimitService;
@@ -37,6 +39,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -45,6 +48,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         AdminDashboardController.class,
         AdminUserController.class,
         AdminWorkoutController.class,
+        AdminReportController.class,
         WorkoutMediaController.class,
         AuthController.class
 })
@@ -71,6 +75,9 @@ class AdminEndpointSecurityTest {
 
     @MockitoBean
     private WorkoutModerationService workoutModerationService;
+
+    @MockitoBean
+    private ReportModerationService reportModerationService;
 
     @MockitoBean
     private UserResponseMapper userResponseMapper;
@@ -193,7 +200,9 @@ class AdminEndpointSecurityTest {
                 patch("/api/admin/users/{id}/unban", id),
                 get("/api/admin/posts"),
                 delete("/api/admin/posts/{id}", id),
-                patch("/api/admin/posts/{id}", id));
+                patch("/api/admin/posts/{id}", id),
+                get("/api/admin/reports"),
+                post("/api/admin/reports/{id}/resolve", id));
     }
 
     private User user(UserRole role, LocalDateTime bannedUntil) {
