@@ -13,6 +13,10 @@ public record FeedPostResponseDTO(
         UUID postId,
         UUID userId,
 
+        // Sessão que originou o post. O cliente precisa dela para apagar o treino:
+        // DELETE /api/workout/{id} opera sobre a sessão, não sobre o post.
+        UUID workoutSessionId,
+
         // Dados de exibição do Perfil do Usuário
         String username,
         String userProfilePicture,

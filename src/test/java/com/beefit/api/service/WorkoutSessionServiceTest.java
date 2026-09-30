@@ -30,6 +30,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.beefit.api.domain.CatalogExercise;
 import com.beefit.api.domain.Card;
+import com.beefit.api.domain.Inventory;
+import com.beefit.api.domain.Post;
 import com.beefit.api.domain.SessionExercise;
 import com.beefit.api.domain.TemplateExercise;
 import com.beefit.api.domain.User;
@@ -58,6 +60,7 @@ import com.beefit.api.mapper.WorkoutMuscleGroupMapper;
 import com.beefit.api.mapper.WorkoutSessionMapper;
 import com.beefit.api.repository.CatalogExerciseRepository;
 import com.beefit.api.repository.PostRepository;
+import com.beefit.api.repository.ReportRepository;
 import com.beefit.api.repository.UserRepository;
 import com.beefit.api.repository.WorkoutSessionRepository;
 import com.beefit.api.repository.WorkoutTemplateRepository;
@@ -97,6 +100,9 @@ class WorkoutSessionServiceTest {
 
     @Mock
     private WorkoutMediaService workoutMediaService;
+
+    @Mock
+    private ReportRepository reportRepository;
 
     @Mock
     private Clock businessClock;
@@ -629,6 +635,62 @@ class WorkoutSessionServiceTest {
 
         assertThrows(InvalidWorkoutSessionStateException.class,
                 () -> workoutSessionService.finishWorkout(userId, workoutId, "finish-1", request));
+    }
+
+    @Test
+    void deleteWorkoutOfAnotherUserDeletesNothing() {
+        UUID workoutId = UUID.randomUUID();
+        WorkoutSession session = inProgressSession(workoutId);
+        session.setUser(user(UUID.randomUUID()));
+        when(workoutSessionRepository.findById(workoutId)).thenReturn(Optional.of(session));
+
+        assertThrows(WorkoutSessionNotFoundException.class,
+                () -> workoutSessionService.deleteWorkout(userId, workoutId));
+
+        verify(postRepository, never()).delete(any(Post.class));
+        verify(reportRepository, never()).deleteByTargetPostId(any());
+        verify(workoutSessionRepository, never()).delete(any(WorkoutSession.class));
+        verify(workoutMediaService, never()).delete(any());
+    }
+
+    @Test
+    void deleteWorkoutRemovesPostReportsCardAndPhoto() {
+        UUID workoutId = UUID.randomUUID();
+        UUID photoId = UUID.randomUUID();
+        WorkoutSession session = inProgressSession(workoutId);
+        Post post = new Post();
+        post.setId(UUID.randomUUID());
+        post.setPhotoMediaId(photoId);
+        Inventory inventory = new Inventory();
+        Card card = new Card();
+        inventory.addCard(card);
+        session.setCard(card);
+        when(workoutSessionRepository.findById(workoutId)).thenReturn(Optional.of(session));
+        when(postRepository.findByWorkoutSessionId(workoutId)).thenReturn(Optional.of(post));
+
+        workoutSessionService.deleteWorkout(userId, workoutId);
+
+        verify(reportRepository).deleteByTargetPostId(post.getId());
+        verify(postRepository).delete(post);
+        assertEquals(null, session.getCard());
+        assertTrue(inventory.getCards().isEmpty());
+        assertEquals(0, inventory.getTotalCards());
+        verify(workoutSessionRepository).delete(session);
+        verify(workoutMediaService).delete(photoId);
+    }
+
+    @Test
+    void deleteWorkoutWithoutPostOrCardOnlyDeletesSession() {
+        UUID workoutId = UUID.randomUUID();
+        WorkoutSession session = inProgressSession(workoutId);
+        when(workoutSessionRepository.findById(workoutId)).thenReturn(Optional.of(session));
+        when(postRepository.findByWorkoutSessionId(workoutId)).thenReturn(Optional.empty());
+
+        workoutSessionService.deleteWorkout(userId, workoutId);
+
+        verify(workoutSessionRepository).delete(session);
+        verify(reportRepository, never()).deleteByTargetPostId(any());
+        verify(workoutMediaService, never()).delete(any());
     }
 
     @Test

@@ -60,6 +60,7 @@ import com.beefit.api.repository.UserRepository;
 import com.beefit.api.repository.WorkoutSessionRepository;
 import com.beefit.api.repository.WorkoutTemplateRepository;
 import com.beefit.api.repository.PostRepository;
+import com.beefit.api.repository.ReportRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -81,6 +82,7 @@ public class WorkoutSessionService {
     private final PostRepository postRepository;
     private final FriendshipService friendshipService;
     private final WorkoutMediaService workoutMediaService;
+    private final ReportRepository reportRepository;
     private final Clock businessClock;
 
     @Transactional(readOnly = true)
@@ -359,11 +361,42 @@ public class WorkoutSessionService {
     public void deleteWorkout(UUID userId, UUID workoutId) {
         WorkoutSession session = workoutSessionRepository.findById(workoutId).orElseThrow(WorkoutSessionNotFoundException::new);
         validateWorkoutOwnership(userId, session);
-        postRepository.findByWorkoutSessionId(session.getId()).ifPresent(post -> {
-            post.setIsRemoved(true);
-            postRepository.save(post);
-        });
+
+        // Apagar o treino apaga tudo o que ele gerou. A ordem segue as FKs sem cascade
+        // no banco (reports → posts → workout_sessions ↔ card), como em UserService.deleteAccount.
+        UUID photoMediaId = postRepository.findByWorkoutSessionId(session.getId())
+                .map(post -> {
+                    reportRepository.deleteByTargetPostId(post.getId());
+                    postRepository.delete(post);
+                    return post.getPhotoMediaId();
+                })
+                .orElse(null);
+
+        // Os contadores do perfil subiram quando o treino foi finalizado e a carta gerada.
+        // Ofensiva (honeys) e contagem semanal ficam: outro treino do dia pode sustentar
+        // o mesmo ponto, e desfazer quebraria a sequência retroativamente.
+        User owner = session.getUser();
+        if (session.getStatus() == WorkoutStatus.FINISHED) {
+            owner.setWorkoutsCount(Math.max(0, owner.getWorkoutsCount() - 1));
+        }
+
+        Card card = session.getCard();
+        if (card != null) {
+            owner.setCardsCount(Math.max(0, (owner.getCardsCount() == null ? 0 : owner.getCardsCount()) - 1));
+            // Sessão e carta apontam uma para a outra; soltar a sessão primeiro deixa a carta sair.
+            session.setCard(null);
+            workoutSessionRepository.flush();
+            card.getInventory().removeCard(card);
+            workoutSessionRepository.flush();
+        }
+
         workoutSessionRepository.delete(session);
+
+        // Por último, porque apaga o arquivo no R2 e não volta num rollback. Mídia já
+        // consumida não entra na limpeza agendada de órfãs, então ficaria no bucket.
+        if (photoMediaId != null) {
+            workoutMediaService.delete(photoMediaId);
+        }
     }
 
     @Transactional
