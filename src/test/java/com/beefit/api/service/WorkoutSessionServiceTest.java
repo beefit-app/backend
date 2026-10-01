@@ -3,6 +3,7 @@ package com.beefit.api.service;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -44,6 +45,7 @@ import com.beefit.api.domain.enums.WorkoutStatus;
 import com.beefit.api.dto.social.SocialEventDTO;
 import com.beefit.api.dto.workout.CardGeneratedEventDTO;
 import com.beefit.api.dto.workout.ExerciseHistoryResponseDTO;
+import com.beefit.api.dto.workout.ExerciseHistorySummaryProjection;
 import com.beefit.api.dto.workout.FinishWorkoutExerciseDTO;
 import com.beefit.api.dto.workout.FinishWorkoutSetDTO;
 import com.beefit.api.dto.workout.FinishWorkoutSnapshotRequestDTO;
@@ -306,25 +308,14 @@ class WorkoutSessionServiceTest {
     @Test
     void getExerciseHistoryReturnsLatestAndBestCompletedPerformance() {
         UUID catalogExerciseId = UUID.randomUUID();
-        CatalogExercise catalogExercise = catalogExercise(catalogExerciseId, "Supino");
 
-        WorkoutSession olderWorkout = inProgressSession(UUID.randomUUID());
-        olderWorkout.setStatus(WorkoutStatus.FINISHED);
-        olderWorkout.setFinishedAt(LocalDateTime.of(2026, 5, 20, 10, 0));
-        SessionExercise olderExercise = sessionExercise(UUID.randomUUID(), catalogExercise, 1);
-        olderExercise.setWorkoutSession(olderWorkout);
-        olderExercise.addSet(set(UUID.randomUUID(), 1, 100.0, 5));
+        ExerciseHistorySummaryProjection latestProj = historyProjection(
+                LocalDateTime.of(2026, 5, 25, 10, 0), 90.0, 8, 1L, 2L);
+        ExerciseHistorySummaryProjection bestProj = historyProjection(
+                LocalDateTime.of(2026, 5, 20, 10, 0), 100.0, 5, 2L, 1L);
 
-        WorkoutSession latestWorkout = inProgressSession(UUID.randomUUID());
-        latestWorkout.setStatus(WorkoutStatus.FINISHED);
-        latestWorkout.setFinishedAt(LocalDateTime.of(2026, 5, 25, 10, 0));
-        SessionExercise latestExercise = sessionExercise(UUID.randomUUID(), catalogExercise, 1);
-        latestExercise.setWorkoutSession(latestWorkout);
-        latestExercise.addSet(set(UUID.randomUUID(), 1, 90.0, 8));
-
-        when(workoutSessionRepository.findFinishedExercisesWithSetsByUserIdAndCatalogExerciseId(
-                userId, catalogExerciseId, WorkoutStatus.FINISHED))
-                .thenReturn(List.of(latestExercise, olderExercise));
+        when(workoutSessionRepository.findExerciseHistorySummary(userId, catalogExerciseId))
+                .thenReturn(List.of(latestProj, bestProj));
 
         ExerciseHistoryResponseDTO history = workoutSessionService.getExerciseHistory(userId, catalogExerciseId);
 
@@ -333,6 +324,22 @@ class WorkoutSessionServiceTest {
         assertEquals(5, history.bestReps());
         assertEquals(90.0, history.lastWeightKg());
         assertEquals(8, history.lastReps());
+    }
+
+    @Test
+    void getExerciseHistoryReturnsEmptyWhenNoHistoryFound() {
+        UUID catalogExerciseId = UUID.randomUUID();
+        when(workoutSessionRepository.findExerciseHistorySummary(userId, catalogExerciseId))
+                .thenReturn(List.of());
+
+        ExerciseHistoryResponseDTO history = workoutSessionService.getExerciseHistory(userId, catalogExerciseId);
+
+        assertNotNull(history);
+        assertNull(history.lastPerformedAt());
+        assertNull(history.bestWeightKg());
+        assertNull(history.bestReps());
+        assertNull(history.lastWeightKg());
+        assertNull(history.lastReps());
     }
 
     @Test
@@ -833,5 +840,35 @@ class WorkoutSessionServiceTest {
                 Boolean.TRUE,
                 List.of(),
                 null);
+    }
+
+    private ExerciseHistorySummaryProjection historyProjection(
+            LocalDateTime finishedAt, Double weightKg, Integer reps, Long rnLatest, Long rnBest) {
+        return new ExerciseHistorySummaryProjection() {
+            @Override
+            public LocalDateTime getFinishedAt() {
+                return finishedAt;
+            }
+
+            @Override
+            public Double getWeightKg() {
+                return weightKg;
+            }
+
+            @Override
+            public Integer getReps() {
+                return reps;
+            }
+
+            @Override
+            public Long getRnLatest() {
+                return rnLatest;
+            }
+
+            @Override
+            public Long getRnBest() {
+                return rnBest;
+            }
+        };
     }
 }

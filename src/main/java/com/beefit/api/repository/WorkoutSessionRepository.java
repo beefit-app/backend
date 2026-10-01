@@ -11,9 +11,13 @@ import org.springframework.data.repository.query.Param;
 import jakarta.persistence.LockModeType;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+
+import com.beefit.api.dto.workout.ExerciseBestScoreProjection;
+import com.beefit.api.dto.workout.ExerciseHistorySummaryProjection;
 
 public interface WorkoutSessionRepository extends JpaRepository<WorkoutSession, UUID> {
 
@@ -114,6 +118,75 @@ public interface WorkoutSessionRepository extends JpaRepository<WorkoutSession, 
             @Param("userId") UUID userId,
             @Param("exerciseId") UUID exerciseId,
             @Param("currentWorkoutId") UUID currentWorkoutId);
+
+    @Query(value = """
+            SELECT se.exercise_id AS exerciseId,
+                   MAX(s.weight_kg * (1.0 + LEAST(s.reps, 10) / 30.0)) AS bestScore
+            FROM sets s
+            JOIN session_exercises se ON se.id = s.exercise_id
+            JOIN workout_sessions ws ON ws.id = se.workout_id
+            WHERE ws.user_id = :userId
+              AND se.exercise_id IN (:exerciseIds)
+              AND ws.id <> :currentWorkoutId
+              AND ws.status = 'FINISHED'
+              AND s.weight_kg > 0
+              AND s.reps > 0
+            GROUP BY se.exercise_id
+            """, nativeQuery = true)
+    List<ExerciseBestScoreProjection> findBestEstimatedOneRepMaxBatchBeforeWorkout(
+            @Param("userId") UUID userId,
+            @Param("exerciseIds") Collection<UUID> exerciseIds,
+            @Param("currentWorkoutId") UUID currentWorkoutId);
+
+    @Query(value = """
+            SELECT se.exercise_id AS exerciseId,
+                   MAX(CAST(s.reps AS double precision)) AS bestScore
+            FROM sets s
+            JOIN session_exercises se ON se.id = s.exercise_id
+            JOIN workout_sessions ws ON ws.id = se.workout_id
+            WHERE ws.user_id = :userId
+              AND se.exercise_id IN (:exerciseIds)
+              AND ws.id <> :currentWorkoutId
+              AND ws.status = 'FINISHED'
+              AND s.weight_kg = 0
+              AND s.reps > 0
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM sets weighted_set
+                  WHERE weighted_set.exercise_id = se.id
+                    AND weighted_set.weight_kg > 0
+                    AND weighted_set.reps > 0
+              )
+            GROUP BY se.exercise_id
+            """, nativeQuery = true)
+    List<ExerciseBestScoreProjection> findBestBodyweightRepsBatchBeforeWorkout(
+            @Param("userId") UUID userId,
+            @Param("exerciseIds") Collection<UUID> exerciseIds,
+            @Param("currentWorkoutId") UUID currentWorkoutId);
+
+    @Query(value = """
+            WITH ranked AS (
+                SELECT ws.finished_at AS finishedAt,
+                       s.weight_kg AS weightKg,
+                       s.reps AS reps,
+                       ROW_NUMBER() OVER (ORDER BY ws.finished_at DESC, s.set_order DESC) AS rnLatest,
+                       ROW_NUMBER() OVER (ORDER BY s.weight_kg DESC, s.reps DESC) AS rnBest
+                FROM sets s
+                JOIN session_exercises se ON se.id = s.exercise_id
+                JOIN workout_sessions ws ON ws.id = se.workout_id
+                WHERE ws.user_id = :userId
+                  AND ws.status = 'FINISHED'
+                  AND se.exercise_id = :catalogExerciseId
+                  AND s.reps > 0
+                  AND s.weight_kg >= 0
+            )
+            SELECT finishedAt, weightKg, reps, rnLatest, rnBest
+            FROM ranked
+            WHERE rnLatest = 1 OR rnBest = 1
+            """, nativeQuery = true)
+    List<ExerciseHistorySummaryProjection> findExerciseHistorySummary(
+            @Param("userId") UUID userId,
+            @Param("catalogExerciseId") UUID catalogExerciseId);
 
     // Um Honey representa um dia com pelo menos um treino elegivel. O treino que
     // esta sendo finalizado e excluido porque a query pode provocar flush antes

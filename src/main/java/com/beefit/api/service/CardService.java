@@ -12,17 +12,20 @@ import com.beefit.api.domain.enums.MuscleGroups;
 import com.beefit.api.repository.CardRepository;
 import com.beefit.api.repository.InventoryRepository;
 import com.beefit.api.repository.WorkoutSessionRepository;
+import com.beefit.api.dto.workout.ExerciseBestScoreProjection;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -65,10 +68,51 @@ public class CardService {
     }
 
     private Optional<ExercisePerformance> selectExtraordinaryPerformance(User user, WorkoutSession workout) {
-        if (workout.getExercises() == null) return Optional.empty();
+        if (workout.getExercises() == null || workout.getExercises().isEmpty()) return Optional.empty();
+
+        Set<UUID> weightedExerciseIds = new HashSet<>();
+        Set<UUID> bodyweightExerciseIds = new HashSet<>();
+
+        for (SessionExercise exercise : workout.getExercises()) {
+            if (exercise.getExercise() == null || exercise.getSets() == null) continue;
+            List<com.beefit.api.domain.Set> validSets = exercise.getSets().stream()
+                    .filter(set -> set.getReps() != null && set.getReps() > 0)
+                    .filter(set -> set.getWeightKg() != null && set.getWeightKg() >= 0)
+                    .toList();
+            if (validSets.isEmpty()) continue;
+
+            boolean weighted = validSets.stream().anyMatch(set -> set.getWeightKg() > 0);
+            if (weighted) {
+                weightedExerciseIds.add(exercise.getExercise().getId());
+            } else {
+                bodyweightExerciseIds.add(exercise.getExercise().getId());
+            }
+        }
+
+        Map<UUID, Double> previousWeightedBests = weightedExerciseIds.isEmpty()
+                ? Map.of()
+                : workoutSessionRepository.findBestEstimatedOneRepMaxBatchBeforeWorkout(
+                        user.getId(), weightedExerciseIds, workout.getId())
+                        .stream()
+                        .filter(p -> p.getExerciseId() != null && p.getBestScore() != null)
+                        .collect(java.util.stream.Collectors.toMap(
+                                ExerciseBestScoreProjection::getExerciseId,
+                                ExerciseBestScoreProjection::getBestScore,
+                                Math::max));
+
+        Map<UUID, Double> previousBodyweightBests = bodyweightExerciseIds.isEmpty()
+                ? Map.of()
+                : workoutSessionRepository.findBestBodyweightRepsBatchBeforeWorkout(
+                        user.getId(), bodyweightExerciseIds, workout.getId())
+                        .stream()
+                        .filter(p -> p.getExerciseId() != null && p.getBestScore() != null)
+                        .collect(java.util.stream.Collectors.toMap(
+                                ExerciseBestScoreProjection::getExerciseId,
+                                ExerciseBestScoreProjection::getBestScore,
+                                Math::max));
 
         return workout.getExercises().stream()
-                .map(exercise -> evaluateExercise(user, workout, exercise))
+                .map(exercise -> evaluateExercise(user, workout, exercise, previousWeightedBests, previousBodyweightBests))
                 .flatMap(Optional::stream)
                 .filter(performance -> performance.improvementPercentage() >= MINIMUM_CARD_IMPROVEMENT_PERCENTAGE)
                 .max(Comparator.comparingDouble(ExercisePerformance::improvementPercentage)
@@ -79,7 +123,9 @@ public class CardService {
     private Optional<ExercisePerformance> evaluateExercise(
             User user,
             WorkoutSession workout,
-            SessionExercise exercise) {
+            SessionExercise exercise,
+            Map<UUID, Double> previousWeightedBests,
+            Map<UUID, Double> previousBodyweightBests) {
         if (exercise.getExercise() == null || exercise.getSets() == null) return Optional.empty();
 
         List<com.beefit.api.domain.Set> completedSets = exercise.getSets().stream()
@@ -97,15 +143,14 @@ public class CardService {
                 .orElseThrow();
         double score = performanceScore(bestSet, weighted);
 
-        Optional<? extends Number> previousBest = weighted
-                ? workoutSessionRepository.findBestEstimatedOneRepMaxBeforeWorkout(
-                        user.getId(), exercise.getExercise().getId(), workout.getId())
-                : workoutSessionRepository.findBestBodyweightRepsBeforeWorkout(
-                        user.getId(), exercise.getExercise().getId(), workout.getId());
-        if (previousBest.isEmpty() || previousBest.get().doubleValue() <= 0) return Optional.empty();
+        UUID exerciseId = exercise.getExercise().getId();
+        Double previousBestScore = weighted
+                ? previousWeightedBests.get(exerciseId)
+                : previousBodyweightBests.get(exerciseId);
 
-        double improvementPercentage = ((score - previousBest.get().doubleValue())
-                / previousBest.get().doubleValue()) * 100.0;
+        if (previousBestScore == null || previousBestScore <= 0) return Optional.empty();
+
+        double improvementPercentage = ((score - previousBestScore) / previousBestScore) * 100.0;
         return Optional.of(new ExercisePerformance(
                 exercise,
                 bestSet,
