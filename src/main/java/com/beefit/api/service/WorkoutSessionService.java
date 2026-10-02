@@ -20,6 +20,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import org.hibernate.Hibernate;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,7 +36,6 @@ import com.beefit.api.domain.enums.MuscleGroups;
 import com.beefit.api.domain.enums.SocialEvent;
 import com.beefit.api.domain.enums.WorkoutStatus;
 import com.beefit.api.dto.social.SocialEventDTO;
-import com.beefit.api.dto.workout.CardGeneratedEventDTO;
 import com.beefit.api.dto.workout.ExerciseHistoryResponseDTO;
 import com.beefit.api.dto.workout.ExerciseHistorySummaryProjection;
 import com.beefit.api.dto.workout.FinishWorkoutExerciseDTO;
@@ -43,6 +43,7 @@ import com.beefit.api.dto.workout.FinishWorkoutSetDTO;
 import com.beefit.api.dto.workout.FinishWorkoutSnapshotRequestDTO;
 import com.beefit.api.dto.workout.StartWorkoutExerciseItemDTO;
 import com.beefit.api.dto.workout.StartWorkoutRequestDTO;
+import com.beefit.api.event.workout.WorkoutFinishedEvent;
 import com.beefit.api.dto.workout.WorkoutPresenceEventDTO;
 import com.beefit.api.dto.workout.WorkoutSessionResponseDTO;
 import com.beefit.api.exception.exercises.CatalogExerciseNotFound;
@@ -68,7 +69,6 @@ import lombok.RequiredArgsConstructor;
 @Service
 @RequiredArgsConstructor
 public class WorkoutSessionService {
-    private static final int MIN_HONEY_WORKOUT_DURATION_SECONDS = 1740;
     private static final Duration MAX_FUTURE_CLOCK_SKEW = Duration.ofMinutes(5);
     private static final Duration MAX_WORKOUT_DURATION = Duration.ofHours(24);
 
@@ -78,7 +78,7 @@ public class WorkoutSessionService {
     private final UserRepository userRepository;
     private final WorkoutSessionMapper workoutSessionMapper;
     private final WorkoutMuscleGroupMapper workoutMuscleGroupMapper;
-    private final CardService cardService;
+    private final ApplicationEventPublisher eventPublisher;
     private final SseService sseService;
     private final PostRepository postRepository;
     private final FriendshipService friendshipService;
@@ -242,44 +242,12 @@ public class WorkoutSessionService {
 
         session.setTotalVolume(calculateTotalVolume(session));
 
-        Card card = cardService.generateCard(user, session);
-
         session.setStatus(WorkoutStatus.FINISHED);
-        session.setCard(card);
 
-        LocalDateTime honeyDayStart = finishedAt.toLocalDate().atStartOfDay();
-        user.setWorkoutsCount(user.getWorkoutsCount() + 1);
-        boolean eligibleForHoney = isEligibleForHoney(session, durationSeconds);
-        boolean alreadyEarnedHoneyToday = eligibleForHoney
-                && workoutSessionRepository.existsEligibleFinishedWorkoutOnDay(
-                        userId,
-                        session.getId(),
-                        WorkoutStatus.FINISHED,
-                        MIN_HONEY_WORKOUT_DURATION_SECONDS,
-                        honeyDayStart,
-                        honeyDayStart.plusDays(1));
-        if (eligibleForHoney && !alreadyEarnedHoneyToday) {
-            user.setOffensiveHoneys(user.getOffensiveHoneys() + 1);
-            user.setWeeklyWorkoutsCount(user.getWeeklyWorkoutsCount() + 1);
-        }
-        userRepository.save(user);
-        // Geracao de posts
-        // Só publica se o treino NÃO for privado E se o usuário NÃO estiver em Modo
-        // Fantasma
-        if (Boolean.TRUE.equals(session.getShouldPostWorkout()) && !session.getIsPrivate() && !user.getGhostMode()) {
-            com.beefit.api.domain.Post autoPost = new com.beefit.api.domain.Post();
-            autoPost.setUser(user);
-            autoPost.setWorkoutSession(session);
-            autoPost.setTotalLikes(0);
-            autoPost.setIsRemoved(false);
-            autoPost.setTitle(request.title());
-            if (request.photoMediaId() != null) {
-                workoutMediaService.consume(request.photoMediaId(), userId);
-                autoPost.setPhotoMediaId(request.photoMediaId());
-            }
+        boolean hasCompletedSets = session.getExercises() != null && session.getExercises().stream()
+                .flatMap(exercise -> exercise.getSets().stream())
+                .anyMatch(set -> set.getReps() != null && set.getReps() > 0);
 
-            postRepository.save(autoPost);
-        }
         WorkoutSession savedSession;
         try {
             savedSession = workoutSessionRepository.saveAndFlush(session);
@@ -287,8 +255,18 @@ public class WorkoutSessionService {
             throw new IdempotencyConflictException("A Idempotency-Key já foi usada em outra finalização.");
         }
 
-        broadcastCardGenerated(userId, savedSession, card);
-        broadcastIfPublic(savedSession, SocialEvent.WORKOUT_FINISHED, finishedAt);
+        eventPublisher.publishEvent(new WorkoutFinishedEvent(
+                savedSession.getId(),
+                userId,
+                savedSession.getFinishedAt(),
+                savedSession.getDurationSeconds(),
+                hasCompletedSets,
+                savedSession.getTitle(),
+                savedSession.getShouldPostWorkout(),
+                savedSession.getIsPrivate(),
+                request.photoMediaId()
+        ));
+
         return workoutSessionMapper.toDto(savedSession);
     }
 
@@ -301,28 +279,6 @@ public class WorkoutSessionService {
         } catch (NoSuchAlgorithmException exception) {
             throw new IllegalStateException("SHA-256 não disponível.", exception);
         }
-    }
-
-    private void broadcastCardGenerated(UUID userId, WorkoutSession session, Card card) {
-        if (card == null) return;
-
-        sseService.broadcastToFriend(
-                new SocialEventDTO<>(
-                        SocialEvent.CARD_GENERATED,
-                        new CardGeneratedEventDTO(
-                                session.getId(),
-                                card.getId(),
-                                card.getEstimatedOneRepMax() == null
-                                        ? card.getBestSetReps().doubleValue()
-                                        : card.getEstimatedOneRepMax(),
-                                card.getCardRarity().name(),
-                                workoutMuscleGroupMapper.toApi(card.getMuscleGroup()),
-                                card.getMuscleIntensities(),
-                                card.getImprovementPercentage() > 0
-                        )
-                ),
-                userId
-        );
     }
 
     private LocalDateTime parseFinishedAt(String finishedAtValue) {
@@ -678,16 +634,6 @@ public class WorkoutSessionService {
 
     private Integer calculateDurationSeconds(LocalDateTime startedAt, LocalDateTime finishedAt) {
         return Math.toIntExact(Duration.between(startedAt, finishedAt).getSeconds());
-    }
-
-    private boolean isEligibleForHoney(WorkoutSession session, int durationSeconds) {
-        if (durationSeconds < MIN_HONEY_WORKOUT_DURATION_SECONDS) {
-            return false;
-        }
-
-        return session.getExercises().stream()
-                .flatMap(exercise -> exercise.getSets().stream())
-                .anyMatch(set -> set.getReps() != null && set.getReps() > 0);
     }
 
     private List<MuscleGroups> filterMuscleGroupsWithoutExercises(

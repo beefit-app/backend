@@ -2,6 +2,7 @@ package com.beefit.api.service;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -28,6 +29,9 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
+
+import com.beefit.api.event.workout.WorkoutFinishedEvent;
 
 import com.beefit.api.domain.CatalogExercise;
 import com.beefit.api.domain.Card;
@@ -92,7 +96,7 @@ class WorkoutSessionServiceTest {
     private SseService sseService;
 
     @Mock
-    private CardService cardService;
+    private ApplicationEventPublisher eventPublisher;
 
     @Mock
     private PostRepository postRepository;
@@ -388,19 +392,6 @@ class WorkoutSessionServiceTest {
         when(catalogExerciseRepository.findById(newCatalogExercise.getId())).thenReturn(Optional.of(newCatalogExercise));
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
         when(workoutMuscleGroupMapper.toDomain(List.of("peito", "pernas"))).thenReturn(List.of(MuscleGroups.CHEST, MuscleGroups.LEGS));
-        Card generatedCard = new Card();
-        generatedCard.setId(UUID.randomUUID());
-        generatedCard.setExercise(newCatalogExercise);
-        generatedCard.setBestSetWeightKg(80.0);
-        generatedCard.setBestSetReps(5);
-        generatedCard.setEstimatedOneRepMax(93.33);
-        generatedCard.setImprovementPercentage(9.0);
-        generatedCard.setCardRarity(CardRarity.RARE);
-        generatedCard.setMuscleGroup(MuscleGroups.CHEST);
-        generatedCard.setMuscleIntensities(Map.of("chest", 4, "deltoids", 2, "triceps", 2));
-
-        when(cardService.generateCard(user, session)).thenReturn(generatedCard);
-        when(workoutMuscleGroupMapper.toApi(MuscleGroups.CHEST)).thenReturn("peito");
         when(workoutSessionRepository.saveAndFlush(any(WorkoutSession.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(workoutSessionMapper.toDto(any(WorkoutSession.class))).thenReturn(responseDto(WorkoutStatus.FINISHED));
 
@@ -408,15 +399,11 @@ class WorkoutSessionServiceTest {
 
         ArgumentCaptor<WorkoutSession> sessionCaptor = ArgumentCaptor.forClass(WorkoutSession.class);
         verify(workoutSessionRepository).saveAndFlush(sessionCaptor.capture());
-        verify(userRepository).save(user);
 
         WorkoutSession savedSession = sessionCaptor.getValue();
         assertEquals(WorkoutStatus.FINISHED, savedSession.getStatus());
         assertEquals(LocalDateTime.of(2026, 5, 26, 10, 45), savedSession.getFinishedAt());
         assertEquals(2700, savedSession.getDurationSeconds());
-        assertEquals(1, user.getOffensiveHoneys());
-        assertEquals(1, user.getWeeklyWorkoutsCount());
-        assertEquals(1, user.getWorkoutsCount());
         assertEquals(List.of(MuscleGroups.CHEST, MuscleGroups.LEGS), savedSession.getMuscleGroupsList());
         assertEquals(2, savedSession.getExercises().size());
         assertEquals(newCatalogExercise, savedSession.getExercises().get(0).getExercise());
@@ -424,57 +411,23 @@ class WorkoutSessionServiceTest {
         assertEquals(80.0 * 5 + 45.0 * 8 + 42.5 * 10, savedSession.getTotalVolume());
         assertEquals("finished", response.status());
 
-        ArgumentCaptor<SocialEventDTO> eventCaptor = ArgumentCaptor.forClass(SocialEventDTO.class);
-        verify(sseService).broadcastToFriend(eventCaptor.capture(), org.mockito.ArgumentMatchers.eq(userId));
-        assertEquals(SocialEvent.CARD_GENERATED, eventCaptor.getValue().type());
-        CardGeneratedEventDTO event = (CardGeneratedEventDTO) eventCaptor.getValue().dataSocialEvent();
-        assertEquals(workoutId, event.workoutId());
-        assertEquals(generatedCard.getId(), event.cardId());
-        assertEquals(93.33, event.attackPower());
-        assertEquals("RARE", event.rarity());
-        assertEquals("peito", event.muscleGroup());
-        assertEquals(Map.of("chest", 4, "deltoids", 2, "triceps", 2), event.muscleIntensities());
-        assertTrue(event.isPersonalRecord());
+        ArgumentCaptor<WorkoutFinishedEvent> eventCaptor = ArgumentCaptor.forClass(WorkoutFinishedEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        WorkoutFinishedEvent event = eventCaptor.getValue();
+        assertEquals(workoutId, event.workoutSessionId());
+        assertEquals(userId, event.userId());
+        assertEquals(LocalDateTime.of(2026, 5, 26, 10, 45), event.finishedAt());
+        assertEquals(2700, event.durationSeconds());
+        assertTrue(event.hasCompletedSets());
+        assertFalse(event.shouldPostWorkout());
 
         WorkoutSessionResponseDTO replay = workoutSessionService.finishWorkout(userId, workoutId, "finish-1", request);
         assertEquals(response, replay);
-        verify(cardService).generateCard(user, session);
-        verify(workoutSessionRepository).existsEligibleFinishedWorkoutOnDay(
-                userId,
-                workoutId,
-                WorkoutStatus.FINISHED,
-                1740,
-                LocalDateTime.of(2026, 5, 26, 0, 0),
-                LocalDateTime.of(2026, 5, 27, 0, 0));
+        verify(eventPublisher, org.mockito.Mockito.times(1)).publishEvent(any(WorkoutFinishedEvent.class));
     }
 
     @Test
-    void finishSecondEligibleWorkoutOnSameDayDoesNotIncrementHoneysAgain() {
-        UUID workoutId = UUID.randomUUID();
-        WorkoutSession session = inProgressSession(workoutId);
-        user.setOffensiveHoneys(5);
-        user.setWeeklyWorkoutsCount(2);
-        FinishWorkoutSnapshotRequestDTO request = finishRequestWithCompletedSet(
-                session, "2026-05-26T10:30:00-03:00", 8);
-
-        prepareMinimalFinish(workoutId, session);
-        when(workoutSessionRepository.existsEligibleFinishedWorkoutOnDay(
-                userId,
-                workoutId,
-                WorkoutStatus.FINISHED,
-                1740,
-                LocalDateTime.of(2026, 5, 26, 0, 0),
-                LocalDateTime.of(2026, 5, 27, 0, 0))).thenReturn(true);
-
-        workoutSessionService.finishWorkout(userId, workoutId, "finish-same-day", request);
-
-        assertEquals(5, user.getOffensiveHoneys());
-        assertEquals(2, user.getWeeklyWorkoutsCount());
-        assertEquals(1, user.getWorkoutsCount());
-    }
-
-    @Test
-    void finishWorkoutBelowThirtyMinutesDoesNotIncrementHoneys() {
+    void finishWorkoutBelowThirtyMinutesPublishesEventWithShortDuration() {
         UUID workoutId = UUID.randomUUID();
         WorkoutSession session = inProgressSession(workoutId);
         FinishWorkoutSnapshotRequestDTO request = minimalFinishRequest("2026-05-26T10:28:59-03:00");
@@ -483,20 +436,14 @@ class WorkoutSessionServiceTest {
 
         workoutSessionService.finishWorkout(userId, workoutId, "finish-short", request);
 
-        assertEquals(0, user.getOffensiveHoneys());
-        assertEquals(0, user.getWeeklyWorkoutsCount());
-        assertEquals(1, user.getWorkoutsCount());
-        verify(workoutSessionRepository, never()).existsEligibleFinishedWorkoutOnDay(
-                any(UUID.class),
-                any(UUID.class),
-                any(WorkoutStatus.class),
-                org.mockito.ArgumentMatchers.anyInt(),
-                any(LocalDateTime.class),
-                any(LocalDateTime.class));
+        ArgumentCaptor<WorkoutFinishedEvent> eventCaptor = ArgumentCaptor.forClass(WorkoutFinishedEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        assertEquals(workoutId, eventCaptor.getValue().workoutSessionId());
+        assertTrue(eventCaptor.getValue().durationSeconds() < 1740);
     }
 
     @Test
-    void finishWorkoutAtThirtyMinutesWithCompletedSetIncrementsHoney() {
+    void finishWorkoutAtThirtyMinutesWithCompletedSetPublishesEventWithCompletedSetsTrue() {
         UUID workoutId = UUID.randomUUID();
         WorkoutSession session = inProgressSession(workoutId);
         FinishWorkoutSnapshotRequestDTO request = finishRequestWithCompletedSet(
@@ -506,19 +453,15 @@ class WorkoutSessionServiceTest {
 
         workoutSessionService.finishWorkout(userId, workoutId, "finish-thirty-minutes", request);
 
-        assertEquals(1, user.getOffensiveHoneys());
-        assertEquals(1, user.getWeeklyWorkoutsCount());
-        verify(workoutSessionRepository).existsEligibleFinishedWorkoutOnDay(
-                userId,
-                workoutId,
-                WorkoutStatus.FINISHED,
-                1740,
-                LocalDateTime.of(2026, 5, 26, 0, 0),
-                LocalDateTime.of(2026, 5, 27, 0, 0));
+        ArgumentCaptor<WorkoutFinishedEvent> eventCaptor = ArgumentCaptor.forClass(WorkoutFinishedEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        assertEquals(workoutId, eventCaptor.getValue().workoutSessionId());
+        assertEquals(1800, eventCaptor.getValue().durationSeconds());
+        assertTrue(eventCaptor.getValue().hasCompletedSets());
     }
 
     @Test
-    void finishThirtyMinuteWorkoutWithoutCompletedSetDoesNotIncrementHoneys() {
+    void finishThirtyMinuteWorkoutWithoutCompletedSetPublishesEventWithCompletedSetsFalse() {
         UUID workoutId = UUID.randomUUID();
         WorkoutSession session = inProgressSession(workoutId);
         FinishWorkoutSnapshotRequestDTO request = minimalFinishRequest("2026-05-26T10:30:00-03:00");
@@ -527,16 +470,14 @@ class WorkoutSessionServiceTest {
 
         workoutSessionService.finishWorkout(userId, workoutId, "finish-empty", request);
 
-        assertEquals(0, user.getOffensiveHoneys());
-        assertEquals(0, user.getWeeklyWorkoutsCount());
-        assertEquals(1, user.getWorkoutsCount());
-        verify(workoutSessionRepository, never()).existsEligibleFinishedWorkoutOnDay(
-                any(UUID.class), any(UUID.class), any(WorkoutStatus.class),
-                org.mockito.ArgumentMatchers.anyInt(), any(LocalDateTime.class), any(LocalDateTime.class));
+        ArgumentCaptor<WorkoutFinishedEvent> eventCaptor = ArgumentCaptor.forClass(WorkoutFinishedEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        assertEquals(workoutId, eventCaptor.getValue().workoutSessionId());
+        assertFalse(eventCaptor.getValue().hasCompletedSets());
     }
 
     @Test
-    void finishThirtyMinuteWorkoutWithZeroRepetitionsDoesNotIncrementHoneys() {
+    void finishThirtyMinuteWorkoutWithZeroRepetitionsPublishesEventWithCompletedSetsFalse() {
         UUID workoutId = UUID.randomUUID();
         WorkoutSession session = inProgressSession(workoutId);
         FinishWorkoutSnapshotRequestDTO request = finishRequestWithCompletedSet(
@@ -546,11 +487,10 @@ class WorkoutSessionServiceTest {
 
         workoutSessionService.finishWorkout(userId, workoutId, "finish-zero-reps", request);
 
-        assertEquals(0, user.getOffensiveHoneys());
-        assertEquals(0, user.getWeeklyWorkoutsCount());
-        verify(workoutSessionRepository, never()).existsEligibleFinishedWorkoutOnDay(
-                any(UUID.class), any(UUID.class), any(WorkoutStatus.class),
-                org.mockito.ArgumentMatchers.anyInt(), any(LocalDateTime.class), any(LocalDateTime.class));
+        ArgumentCaptor<WorkoutFinishedEvent> eventCaptor = ArgumentCaptor.forClass(WorkoutFinishedEvent.class);
+        verify(eventPublisher).publishEvent(eventCaptor.capture());
+        assertEquals(workoutId, eventCaptor.getValue().workoutSessionId());
+        assertFalse(eventCaptor.getValue().hasCompletedSets());
     }
 
     @Test
