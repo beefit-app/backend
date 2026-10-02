@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -13,6 +14,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.beefit.api.dto.workout.ExerciseBestScoreProjection;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -67,9 +69,9 @@ class CardServiceTest {
     void firstPerformanceOnlyEstablishesBaselineAndDoesNotGenerateCard() {
         SessionExercise benchPress = weightedExercise("Supino", 1, 100.0, 5);
         workout.setExercises(List.of(benchPress));
-        when(workoutSessionRepository.findBestEstimatedOneRepMaxBeforeWorkout(
-                user.getId(), benchPress.getExercise().getId(), workout.getId()))
-                .thenReturn(Optional.empty());
+        when(workoutSessionRepository.findBestEstimatedOneRepMaxBatchBeforeWorkout(
+                eq(user.getId()), any(), eq(workout.getId())))
+                .thenReturn(List.of());
 
         assertNull(cardService.generateCard(user, workout));
 
@@ -81,9 +83,9 @@ class CardServiceTest {
     void improvementBelowThreePercentDoesNotGenerateCard() {
         SessionExercise benchPress = weightedExercise("Supino", 1, 100.0, 1);
         workout.setExercises(List.of(benchPress));
-        when(workoutSessionRepository.findBestEstimatedOneRepMaxBeforeWorkout(
-                user.getId(), benchPress.getExercise().getId(), workout.getId()))
-                .thenReturn(Optional.of(102.0));
+        when(workoutSessionRepository.findBestEstimatedOneRepMaxBatchBeforeWorkout(
+                eq(user.getId()), any(), eq(workout.getId())))
+                .thenReturn(List.of(projection(benchPress.getExercise().getId(), 102.0)));
 
         assertNull(cardService.generateCard(user, workout));
 
@@ -95,12 +97,12 @@ class CardServiceTest {
         SessionExercise benchPress = weightedExercise("Supino", 1, 100.0, 5);
         SessionExercise row = weightedExercise("Remada", 2, 60.0, 1);
         workout.setExercises(List.of(benchPress, row));
-        when(workoutSessionRepository.findBestEstimatedOneRepMaxBeforeWorkout(
-                user.getId(), benchPress.getExercise().getId(), workout.getId()))
-                .thenReturn(Optional.of(100.0));
-        when(workoutSessionRepository.findBestEstimatedOneRepMaxBeforeWorkout(
-                user.getId(), row.getExercise().getId(), workout.getId()))
-                .thenReturn(Optional.of(50.0));
+        when(workoutSessionRepository.findBestEstimatedOneRepMaxBatchBeforeWorkout(
+                eq(user.getId()), any(), eq(workout.getId())))
+                .thenReturn(List.of(
+                        projection(benchPress.getExercise().getId(), 100.0),
+                        projection(row.getExercise().getId(), 50.0)
+                ));
         prepareCardPersistence();
 
         Card card = cardService.generateCard(user, workout);
@@ -118,9 +120,9 @@ class CardServiceTest {
     void bodyweightExerciseUsesRepetitionsAndCanGenerateRareCard() {
         SessionExercise pullUp = bodyweightExercise("Barra fixa", 1, 20);
         workout.setExercises(List.of(pullUp));
-        when(workoutSessionRepository.findBestBodyweightRepsBeforeWorkout(
-                user.getId(), pullUp.getExercise().getId(), workout.getId()))
-                .thenReturn(Optional.of(18));
+        when(workoutSessionRepository.findBestBodyweightRepsBatchBeforeWorkout(
+                eq(user.getId()), any(), eq(workout.getId())))
+                .thenReturn(List.of(projection(pullUp.getExercise().getId(), 18.0)));
         prepareCardPersistence();
 
         Card card = cardService.generateCard(user, workout);
@@ -144,9 +146,9 @@ class CardServiceTest {
         double weightForOneRep = targetOneRepMax / (1.0 + 1.0 / 30.0);
         SessionExercise exercise = weightedExercise("Desenvolvimento", 1, weightForOneRep, 1);
         workout.setExercises(List.of(exercise));
-        when(workoutSessionRepository.findBestEstimatedOneRepMaxBeforeWorkout(
-                user.getId(), exercise.getExercise().getId(), workout.getId()))
-                .thenReturn(Optional.of(100.0));
+        when(workoutSessionRepository.findBestEstimatedOneRepMaxBatchBeforeWorkout(
+                eq(user.getId()), any(), eq(workout.getId())))
+                .thenReturn(List.of(projection(exercise.getExercise().getId(), 100.0)));
         prepareCardPersistence();
 
         assertEquals(expectedRarity, cardService.generateCard(user, workout).getCardRarity());
@@ -166,6 +168,20 @@ class CardServiceTest {
     private void prepareCardPersistence() {
         when(inventoryRepository.findByUserIdWithCards(user.getId())).thenReturn(Optional.of(inventory));
         when(cardRepository.save(any(Card.class))).thenAnswer(invocation -> invocation.getArgument(0));
+    }
+
+    private ExerciseBestScoreProjection projection(UUID exerciseId, Double score) {
+        return new ExerciseBestScoreProjection() {
+            @Override
+            public UUID getExerciseId() {
+                return exerciseId;
+            }
+
+            @Override
+            public Double getBestScore() {
+                return score;
+            }
+        };
     }
 
     private SessionExercise weightedExercise(String name, int order, double weight, int reps) {
