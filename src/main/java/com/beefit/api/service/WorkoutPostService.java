@@ -1,6 +1,12 @@
 package com.beefit.api.service;
 
+import org.springframework.dao.ConcurrencyFailureException;
+import org.springframework.dao.TransientDataAccessException;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Recover;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,9 +33,23 @@ public class WorkoutPostService {
     private final PostRepository postRepository;
     private final WorkoutMediaService workoutMediaService;
 
+    @Retryable(
+            retryFor = {
+                    TransientDataAccessException.class,
+                    ConcurrencyFailureException.class,
+                    CannotCreateTransactionException.class
+            },
+            maxAttempts = 3,
+            backoff = @Backoff(delay = 1000, multiplier = 2.0)
+    )
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void processWorkoutPost(WorkoutFinishedEvent event) {
         if (!event.shouldPostWorkout() || event.isPrivate()) {
+            return;
+        }
+
+        if (postRepository.findByWorkoutSessionId(event.workoutSessionId()).isPresent()) {
+            log.info("Post já existente para o treino {}, ignorando reprocessamento.", event.workoutSessionId());
             return;
         }
 
@@ -56,5 +76,16 @@ public class WorkoutPostService {
         }
 
         postRepository.save(autoPost);
+    }
+
+    @Recover
+    public void recoverWorkoutPost(Throwable ex, WorkoutFinishedEvent event) throws Throwable {
+        if (ex instanceof TransientDataAccessException || ex instanceof ConcurrencyFailureException
+                || ex instanceof CannotCreateTransactionException) {
+            log.error("CRÍTICO: Todas as tentativas de retry esgotadas ao criar post no feed para o treino {}. Erro: {}",
+                    event.workoutSessionId(), ex.getMessage(), ex);
+            return;
+        }
+        throw ex;
     }
 }

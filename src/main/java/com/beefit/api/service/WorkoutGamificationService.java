@@ -3,7 +3,13 @@ package com.beefit.api.service;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+import org.springframework.dao.ConcurrencyFailureException;
+import org.springframework.dao.TransientDataAccessException;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Recover;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,6 +43,15 @@ public class WorkoutGamificationService {
     private final SseService sseService;
     private final WorkoutMuscleGroupMapper workoutMuscleGroupMapper;
 
+    @Retryable(
+            retryFor = {
+                    TransientDataAccessException.class,
+                    ConcurrencyFailureException.class,
+                    CannotCreateTransactionException.class
+            },
+            maxAttempts = 3,
+            backoff = @Backoff(delay = 1000, multiplier = 2.0)
+    )
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void processWorkoutFinished(WorkoutFinishedEvent event) {
         log.info("Iniciando processWorkoutFinished para o user {} e treino {}", event.userId(), event.workoutSessionId());
@@ -78,6 +93,17 @@ public class WorkoutGamificationService {
         if (card != null) {
             broadcastCardGenerated(event.userId(), session, card);
         }
+    }
+
+    @Recover
+    public void recoverWorkoutFinished(Throwable ex, WorkoutFinishedEvent event) throws Throwable {
+        if (ex instanceof TransientDataAccessException || ex instanceof ConcurrencyFailureException
+                || ex instanceof CannotCreateTransactionException) {
+            log.error("CRÍTICO: Todas as tentativas de retry esgotadas ao processar gamificação do treino {}. Erro: {}",
+                    event.workoutSessionId(), ex.getMessage(), ex);
+            return;
+        }
+        throw ex;
     }
 
     private void broadcastCardGenerated(UUID userId, WorkoutSession session, Card card) {
