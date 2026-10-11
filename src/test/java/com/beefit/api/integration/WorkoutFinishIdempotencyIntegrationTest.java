@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.when;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -12,6 +13,7 @@ import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -102,12 +104,15 @@ class WorkoutFinishIdempotencyIntegrationTest {
 
         workoutSessionService.finishWorkout(user.getId(), workout.getId(), key, request);
 
-        User completedUser = userRepository.findById(user.getId()).orElseThrow();
-        assertEquals(1, completedUser.getWorkoutsCount());
-        assertEquals(0, completedUser.getCardsCount());
-        assertEquals(0, cardRepository.count());
-        assertEquals(1, postRepository.count());
-        assertEquals(Optional.empty(), inventoryRepository.findByUserIdWithCards(user.getId()));
+        Awaitility.await().atMost(Duration.ofSeconds(5)).untilAsserted(() -> {
+            entityManager.clear();
+            User completedUser = userRepository.findById(user.getId()).orElseThrow();
+            assertEquals(1, completedUser.getWorkoutsCount());
+            assertEquals(0, completedUser.getCardsCount());
+            assertEquals(0, cardRepository.count());
+            assertEquals(1, postRepository.count());
+            assertEquals(Optional.empty(), inventoryRepository.findByUserIdWithCards(user.getId()));
+        });
 
         FinishWorkoutSnapshotRequestDTO changedRequest = finishRequest(workout, catalogExercise, "Conteúdo alterado");
         assertThrows(IdempotencyConflictException.class,
