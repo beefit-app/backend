@@ -53,4 +53,8 @@ public class CatalogExercise {
 
     @Column(length = 1000)
     private String instructions;
+
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    @Column(columnDefinition = "varchar array")
+    private List<String> images = new ArrayList<>();
 }

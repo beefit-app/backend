@@ -31,6 +31,7 @@ public class ExerciseCatalogService {
     private CatalogExerciseResponseDTO toDto(CatalogExercise exercise) {
         return new CatalogExerciseResponseDTO(exercise.getId(), exercise.getName(),
                 exercise.getPrimaryMuscleGroupsList(), exercise.getSecondaryMuscleGroupsList(),
-                exercise.getPrimaryMusclesList(), exercise.getSecondaryMusclesList(), exercise.getInstructions());
+                exercise.getPrimaryMusclesList(), exercise.getSecondaryMusclesList(), exercise.getInstructions(),
+                exercise.getImages());
     }
 }
