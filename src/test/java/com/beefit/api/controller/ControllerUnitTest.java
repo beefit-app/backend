@@ -310,7 +310,7 @@ class ControllerUnitTest {
         exercise.setId(exerciseId);
         exercise.setName("Supino");
         PageRequest pageable = PageRequest.of(0, 20);
-        CatalogExerciseResponseDTO exerciseDto = new CatalogExerciseResponseDTO(exerciseId, "Supino", null, null, null, null, null);
+        CatalogExerciseResponseDTO exerciseDto = new CatalogExerciseResponseDTO(exerciseId, "Supino", null, null, null, null, null, null);
         Page<CatalogExerciseResponseDTO> page = new PageImpl<>(List.of(exerciseDto), pageable, 1);
 
         when(exerciseCatalogService.list("supino", pageable)).thenReturn(page);
