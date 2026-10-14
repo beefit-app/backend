@@ -22,4 +22,6 @@ public class ExerciseSeedDTO {
     @JsonProperty("instructions")
     List<String> instructions;
 
+    @JsonProperty("images")
+    List<String> images;
 }

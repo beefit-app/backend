@@ -4,6 +4,7 @@ import com.beefit.api.domain.CatalogExercise;
 import com.beefit.api.domain.enums.MuscleGroups;
 import com.beefit.api.domain.enums.AnatomicalMuscle;
 import com.beefit.api.dto.seed.ExerciseSeedDTO;
+import com.beefit.api.dto.seed.ExerciseSeedFileDTO;
 import com.beefit.api.exception.exercises.DatabaseSeederFailException;
 import com.beefit.api.repository.CatalogExerciseRepository;
 import tools.jackson.core.type.TypeReference;
@@ -49,14 +50,16 @@ public class DatabaseSeeder implements CommandLineRunner { // Interface faz a cl
             return;
         }
 
-        ClassPathResource resource = new ClassPathResource("seeds/exercicesv2.json");
+        ClassPathResource resource = new ClassPathResource("static/exercises/exercisesv5.json");
 
         try(InputStream inputStream = resource.getInputStream() /* Passa do Json para bytes */){
-                // Cria lista de ExerciseSeedDTO a partir dos Json
-                List<ExerciseSeedDTO> seeds = objectMapper.readValue(
-                        inputStream,
-                        new TypeReference<List<ExerciseSeedDTO>>() {}
-                );
+            // Cria lista de ExerciseSeedDTO a partir dos Json
+            ExerciseSeedFileDTO seedFile = objectMapper.readValue(
+                    inputStream,
+                    ExerciseSeedFileDTO.class
+            );
+
+            List<ExerciseSeedDTO> seeds = seedFile.getExercises();
 
             if(catalogExerciseRepository.count() == 0){
                 LOGGER.info("Catálogo vazio; iniciando carga inicial de exercícios.");
@@ -69,6 +72,8 @@ public class DatabaseSeeder implements CommandLineRunner { // Interface faz a cl
                     CatalogExercise exercise = new CatalogExercise();
                     String fullName = seed.getName().substring(0,1).toUpperCase() + seed.getName().substring(1);
                     exercise.setName(fullName);
+                    exercise.setImages(seed.getImages());
+
                     if (seed.getInstructions() != null && !seed.getInstructions().isEmpty()) {
                         // Junta todos os passos quebando a linha (\n) para ficar formatado
                         String fullDescription = String.join("\n", seed.getInstructions());
