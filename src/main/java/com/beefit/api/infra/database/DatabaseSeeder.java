@@ -109,6 +109,7 @@ public class DatabaseSeeder implements CommandLineRunner { // Interface faz a cl
                 LOGGER.info("Carga inicial de exercícios concluída.");
             } else {
                 backfillAnatomicalMuscles(catalogExerciseRepository, seeds);
+                backfillImages(catalogExerciseRepository, seeds);
             }
         } catch (IOException | IllegalArgumentException e){
             throw new DatabaseSeederFailException("Não foi possível carregar os dados dos exercícios para o banco de dados.", e);
@@ -143,6 +144,29 @@ public class DatabaseSeeder implements CommandLineRunner { // Interface faz a cl
         if (!changedExercises.isEmpty()) {
             catalogExerciseRepository.saveAll(changedExercises);
             LOGGER.info("Músculos anatômicos preenchidos em {} exercícios existentes.", changedExercises.size());
+        }
+    }
+
+    private void backfillImages(
+            CatalogExerciseRepository catalogExerciseRepository,
+            List<ExerciseSeedDTO> seeds) {
+        Map<String, ExerciseSeedDTO> seedsByName = new HashMap<>();
+        for (ExerciseSeedDTO seed : seeds) {
+            seedsByName.put(capitalize(seed.getName()), seed);
+        }
+
+        List<CatalogExercise> changedExercises = new ArrayList<>();
+        for (CatalogExercise exercise : catalogExerciseRepository.findAll()) {
+            if (exercise.getImages() != null && !exercise.getImages().isEmpty()) continue;
+            ExerciseSeedDTO seed = seedsByName.get(exercise.getName());
+            if (seed == null || seed.getImages() == null || seed.getImages().isEmpty()) continue;
+            exercise.setImages(seed.getImages());
+            changedExercises.add(exercise);
+        }
+
+        if (!changedExercises.isEmpty()) {
+            catalogExerciseRepository.saveAll(changedExercises);
+            LOGGER.info("Imagens preenchidas em {} exercícios existentes.", changedExercises.size());
         }
     }
 
