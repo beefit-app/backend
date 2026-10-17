@@ -19,6 +19,12 @@ public interface ReportRepository extends JpaRepository<Report, UUID> {
 
     boolean existsByReporterIdAndTargetUserId(UUID reporterId, UUID targetUserId);
 
+    boolean existsByReporterIdAndTargetCommentId(UUID reporterId, UUID targetCommentId);
+
+    @Modifying(flushAutomatically = true)
+    @Query("UPDATE Report r SET r.status = :newStatus WHERE r.targetComment.id = :commentId AND r.status = com.beefit.api.domain.enums.ReportStatus.PENDING")
+    int closePendingByTargetComment(@Param("commentId") UUID commentId, @Param("newStatus") ReportStatus newStatus);
+
     Page<Report> findAllByStatus(ReportStatus status, Pageable pageable);
 
     @Modifying(flushAutomatically = true)

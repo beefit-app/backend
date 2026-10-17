@@ -29,6 +29,7 @@ public class ReportModerationService {
     private final ReportRepository reportRepository;
     private final WorkoutModerationService workoutModerationService;
     private final AdminUserService adminUserService;
+    private final PostCommentService commentService;
 
     @Transactional(readOnly = true)
     public Page<AdminReportResponseDTO> listReports(ReportStatus status, Pageable pageable) {
@@ -52,6 +53,12 @@ public class ReportModerationService {
         ReportResolutionAction action = request.action();
 
         switch (action) {
+            case REMOVE_COMMENT -> {
+                if (report.getTargetType() != ReportTargetType.COMMENT) {
+                    throw new IllegalArgumentException("Só é possível remover comentário em denúncia de comentário.");
+                }
+                commentService.moderate(report.getTargetComment().getId());
+            }
             case REMOVE_POST -> {
                 if (!isPostTarget) {
                     throw new IllegalArgumentException("Só é possível remover publicação em denúncia de publicação.");
@@ -63,24 +70,33 @@ public class ReportModerationService {
         }
 
         ReportStatus newStatus = action == ReportResolutionAction.DISMISS ? ReportStatus.DISMISSED : ReportStatus.REVIEWED;
-        int closedReports = isPostTarget
-                ? reportRepository.closePendingByTargetPost(report.getTargetPost().getId(), newStatus)
-                : reportRepository.closePendingByTargetUser(report.getTargetUser().getId(), newStatus);
+        int closedReports = switch (report.getTargetType()) {
+            case POST -> reportRepository.closePendingByTargetPost(report.getTargetPost().getId(), newStatus);
+            case USER -> reportRepository.closePendingByTargetUser(report.getTargetUser().getId(), newStatus);
+            case COMMENT -> reportRepository.closePendingByTargetComment(report.getTargetComment().getId(), newStatus);
+        };
 
         return new ResolvedReportResponseDTO(report.getId(), action, newStatus, closedReports);
     }
 
     private User targetOwner(Report report) {
-        return report.getTargetType() == ReportTargetType.POST
-                ? report.getTargetPost().getUser()
-                : report.getTargetUser();
+        return switch (report.getTargetType()) {
+            case POST -> report.getTargetPost().getUser();
+            case USER -> report.getTargetUser();
+            case COMMENT -> report.getTargetComment().getAuthor();
+        };
     }
 
     private AdminReportResponseDTO toAdminReportResponse(Report report) {
         boolean isPostTarget = report.getTargetType() == ReportTargetType.POST;
 
-        UUID targetId = isPostTarget ? report.getTargetPost().getId() : report.getTargetUser().getId();
-        String targetPostTitle = isPostTarget ? report.getTargetPost().getTitle() : null;
+        UUID targetId = switch (report.getTargetType()) {
+            case POST -> report.getTargetPost().getId();
+            case USER -> report.getTargetUser().getId();
+            case COMMENT -> report.getTargetComment().getId();
+        };
+        String targetPostTitle = isPostTarget ? report.getTargetPost().getTitle()
+                : report.getTargetType() == ReportTargetType.COMMENT ? report.getTargetComment().getText() : null;
         User targetOwner = targetOwner(report);
         User reporter = report.getReporter();
 

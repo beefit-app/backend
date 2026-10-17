@@ -44,6 +44,10 @@ public class Report {
     @JoinColumn(name = "target_user_id")
     private User targetUser;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "target_comment_id")
+    private PostComment targetComment;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 32)
     private ReportReason reason;

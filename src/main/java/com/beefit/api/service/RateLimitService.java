@@ -65,6 +65,10 @@ public class RateLimitService {
         check("upload-user", userId.toString(), 20, UPLOAD_WINDOW);
     }
 
+    public void checkComment(UUID userId) {
+        check("comment-user", userId.toString(), 10, Duration.ofMinutes(1));
+    }
+
     public void checkReport(UUID userId) {
         check("report-user", userId.toString(), 10, REPORT_WINDOW);
     }

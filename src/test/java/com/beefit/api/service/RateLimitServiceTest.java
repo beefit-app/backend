@@ -23,6 +23,15 @@ class RateLimitServiceTest {
     private RateLimitRepository repository;
 
     @Test
+    void allowsTenCommentsAndRejectsTheEleventh() {
+        when(repository.increment(anyString(), any(Instant.class), any(Instant.class))).thenReturn(10, 11);
+        RateLimitService service = new RateLimitService(repository, 5);
+        java.util.UUID userId = java.util.UUID.randomUUID();
+        service.checkComment(userId);
+        assertThrows(RateLimitExceededException.class, () -> service.checkComment(userId));
+    }
+
+    @Test
     void rejectsLoginWhenAccountLimitIsExceededWithoutPersistingPlainEmail() {
         when(repository.increment(anyString(), any(Instant.class), any(Instant.class)))
                 .thenReturn(1, 6);

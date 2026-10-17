@@ -23,6 +23,7 @@ import com.beefit.api.exception.friendship.PostNotFoundException;
 import com.beefit.api.exception.user.UserNotFoundException;
 import com.beefit.api.repository.LikeRepository;
 import com.beefit.api.repository.PostRepository;
+import com.beefit.api.repository.PostCommentRepository;
 import com.beefit.api.repository.UserRepository;
 import com.beefit.api.repository.FriendshipRepository;
 
@@ -36,15 +37,18 @@ public class PostService {
     private final FriendshipRepository friendshipRepository;
     private final FriendshipService friendshipService;
     private final SseService sseService;
+    private final PostCommentRepository commentRepository;
 
     public PostService(PostRepository postRepository, LikeRepository likeRepository, UserRepository userRepository,
-            FriendshipRepository friendshipRepository, FriendshipService friendshipService, SseService sseService) {
+            FriendshipRepository friendshipRepository, FriendshipService friendshipService, SseService sseService,
+            PostCommentRepository commentRepository) {
         this.postRepository = postRepository;
         this.likeRepository = likeRepository;
         this.userRepository = userRepository;
         this.friendshipRepository = friendshipRepository;
         this.friendshipService = friendshipService;
         this.sseService = sseService;
+        this.commentRepository = commentRepository;
     }
 
      // Recupera o feed social de forma paginada.
@@ -57,13 +61,12 @@ public class PostService {
         Page<Post> postsPage = postRepository.findFriendsFeed(currentUser, pageable);
 
         // Mapeia a página de entidades para uma página de DTOs de resposta
-        return postsPage.map(post -> convertToFeedPostResponseDTO(post, currentUser));
+        return toFeedPage(postsPage, currentUser);
     }
 
     @Transactional
     public Page<FeedPostResponseDTO> getOwnPosts(User user, Pageable pageable) {
-        return postRepository.findAllByUserAndIsRemovedFalseOrderByPublishedAtDesc(user, pageable)
-                .map(post -> convertToFeedPostResponseDTO(post, user));
+        return toFeedPage(postRepository.findAllByUserAndIsRemovedFalseOrderByPublishedAtDesc(user, pageable), user);
     }
 
     @Transactional
@@ -77,14 +80,22 @@ public class PostService {
             return Page.empty(pageable);
         }
 
-        return postRepository.findAllByUserAndIsRemovedFalseOrderByPublishedAtDesc(target, pageable)
-                .map(post -> convertToFeedPostResponseDTO(post, currentUser));
+        return toFeedPage(postRepository.findAllByUserAndIsRemovedFalseOrderByPublishedAtDesc(target, pageable), currentUser);
     }
 
 
      // Método auxiliar que converte a entidade Post e suas dependências no DTO do Feed.
 
-    private FeedPostResponseDTO convertToFeedPostResponseDTO(Post post, User currentUser) {
+    private Page<FeedPostResponseDTO> toFeedPage(Page<Post> posts, User viewer) {
+        java.util.Map<UUID, Long> counts = new java.util.HashMap<>();
+        if (!posts.isEmpty()) {
+            commentRepository.countByPosts(posts.stream().map(Post::getId).toList())
+                    .forEach(count -> counts.put(count.getPostId(), count.getTotal()));
+        }
+        return posts.map(post -> convertToFeedPostResponseDTO(post, viewer, counts.getOrDefault(post.getId(), 0L)));
+    }
+
+    private FeedPostResponseDTO convertToFeedPostResponseDTO(Post post, User currentUser, long commentsCount) {
         User author = post.getUser();
         var session = post.getWorkoutSession();
 
@@ -132,7 +143,8 @@ public class PostService {
                 session.getDurationSeconds(),
                 session.getEstimatedCalories(),
                 bodyHeatMap,
-                exerciseDTOs
+                exerciseDTOs,
+                commentsCount
         );
     }
 

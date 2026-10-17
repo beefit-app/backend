@@ -4,5 +4,6 @@ package com.beefit.api.domain.enums;
 // em reports; o CHECK reports_target_shape_check garante essa exclusividade.
 public enum ReportTargetType {
     POST,
+    COMMENT,
     USER
 }

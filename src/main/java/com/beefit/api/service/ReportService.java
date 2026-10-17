@@ -11,6 +11,7 @@ import com.beefit.api.exception.report.CannotReportSelfException;
 import com.beefit.api.exception.report.ReportAlreadyExistsException;
 import com.beefit.api.exception.report.ReportTargetNotFoundException;
 import com.beefit.api.repository.PostRepository;
+import com.beefit.api.repository.PostCommentRepository;
 import com.beefit.api.repository.ReportRepository;
 import com.beefit.api.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -29,11 +30,12 @@ public class ReportService {
     // Nomes dos indices parciais criados em V13; a violacao so pode ser traduzida
     // para "ja denunciou" se vier exatamente de um deles.
     private static final Set<String> DUPLICATE_REPORT_CONSTRAINTS =
-            Set.of("reports_unique_post_per_reporter", "reports_unique_user_per_reporter");
+            Set.of("reports_unique_post_per_reporter", "reports_unique_user_per_reporter", "reports_unique_comment_per_reporter");
 
     private final ReportRepository reportRepository;
     private final PostRepository postRepository;
     private final UserRepository userRepository;
+    private final PostCommentRepository commentRepository;
 
     @Transactional
     public ReportResponseDTO createReport(User reporter, CreateReportDTO dto) {
@@ -46,6 +48,16 @@ public class ReportService {
 
         if (dto.targetType() == ReportTargetType.POST) {
             attachPostTarget(report, reporter, dto.targetId());
+        } else if (dto.targetType() == ReportTargetType.COMMENT) {
+            var comment = commentRepository.findById(dto.targetId()).orElseThrow(ReportTargetNotFoundException::new);
+            if (comment.isRemoved() || postRepository.findVisibleById(comment.getPost().getId(), reporter.getId()).isEmpty()) {
+                throw new ReportTargetNotFoundException();
+            }
+            if (comment.getAuthor().getId().equals(reporter.getId())) throw new CannotReportSelfException();
+            if (reportRepository.existsByReporterIdAndTargetCommentId(reporter.getId(), comment.getId())) {
+                throw new ReportAlreadyExistsException();
+            }
+            report.setTargetComment(comment);
         } else {
             attachUserTarget(report, reporter, dto.targetId());
         }
@@ -116,9 +128,11 @@ public class ReportService {
     }
 
     private ReportResponseDTO toResponse(Report report) {
-        UUID targetId = report.getTargetType() == ReportTargetType.POST
-                ? report.getTargetPost().getId()
-                : report.getTargetUser().getId();
+        UUID targetId = switch (report.getTargetType()) {
+            case POST -> report.getTargetPost().getId();
+            case USER -> report.getTargetUser().getId();
+            case COMMENT -> report.getTargetComment().getId();
+        };
 
         return new ReportResponseDTO(
                 report.getId(),
