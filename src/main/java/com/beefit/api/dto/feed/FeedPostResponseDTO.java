@@ -42,5 +42,6 @@ public record FeedPostResponseDTO(
 
          //Lista detalhada contendo os exercícios, séries e cargas realizados nesta sessão.
 
-        List<FeedExerciseDTO> exercises
+        List<FeedExerciseDTO> exercises,
+        long commentsCount
 ) {}

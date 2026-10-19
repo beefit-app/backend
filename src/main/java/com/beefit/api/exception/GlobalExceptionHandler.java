@@ -50,6 +50,14 @@ import jakarta.servlet.http.HttpServletRequest;
                       // interceptar as exceptions
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(org.springframework.web.server.ResponseStatusException.class)
+    public ResponseEntity<ErrorResponse> handleResponseStatus(
+            org.springframework.web.server.ResponseStatusException exception, HttpServletRequest request) {
+        return ResponseEntity.status(exception.getStatusCode()).body(new ErrorResponse(
+                LocalDateTime.now(), exception.getStatusCode().value(),
+                "Falha na requisição", exception.getReason(), List.of(), request.getRequestURI()));
+    }
+
     @ExceptionHandler({ EmailAlreadyInUse.class, UsernameAlreadyInUse.class }) // Essa anotação indica o tipo de exception que deve ser interceptada
     @ResponseStatus(HttpStatus.CONFLICT)
     public ErrorResponse handleRegisterConflictExceptions(RuntimeException e, HttpServletRequest request) {

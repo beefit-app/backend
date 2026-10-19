@@ -228,6 +228,8 @@ public class UserService {
         entityManager.createNativeQuery("DELETE FROM post_likes WHERE user_id = :userId OR post_id IN (SELECT id FROM posts WHERE user_id = :userId)")
                 .setParameter("userId", userId).executeUpdate();
 
+        // Comentários usam ON DELETE CASCADE para usuário/post, inclusive denúncias
+        // contra esses comentários. Isso também cobre DELETEs nativos neste fluxo.
         // 6. Apagar postagens do usuário
         entityManager.createNativeQuery("DELETE FROM posts WHERE user_id = :userId")
                 .setParameter("userId", userId).executeUpdate();

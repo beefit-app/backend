@@ -11,5 +11,6 @@ public enum SocialEvent {
     FRIEND_REMOVED,
     TEMPLATE_IMPORTED,
     POST_LIKED,
+    POST_COMMENTS_CHANGED,
     PROFILE_UPDATED
 }

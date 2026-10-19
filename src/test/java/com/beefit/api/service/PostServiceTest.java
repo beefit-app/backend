@@ -40,6 +40,9 @@ class PostServiceTest {
     private PostRepository postRepository;
 
     @Mock
+    private com.beefit.api.repository.PostCommentRepository commentRepository;
+
+    @Mock
     private LikeRepository likeRepository;
 
     @Mock
