@@ -98,8 +98,7 @@ public class SecurityConfiguration {
                 .headers(headers -> headers
                         .contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'none'; frame-ancestors 'none'"))
                         .frameOptions(frame -> frame.deny())
-                        .referrerPolicy(referrer -> referrer.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER))
-                        .permissionsPolicy(permissions -> permissions.policy("camera=(), microphone=(), geolocation=()")))
+                        .referrerPolicy(referrer -> referrer.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER)).permissionsPolicyHeader(permissions -> permissions.policy("camera=(), microphone=(), geolocation=()")))
 
                 .authorizeHttpRequests(authorize -> {
                         // .requestMatchers(HttpMethod.POST, "/dashboard").hasRole("ADMIN")
@@ -113,6 +112,7 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.GET, "/auth/legal-versions").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/refresh").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/logout").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/images/**").permitAll()
                         .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN");
 

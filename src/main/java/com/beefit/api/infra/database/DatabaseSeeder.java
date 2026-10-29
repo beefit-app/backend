@@ -4,6 +4,7 @@ import com.beefit.api.domain.CatalogExercise;
 import com.beefit.api.domain.enums.MuscleGroups;
 import com.beefit.api.domain.enums.AnatomicalMuscle;
 import com.beefit.api.dto.seed.ExerciseSeedDTO;
+import com.beefit.api.dto.seed.ExerciseSeedFileDTO;
 import com.beefit.api.exception.exercises.DatabaseSeederFailException;
 import com.beefit.api.repository.CatalogExerciseRepository;
 import tools.jackson.core.type.TypeReference;
@@ -49,14 +50,16 @@ public class DatabaseSeeder implements CommandLineRunner { // Interface faz a cl
             return;
         }
 
-        ClassPathResource resource = new ClassPathResource("seeds/exercicesv2.json");
+        ClassPathResource resource = new ClassPathResource("static/exercises/exercisesv5.json");
 
         try(InputStream inputStream = resource.getInputStream() /* Passa do Json para bytes */){
-                // Cria lista de ExerciseSeedDTO a partir dos Json
-                List<ExerciseSeedDTO> seeds = objectMapper.readValue(
-                        inputStream,
-                        new TypeReference<List<ExerciseSeedDTO>>() {}
-                );
+            // Cria lista de ExerciseSeedDTO a partir dos Json
+            ExerciseSeedFileDTO seedFile = objectMapper.readValue(
+                    inputStream,
+                    ExerciseSeedFileDTO.class
+            );
+
+            List<ExerciseSeedDTO> seeds = seedFile.getExercises();
 
             if(catalogExerciseRepository.count() == 0){
                 LOGGER.info("Catálogo vazio; iniciando carga inicial de exercícios.");
@@ -69,6 +72,8 @@ public class DatabaseSeeder implements CommandLineRunner { // Interface faz a cl
                     CatalogExercise exercise = new CatalogExercise();
                     String fullName = seed.getName().substring(0,1).toUpperCase() + seed.getName().substring(1);
                     exercise.setName(fullName);
+                    exercise.setImages(seed.getImages());
+
                     if (seed.getInstructions() != null && !seed.getInstructions().isEmpty()) {
                         // Junta todos os passos quebando a linha (\n) para ficar formatado
                         String fullDescription = String.join("\n", seed.getInstructions());
@@ -104,6 +109,7 @@ public class DatabaseSeeder implements CommandLineRunner { // Interface faz a cl
                 LOGGER.info("Carga inicial de exercícios concluída.");
             } else {
                 backfillAnatomicalMuscles(catalogExerciseRepository, seeds);
+                backfillImages(catalogExerciseRepository, seeds);
             }
         } catch (IOException | IllegalArgumentException e){
             throw new DatabaseSeederFailException("Não foi possível carregar os dados dos exercícios para o banco de dados.", e);
@@ -138,6 +144,29 @@ public class DatabaseSeeder implements CommandLineRunner { // Interface faz a cl
         if (!changedExercises.isEmpty()) {
             catalogExerciseRepository.saveAll(changedExercises);
             LOGGER.info("Músculos anatômicos preenchidos em {} exercícios existentes.", changedExercises.size());
+        }
+    }
+
+    private void backfillImages(
+            CatalogExerciseRepository catalogExerciseRepository,
+            List<ExerciseSeedDTO> seeds) {
+        Map<String, ExerciseSeedDTO> seedsByName = new HashMap<>();
+        for (ExerciseSeedDTO seed : seeds) {
+            seedsByName.put(capitalize(seed.getName()), seed);
+        }
+
+        List<CatalogExercise> changedExercises = new ArrayList<>();
+        for (CatalogExercise exercise : catalogExerciseRepository.findAll()) {
+            if (exercise.getImages() != null && !exercise.getImages().isEmpty()) continue;
+            ExerciseSeedDTO seed = seedsByName.get(exercise.getName());
+            if (seed == null || seed.getImages() == null || seed.getImages().isEmpty()) continue;
+            exercise.setImages(seed.getImages());
+            changedExercises.add(exercise);
+        }
+
+        if (!changedExercises.isEmpty()) {
+            catalogExerciseRepository.saveAll(changedExercises);
+            LOGGER.info("Imagens preenchidas em {} exercícios existentes.", changedExercises.size());
         }
     }
 

@@ -12,5 +12,6 @@ public record CatalogExerciseResponseDTO(
         List<MuscleGroups> secondaryMuscleGroupsList,
         List<AnatomicalMuscle> primaryMusclesList,
         List<AnatomicalMuscle> secondaryMusclesList,
-        String instructions) {
+        String instructions,
+        List<String> images){
 }
