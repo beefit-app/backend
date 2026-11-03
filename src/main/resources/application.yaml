@@ -82,7 +82,9 @@ beefit:
   oauth2:
     # Para onde o OAuth2LoginSuccessHandler/FailureHandler redirecionam depois do
     # login social, com o código de troca (?code=...) ou erro (?error=...) anexado.
-    callback-base-web: ${BEEFIT_OAUTH2_CALLBACK_BASE_WEB:http://localhost:5173/auth/callback}
+    # callback-base-web NAO pode comecar com /auth: o vite.config.ts do frontend
+    # faz proxy de /auth/** pro backend em dev, entao essa rota nunca chegaria na SPA.
+    callback-base-web: ${BEEFIT_OAUTH2_CALLBACK_BASE_WEB:http://localhost:5173/oauth-callback}
     callback-base-mobile: ${BEEFIT_OAUTH2_CALLBACK_BASE_MOBILE:com.beefit.app://auth/callback}
 # : depois da variável cria um fallback seguro caso ela não seja encontrada no ambiente/CI
 cloudflare:
