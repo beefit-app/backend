@@ -34,6 +34,33 @@ spring:
       readiness:
         wait: always
 
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID}
+            client-secret: ${GOOGLE_CLIENT_SECRET}
+            scope: openid,profile,email
+          microsoft:
+            client-id: ${MICROSOFT_CLIENT_ID}
+            client-secret: ${MICROSOFT_CLIENT_SECRET}
+            scope: openid,profile,email
+            authorization-grant-type: authorization_code
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+            provider: microsoft
+        # Sem issuer-uri de proposito: o endpoint /common/v2.0 da Microsoft serve contas
+        # pessoais e corporativas/escolares, e o claim "iss" do id_token varia por tenant.
+        # Configurar issuer-uri forcaria a OIDC discovery a validar um issuer fixo, o que
+        # quebraria o login de contas de tenants diferentes do configurado.
+        provider:
+          microsoft:
+            authorization-uri: https://login.microsoftonline.com/common/oauth2/v2.0/authorize
+            token-uri: https://login.microsoftonline.com/common/oauth2/v2.0/token
+            jwk-set-uri: https://login.microsoftonline.com/common/discovery/v2.0/keys
+            user-info-uri: https://graph.microsoft.com/oidc/userinfo
+            user-name-attribute: sub
+
 beefit:
   beta:
     enabled: ${BEEFIT_BETA_MODE:false}
@@ -52,6 +79,11 @@ beefit:
       registration-maximum: ${BEEFIT_SECURITY_RATE_LIMIT_REGISTRATION_MAXIMUM:5}
     token:
       secret: ${JWT_SECRET}
+  oauth2:
+    # Para onde o OAuth2LoginSuccessHandler/FailureHandler redirecionam depois do
+    # login social, com o código de troca (?code=...) ou erro (?error=...) anexado.
+    callback-base-web: ${BEEFIT_OAUTH2_CALLBACK_BASE_WEB:http://localhost:5173/auth/callback}
+    callback-base-mobile: ${BEEFIT_OAUTH2_CALLBACK_BASE_MOBILE:com.beefit.app://auth/callback}
 # : depois da variável cria um fallback seguro caso ela não seja encontrada no ambiente/CI
 cloudflare:
   r2:

@@ -9,6 +9,7 @@ import com.beefit.api.dto.auth.RefreshTokenResponseDTO;
 import com.beefit.api.dto.auth.UserResponseDTO;
 import com.beefit.api.exception.user.EmailAlreadyInUse;
 import com.beefit.api.exception.user.InvalidSessionException;
+import com.beefit.api.exception.user.SocialLoginRequiredException;
 import com.beefit.api.exception.user.UsernameAlreadyInUse;
 import com.beefit.api.mapper.UserResponseMapper;
 import com.beefit.api.repository.AuthSessionRepository;
@@ -68,12 +69,31 @@ public class AuthService implements UserDetailsService {
 
     @Transactional
     public LoginResponseDTO login(String email, String password, String deviceId) {
-        var usernamePassword = new UsernamePasswordAuthenticationToken(normalizeEmail(email), password);
+        String normalizedEmail = normalizeEmail(email);
+
+        // BCryptPasswordEncoder.matches lanca IllegalArgumentException para hash nulo,
+        // o que o DaoAuthenticationProvider interno do authenticationManager nao trata
+        // como falha de credenciais. Contas criadas via login social nao tem senha
+        // local (passwordHash == null), entao essa checagem precisa vir antes dele.
+        userRepository.findOptionalByEmailIgnoreCase(normalizedEmail)
+                .filter(user -> user.getPasswordHash() == null)
+                .ifPresent(user -> {
+                    throw new SocialLoginRequiredException(
+                            "Esta conta usa login social. Entre com Google ou Microsoft.");
+                });
+
+        var usernamePassword = new UsernamePasswordAuthenticationToken(normalizedEmail, password);
 
         var authenticationManager = authenticationConfiguration.getAuthenticationManager();
         var auth = authenticationManager.authenticate(usernamePassword);
         User authenticatedUser = (User) auth.getPrincipal();
         return createSession(authenticatedUser, deviceId);
+    }
+
+    /** Emite sessão (JWT + refresh token) para um usuário já resolvido pelo fluxo de login social. */
+    @Transactional
+    public LoginResponseDTO loginSocialUser(User user, String deviceId) {
+        return createSession(user, deviceId);
     }
 
     @Transactional

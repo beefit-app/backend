@@ -32,6 +32,7 @@ public class SecurityFilter extends OncePerRequestFilter {
             "/auth/register",
             "/auth/refresh",
             "/auth/logout",
+            "/auth/social/exchange",
             "/error"
     };
 

@@ -112,6 +112,9 @@ class ControllerUnitTest {
     private LegalConsentService legalConsentService;
 
     @Mock
+    private com.beefit.api.infra.security.oauth2.SocialExchangeCodeStore socialExchangeCodeStore;
+
+    @Mock
     private ExerciseCatalogService exerciseCatalogService;
 
     @AfterEach
@@ -121,7 +124,7 @@ class ControllerUnitTest {
 
     @Test
     void authLoginReturnsOkWithLoginResponse() {
-        AuthController controller = new AuthController(authService, registerMapper, userResponseMapper, rateLimitService, legalConsentService);
+        AuthController controller = new AuthController(authService, registerMapper, userResponseMapper, rateLimitService, legalConsentService, socialExchangeCodeStore);
         LoginResponseDTO loginResponse = new LoginResponseDTO(
                 "token",
                 "refresh-token",
@@ -139,7 +142,7 @@ class ControllerUnitTest {
 
     @Test
     void authRefreshReturnsNewTokens() {
-        AuthController controller = new AuthController(authService, registerMapper, userResponseMapper, rateLimitService, legalConsentService);
+        AuthController controller = new AuthController(authService, registerMapper, userResponseMapper, rateLimitService, legalConsentService, socialExchangeCodeStore);
         RefreshTokenResponseDTO refreshResponse = new RefreshTokenResponseDTO("new-access", "new-refresh");
 
         when(authService.refreshSession("refresh-token", "device-1")).thenReturn(refreshResponse);
@@ -154,7 +157,7 @@ class ControllerUnitTest {
 
     @Test
     void authLogoutReturnsNoContent() {
-        AuthController controller = new AuthController(authService, registerMapper, userResponseMapper, rateLimitService, legalConsentService);
+        AuthController controller = new AuthController(authService, registerMapper, userResponseMapper, rateLimitService, legalConsentService, socialExchangeCodeStore);
 
         ResponseEntity<Void> response = controller.logout(new LogoutRequestDTO("refresh-token", "device-1"));
 
@@ -164,7 +167,7 @@ class ControllerUnitTest {
 
     @Test
     void authMeMapsAuthenticatedUser() {
-        AuthController controller = new AuthController(authService, registerMapper, userResponseMapper, rateLimitService, legalConsentService);
+        AuthController controller = new AuthController(authService, registerMapper, userResponseMapper, rateLimitService, legalConsentService, socialExchangeCodeStore);
         User user = user();
         UserResponseDTO dto = new UserResponseDTO(user.getId(), user.getFullName(), user.getUsername(), user.getEmail(), user.getBodyWeight(), user.getWeeklyGoal(), user.getRole());
 

@@ -1,0 +1,141 @@
+package com.beefit.api.service;
+
+import com.beefit.api.domain.Inventory;
+import com.beefit.api.domain.User;
+import com.beefit.api.domain.UserSocialAccount;
+import com.beefit.api.domain.enums.SocialProvider;
+import com.beefit.api.domain.enums.UserRole;
+import com.beefit.api.exception.user.EmailAlreadyInUse;
+import com.beefit.api.repository.InventoryRepository;
+import com.beefit.api.repository.UserRepository;
+import com.beefit.api.repository.UserSocialAccountRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.util.Locale;
+import java.util.Optional;
+
+/**
+ * Resolve a conta local correspondente a um login social, aplicando a regra de
+ * account linking: vincula silenciosamente a uma conta existente quando o
+ * e-mail do provedor é verificado, ou cria uma conta nova (sem senha local).
+ */
+@Service
+@RequiredArgsConstructor
+public class SocialAuthService {
+
+    // Google/Microsoft não fornecem peso corporal nem meta semanal de treinos;
+    // esses valores são editáveis depois via PATCH /profile. Débito técnico aceito:
+    // o DoD deste ticket só exige emissão de JWT válido, não perfil completo.
+    private static final float DEFAULT_BODY_WEIGHT = 70f;
+    private static final int DEFAULT_WEEKLY_GOAL = 3;
+
+    private final UserRepository userRepository;
+    private final UserSocialAccountRepository userSocialAccountRepository;
+    private final InventoryRepository inventoryRepository;
+    private final LegalConsentService legalConsentService;
+
+    @Transactional
+    public User resolveOrCreate(SocialProvider provider, String providerUserId, String email,
+            boolean emailVerified, String fullNameClaim) {
+        Optional<UserSocialAccount> existingLink =
+                userSocialAccountRepository.findByProviderAndProviderUserId(provider, providerUserId);
+        if (existingLink.isPresent()) {
+            return existingLink.get().getUser();
+        }
+
+        String normalizedEmail = normalizeEmail(email);
+        Optional<User> existingUserByEmail = userRepository.findOptionalByEmailIgnoreCase(normalizedEmail);
+
+        // So confiamos na posse do e-mail quando o provedor o marca como verificado;
+        // sem isso, linkar por e-mail abriria uma forma de assumir a conta de outra pessoa.
+        if (emailVerified && existingUserByEmail.isPresent()) {
+            linkAccount(existingUserByEmail.get(), provider, providerUserId);
+            return existingUserByEmail.get();
+        }
+
+        // users.email tem constraint UNIQUE — nao ha como criar uma segunda conta com
+        // esse e-mail mesmo que nao verificado. Recusar explicitamente aqui em vez de
+        // deixar a inserção falhar com uma violação de constraint crua.
+        if (existingUserByEmail.isPresent()) {
+            throw new EmailAlreadyInUse(
+                    "Esse e-mail já está associado a outra conta. Verifique seu e-mail com o provedor ou entre com e-mail e senha.");
+        }
+
+        User newUser = createUser(normalizedEmail, fullNameClaim);
+        linkAccount(newUser, provider, providerUserId);
+        return newUser;
+    }
+
+    private User createUser(String email, String fullNameClaim) {
+        User user = new User();
+        user.setEmail(email);
+        user.setFullName(normalizeFullName(fullNameClaim, email));
+        user.setUsername(generateUniqueUsername(email));
+        user.setBodyWeight(DEFAULT_BODY_WEIGHT);
+        user.setWeeklyGoal(DEFAULT_WEEKLY_GOAL);
+        user.setRole(UserRole.USER);
+
+        legalConsentService.recordConsent(
+                user, legalConsentService.termsVersion(), legalConsentService.privacyVersion());
+
+        User savedUser = userRepository.save(user);
+
+        Inventory inventory = new Inventory();
+        inventory.setUser(savedUser);
+        inventory.setTotalCards(0);
+        inventoryRepository.save(inventory);
+
+        return savedUser;
+    }
+
+    private void linkAccount(User user, SocialProvider provider, String providerUserId) {
+        UserSocialAccount account = new UserSocialAccount();
+        account.setUser(user);
+        account.setProvider(provider);
+        account.setProviderUserId(providerUserId);
+        account.setCreatedAt(LocalDateTime.now());
+        userSocialAccountRepository.save(account);
+    }
+
+    private String normalizeFullName(String fullNameClaim, String email) {
+        String candidate = fullNameClaim == null ? "" : fullNameClaim.trim();
+        if (candidate.length() >= 4) {
+            return candidate.length() > 100 ? candidate.substring(0, 100) : candidate;
+        }
+        String localPart = localPart(email);
+        StringBuilder padded = new StringBuilder(localPart.isBlank() ? "usuario" : localPart);
+        while (padded.length() < 4) {
+            padded.append(padded);
+        }
+        return padded.substring(0, Math.min(padded.length(), 100));
+    }
+
+    private String generateUniqueUsername(String email) {
+        String base = localPart(email).toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9._-]", "");
+        if (base.isBlank()) {
+            base = "user";
+        }
+        String candidate = base;
+        int suffix = 0;
+        while (userRepository.findByUsernameIgnoreCase(candidate).isPresent()) {
+            suffix++;
+            candidate = base + suffix;
+        }
+        return candidate;
+    }
+
+    private String localPart(String email) {
+        if (email == null) {
+            return "";
+        }
+        int at = email.indexOf('@');
+        return at > 0 ? email.substring(0, at) : email;
+    }
+
+    private String normalizeEmail(String email) {
+        return email == null ? null : email.trim().toLowerCase(Locale.ROOT);
+    }
+}

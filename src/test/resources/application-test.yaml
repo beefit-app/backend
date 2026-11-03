@@ -15,6 +15,28 @@ beefit:
 spring:
   jpa:
     show-sql: false
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: test-google-client-id
+            client-secret: test-google-client-secret
+            scope: openid,profile,email
+          microsoft:
+            client-id: test-microsoft-client-id
+            client-secret: test-microsoft-client-secret
+            scope: openid,profile,email
+            authorization-grant-type: authorization_code
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+            provider: microsoft
+        provider:
+          microsoft:
+            authorization-uri: https://login.microsoftonline.com/common/oauth2/v2.0/authorize
+            token-uri: https://login.microsoftonline.com/common/oauth2/v2.0/token
+            jwk-set-uri: https://login.microsoftonline.com/common/discovery/v2.0/keys
+            user-info-uri: https://graph.microsoft.com/oidc/userinfo
+            user-name-attribute: sub
 
 cloudflare:
   r2:

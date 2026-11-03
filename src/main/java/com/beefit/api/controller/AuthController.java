@@ -7,7 +7,10 @@ import com.beefit.api.dto.auth.LogoutRequestDTO;
 import com.beefit.api.dto.auth.RefreshTokenRequestDTO;
 import com.beefit.api.dto.auth.RefreshTokenResponseDTO;
 import com.beefit.api.dto.auth.RegisterDTO;
+import com.beefit.api.dto.auth.SocialExchangeRequestDTO;
 import com.beefit.api.dto.auth.UserResponseDTO;
+import com.beefit.api.exception.user.InvalidSocialExchangeCodeException;
+import com.beefit.api.infra.security.oauth2.SocialExchangeCodeStore;
 import com.beefit.api.mapper.RegisterMapper;
 import com.beefit.api.mapper.UserResponseMapper;
 import com.beefit.api.service.AuthService;
@@ -35,6 +38,7 @@ public class AuthController implements GenericController {
     private final UserResponseMapper userResponseMapper;
     private final RateLimitService rateLimitService;
     private final LegalConsentService legalConsentService;
+    private final SocialExchangeCodeStore socialExchangeCodeStore;
 
     @Value("${beefit.registration.enabled:true}")
     private boolean registrationEnabled;
@@ -73,6 +77,16 @@ public class AuthController implements GenericController {
 
         // Retornando sucesso sempre por enquanto
         return ResponseEntity.created(location).body(login);
+    }
+
+    // Troca o código de uso único emitido pelo callback de login social (Google/Microsoft)
+    // pela sessão real (JWT + refresh token). Ver OAuth2LoginSuccessHandler/SocialExchangeCodeStore.
+    @PostMapping("/social/exchange")
+    public ResponseEntity<LoginResponseDTO> exchangeSocialCode(@RequestBody @Valid SocialExchangeRequestDTO data) {
+        LoginResponseDTO session = socialExchangeCodeStore.consume(data.code())
+                .orElseThrow(() -> new InvalidSocialExchangeCodeException(
+                        "Código de login social inválido ou expirado. Tente novamente."));
+        return ResponseEntity.ok(session);
     }
 
     @GetMapping("/legal-versions")
