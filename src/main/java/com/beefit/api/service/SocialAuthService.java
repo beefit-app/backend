@@ -6,6 +6,7 @@ import com.beefit.api.domain.UserSocialAccount;
 import com.beefit.api.domain.enums.SocialProvider;
 import com.beefit.api.domain.enums.UserRole;
 import com.beefit.api.exception.user.EmailAlreadyInUse;
+import com.beefit.api.exception.user.UnverifiedSocialEmailException;
 import com.beefit.api.repository.InventoryRepository;
 import com.beefit.api.repository.UserRepository;
 import com.beefit.api.repository.UserSocialAccountRepository;
@@ -71,6 +72,15 @@ public class SocialAuthService {
         if (existingUserByEmail.isPresent()) {
             throw new EmailAlreadyInUse(
                     "Esse e-mail já está associado a outra conta. Verifique seu e-mail com o provedor ou entre com e-mail e senha.");
+        }
+
+        // Nunca criar conta com e-mail nao verificado: alguem poderia "reservar" o
+        // e-mail de outra pessoa, e quando o dono real entrasse depois com um provedor
+        // que verifica o e-mail, o login seria vinculado a essa conta pre-criada (que
+        // o atacante continua acessando pelo proprio vinculo social).
+        if (!emailVerified || normalizedEmail == null || normalizedEmail.isBlank()) {
+            throw new UnverifiedSocialEmailException(
+                    "O provedor não confirmou a verificação do seu e-mail. Verifique o e-mail na sua conta do provedor e tente novamente.");
         }
 
         User newUser = createUser(normalizedEmail, fullNameClaim);

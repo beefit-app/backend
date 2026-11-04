@@ -79,7 +79,7 @@ public class AuthService implements UserDetailsService {
                 .filter(user -> user.getPasswordHash() == null)
                 .ifPresent(user -> {
                     throw new SocialLoginRequiredException(
-                            "Esta conta usa login social. Entre com Google ou Microsoft.");
+                            "Esta conta usa login social. Entre com Google ou Apple.");
                 });
 
         var usernamePassword = new UsernamePasswordAuthenticationToken(normalizedEmail, password);

@@ -167,6 +167,23 @@ class SocialLoginIntegrationTest {
         assertTrue(userRepository.findById(existing.getId()).isPresent());
     }
 
+    /**
+     * Sem conta prévia, um e-mail não verificado também não pode criar conta nova:
+     * senão alguém "reservaria" o e-mail de outra pessoa e o dono real, ao entrar
+     * depois com e-mail verificado, seria vinculado silenciosamente a essa conta.
+     */
+    @Test
+    void unverifiedEmailWithoutExistingAccountDoesNotCreateAccount() throws Exception {
+        String email = "reserva." + UUID.randomUUID() + "@gmail.com";
+        String providerUserId = "google-sub-" + UUID.randomUUID();
+
+        String redirectLocation = runAuthorizationCodeFlow(providerUserId, email, false, "Email Não Verificado");
+
+        assertTrue(redirectLocation.contains("error=social_login_failed"));
+        assertTrue(socialAccountRepository.findByProviderAndProviderUserId(SocialProvider.GOOGLE, providerUserId).isEmpty());
+        assertTrue(userRepository.findOptionalByEmailIgnoreCase(email).isEmpty());
+    }
+
     @Test
     void invalidProviderTokenRedirectsWithErrorAndNeverIssuesExchangeCode() throws Exception {
         MockHttpSession session = new MockHttpSession();

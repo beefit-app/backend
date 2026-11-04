@@ -32,8 +32,12 @@ public class SocialExchangeCodeStore {
     private final SecureRandom secureRandom = new SecureRandom();
 
     public String issue(LoginResponseDTO session) {
+        Instant now = Instant.now();
+        // Códigos emitidos e nunca trocados (usuário fechou o app no meio do fluxo)
+        // ficariam no mapa pra sempre; a varredura é barata porque o TTL é curto.
+        codes.values().removeIf(entry -> entry.expiresAt().isBefore(now));
         String code = generateCode();
-        codes.put(code, new Entry(session, Instant.now().plus(TTL)));
+        codes.put(code, new Entry(session, now.plus(TTL)));
         return code;
     }
 
