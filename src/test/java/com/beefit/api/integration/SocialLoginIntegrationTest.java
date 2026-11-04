@@ -5,6 +5,8 @@ import com.beefit.api.domain.enums.SocialProvider;
 import com.beefit.api.domain.enums.UserRole;
 import com.beefit.api.repository.UserRepository;
 import com.beefit.api.repository.UserSocialAccountRepository;
+import com.beefit.api.service.LegalConsentService;
+import com.jayway.jsonpath.JsonPath;
 import com.beefit.api.support.OAuth2ProviderStubSupport;
 import com.beefit.api.support.PostgreSqlTestSupport;
 import com.github.tomakehurst.wiremock.WireMockServer;
@@ -101,6 +103,7 @@ class SocialLoginIntegrationTest {
     @Autowired UserRepository userRepository;
     @Autowired UserSocialAccountRepository socialAccountRepository;
     @Autowired PasswordEncoder passwordEncoder;
+    @Autowired LegalConsentService legalConsentService;
 
     @BeforeEach
     void resetStubs() {
@@ -120,10 +123,17 @@ class SocialLoginIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").isNotEmpty())
                 .andExpect(jsonPath("$.refreshToken").isNotEmpty())
-                .andExpect(jsonPath("$.user.email").value(email));
+                .andExpect(jsonPath("$.user.email").value(email))
+                .andExpect(jsonPath("$.user.profileComplete").value(false));
 
+        // O provedor não fornece peso/meta, e o aceite dos termos precisa ser do
+        // usuário: nada disso é inventado na criação (ver "Complete seu cadastro").
         User created = userRepository.findOptionalByEmailIgnoreCase(email).orElseThrow();
         assertNull(created.getPasswordHash());
+        assertNull(created.getBodyWeight());
+        assertNull(created.getWeeklyGoal());
+        assertNull(created.getAcceptedTermsVersion());
+        assertNull(created.getAcceptedPrivacyVersion());
         assertTrue(socialAccountRepository.findByProviderAndProviderUserId(SocialProvider.GOOGLE, providerUserId)
                 .isPresent());
     }
@@ -354,6 +364,111 @@ class SocialLoginIntegrationTest {
         String redirectLocation = callbackResult.getResponse().getHeader("Location");
         assertNotNull(redirectLocation);
         return redirectLocation;
+    }
+
+    // ---- "Complete seu cadastro" (conta social recém-criada) ----
+
+    @Test
+    void incompleteSocialAccountIsBlockedFromApiButKeepsAuthAndAccountRoutes() throws Exception {
+        String accessToken = newSocialAccountAccessToken();
+
+        mvc.perform(get("/api/profile/me/posts").header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error").value("PROFILE_INCOMPLETE"));
+
+        mvc.perform(get("/auth/me").header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.profileComplete").value(false))
+                .andExpect(jsonPath("$.bodyWeight").doesNotExist());
+
+        mvc.perform(get("/api/profile/me").header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void incompleteSocialAccountCanStillDeleteItself() throws Exception {
+        String accessToken = newSocialAccountAccessToken();
+
+        int status = mvc.perform(delete("/api/profile/me").header("Authorization", "Bearer " + accessToken))
+                .andReturn().getResponse().getStatus();
+
+        // Só importa que o ProfileCompletionFilter não barre a exclusão; as regras
+        // da exclusão em si (corpo exigido etc.) são de outro teste.
+        assertNotEquals(403, status);
+    }
+
+    @Test
+    void completingProfileStoresDataAndConsentAndUnlocksApi() throws Exception {
+        String email = "completar." + UUID.randomUUID() + "@gmail.com";
+        String accessToken = newSocialAccountAccessToken(email);
+
+        mvc.perform(post("/auth/complete-profile").header("Authorization", "Bearer " + accessToken)
+                        .contentType("application/json")
+                        .content(completeProfileBody(82.5F, 5, legalConsentService.termsVersion(),
+                                legalConsentService.privacyVersion())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.profileComplete").value(true))
+                .andExpect(jsonPath("$.bodyWeight").value(82.5))
+                .andExpect(jsonPath("$.weeklyGoal").value(5));
+
+        User completed = userRepository.findOptionalByEmailIgnoreCase(email).orElseThrow();
+        assertEquals(82.5F, completed.getBodyWeight());
+        assertEquals(5, completed.getWeeklyGoal());
+        assertEquals(legalConsentService.termsVersion(), completed.getAcceptedTermsVersion());
+        assertNotNull(completed.getTermsAcceptedAt());
+        assertEquals(legalConsentService.privacyVersion(), completed.getAcceptedPrivacyVersion());
+
+        mvc.perform(get("/api/profile/me/posts").header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk());
+
+        // Uma vez completo, peso/meta mudam pelo perfil — não por aqui de novo.
+        mvc.perform(post("/auth/complete-profile").header("Authorization", "Bearer " + accessToken)
+                        .contentType("application/json")
+                        .content(completeProfileBody(60F, 2, legalConsentService.termsVersion(),
+                                legalConsentService.privacyVersion())))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error").value("PROFILE_ALREADY_COMPLETE"));
+    }
+
+    @Test
+    void completingProfileRejectsOutdatedLegalVersionsAndInvalidWeight() throws Exception {
+        String email = "invalido." + UUID.randomUUID() + "@gmail.com";
+        String accessToken = newSocialAccountAccessToken(email);
+
+        mvc.perform(post("/auth/complete-profile").header("Authorization", "Bearer " + accessToken)
+                        .contentType("application/json")
+                        .content(completeProfileBody(80F, 3, "versao-antiga", legalConsentService.privacyVersion())))
+                .andExpect(status().isBadRequest());
+
+        mvc.perform(post("/auth/complete-profile").header("Authorization", "Bearer " + accessToken)
+                        .contentType("application/json")
+                        .content(completeProfileBody(10F, 3, legalConsentService.termsVersion(),
+                                legalConsentService.privacyVersion())))
+                .andExpect(status().isBadRequest());
+
+        User stillIncomplete = userRepository.findOptionalByEmailIgnoreCase(email).orElseThrow();
+        assertFalse(stillIncomplete.isProfileComplete());
+        assertNull(stillIncomplete.getAcceptedTermsVersion());
+    }
+
+    private String newSocialAccountAccessToken() throws Exception {
+        return newSocialAccountAccessToken("social." + UUID.randomUUID() + "@gmail.com");
+    }
+
+    private String newSocialAccountAccessToken(String email) throws Exception {
+        String exchangeCode = queryParam(
+                runAuthorizationCodeFlow("google-sub-" + UUID.randomUUID(), email, true, "Conta Social"), "code");
+        String body = mvc.perform(post("/auth/social/exchange").contentType("application/json")
+                        .content("{\"code\":\"" + exchangeCode + "\"}"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        return JsonPath.read(body, "$.accessToken");
+    }
+
+    private String completeProfileBody(float weight, int weeklyGoal, String termsVersion, String privacyVersion) {
+        return """
+                {"bodyWeight": %s, "weeklyGoal": %d, "acceptedTermsVersion": "%s", "acceptedPrivacyVersion": "%s"}
+                """.formatted(weight, weeklyGoal, termsVersion, privacyVersion);
     }
 
     private String queryParam(String url, String name) {

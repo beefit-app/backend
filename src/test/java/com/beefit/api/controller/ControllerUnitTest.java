@@ -128,7 +128,7 @@ class ControllerUnitTest {
         LoginResponseDTO loginResponse = new LoginResponseDTO(
                 "token",
                 "refresh-token",
-                new UserResponseDTO(UUID.randomUUID(), "Test User", "testuser", "test@example.com", 80.0f, 4, com.beefit.api.domain.enums.UserRole.USER));
+                new UserResponseDTO(UUID.randomUUID(), "Test User", "testuser", "test@example.com", 80.0f, 4, com.beefit.api.domain.enums.UserRole.USER, true));
 
         when(authService.login("test@example.com", "secret", "device-1")).thenReturn(loginResponse);
 
@@ -169,7 +169,7 @@ class ControllerUnitTest {
     void authMeMapsAuthenticatedUser() {
         AuthController controller = new AuthController(authService, registerMapper, userResponseMapper, rateLimitService, legalConsentService, socialExchangeCodeStore);
         User user = user();
-        UserResponseDTO dto = new UserResponseDTO(user.getId(), user.getFullName(), user.getUsername(), user.getEmail(), user.getBodyWeight(), user.getWeeklyGoal(), user.getRole());
+        UserResponseDTO dto = new UserResponseDTO(user.getId(), user.getFullName(), user.getUsername(), user.getEmail(), user.getBodyWeight(), user.getWeeklyGoal(), user.getRole(), user.isProfileComplete());
 
         when(userResponseMapper.toDto(user)).thenReturn(dto);
 

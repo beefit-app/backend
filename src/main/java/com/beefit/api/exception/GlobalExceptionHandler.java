@@ -114,6 +114,19 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(ProfileAlreadyCompleteException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleProfileAlreadyComplete(ProfileAlreadyCompleteException e, HttpServletRequest request) {
+        return new ErrorResponse(
+                LocalDateTime.now(),
+                HttpStatus.CONFLICT.value(),
+                "PROFILE_ALREADY_COMPLETE",
+                e.getMessage(),
+                List.of(),
+                request.getRequestURI()
+        );
+    }
+
     @ExceptionHandler(InvalidSocialExchangeCodeException.class)
     @ResponseStatus(HttpStatus.UNAUTHORIZED)
     public ErrorResponse handleInvalidSocialExchangeCode(InvalidSocialExchangeCodeException e, HttpServletRequest request) {

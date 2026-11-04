@@ -182,6 +182,7 @@ public class SecurityConfiguration {
                         authorize.anyRequest().authenticated();
                 })
                 .addFilterBefore(securityFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(new ProfileCompletionFilter(), SecurityFilter.class)
                 .build(); // Builda o Security Filter Chain (Cadeia de verificações para a autenticação)
     };
 

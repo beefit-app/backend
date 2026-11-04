@@ -7,7 +7,10 @@ import com.beefit.api.domain.enums.UserRole;
 import com.beefit.api.dto.auth.LoginResponseDTO;
 import com.beefit.api.dto.auth.RefreshTokenResponseDTO;
 import com.beefit.api.dto.auth.UserResponseDTO;
+import com.beefit.api.dto.auth.CompleteProfileRequestDTO;
 import com.beefit.api.exception.user.EmailAlreadyInUse;
+import com.beefit.api.exception.user.ProfileAlreadyCompleteException;
+import com.beefit.api.exception.user.UserNotFoundException;
 import com.beefit.api.exception.user.InvalidSessionException;
 import com.beefit.api.exception.user.SocialLoginRequiredException;
 import com.beefit.api.exception.user.UsernameAlreadyInUse;
@@ -216,6 +219,28 @@ public class AuthService implements UserDetailsService {
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException("SHA-256 não disponível para hash de refresh token.", e);
         }
+    }
+
+    /**
+     * Fecha o cadastro de uma conta criada via login social: grava peso, meta e o
+     * aceite das versões vigentes dos documentos legais. Só vale uma vez — depois
+     * disso peso/meta mudam pelo perfil (PUT /api/profile/me).
+     */
+    @Transactional
+    public UserResponseDTO completeProfile(User principal, CompleteProfileRequestDTO data) {
+        // O principal vem do SecurityFilter, fora desta transação: recarrega para
+        // gravar sobre a entidade gerenciada.
+        User user = userRepository.findById(principal.getId())
+                .orElseThrow(UserNotFoundException::new);
+        if (user.isProfileComplete()) {
+            throw new ProfileAlreadyCompleteException();
+        }
+
+        legalConsentService.recordConsent(user, data.acceptedTermsVersion(), data.acceptedPrivacyVersion());
+        user.setBodyWeight(data.bodyWeight());
+        user.setWeeklyGoal(data.weeklyGoal());
+
+        return userResponseMapper.toDto(userRepository.save(user));
     }
 
     public void recordLegalConsent(User user, String termsVersion, String privacyVersion) {

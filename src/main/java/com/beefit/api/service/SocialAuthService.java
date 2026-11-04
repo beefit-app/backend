@@ -28,16 +28,9 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class SocialAuthService {
 
-    // Google/Microsoft não fornecem peso corporal nem meta semanal de treinos;
-    // esses valores são editáveis depois via PATCH /profile. Débito técnico aceito:
-    // o DoD deste ticket só exige emissão de JWT válido, não perfil completo.
-    private static final float DEFAULT_BODY_WEIGHT = 70f;
-    private static final int DEFAULT_WEEKLY_GOAL = 3;
-
     private final UserRepository userRepository;
     private final UserSocialAccountRepository userSocialAccountRepository;
     private final InventoryRepository inventoryRepository;
-    private final LegalConsentService legalConsentService;
 
     @Transactional
     public User resolveOrCreate(SocialProvider provider, String providerUserId, String email,
@@ -93,12 +86,11 @@ public class SocialAuthService {
         user.setEmail(email);
         user.setFullName(normalizeFullName(fullNameClaim, email));
         user.setUsername(generateUniqueUsername(email));
-        user.setBodyWeight(DEFAULT_BODY_WEIGHT);
-        user.setWeeklyGoal(DEFAULT_WEEKLY_GOAL);
+        // Peso, meta semanal e aceite dos termos ficam de fora de propósito: o provedor
+        // não os fornece e inventar valores distorceria calorias/cards (e o aceite
+        // precisa ser do usuário). A conta nasce incompleta e o app pede esses dados
+        // na tela "Complete seu cadastro" (POST /auth/complete-profile).
         user.setRole(UserRole.USER);
-
-        legalConsentService.recordConsent(
-                user, legalConsentService.termsVersion(), legalConsentService.privacyVersion());
 
         User savedUser = userRepository.save(user);
 

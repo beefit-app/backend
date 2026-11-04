@@ -93,7 +93,8 @@ class AuthServiceTest {
                 user.getEmail(),
                 user.getBodyWeight(),
                 user.getWeeklyGoal(),
-                user.getRole());
+                user.getRole(),
+                user.isProfileComplete());
         UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                 user,
                 null,

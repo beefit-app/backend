@@ -3,6 +3,7 @@ package com.beefit.api.controller;
 import com.beefit.api.domain.User;
 import com.beefit.api.dto.auth.AuthenticationDTO;
 import com.beefit.api.dto.auth.LoginResponseDTO;
+import com.beefit.api.dto.auth.CompleteProfileRequestDTO;
 import com.beefit.api.dto.auth.LogoutRequestDTO;
 import com.beefit.api.dto.auth.RefreshTokenRequestDTO;
 import com.beefit.api.dto.auth.RefreshTokenResponseDTO;
@@ -106,6 +107,14 @@ public class AuthController implements GenericController {
     public ResponseEntity<Void> logout(@RequestBody @Valid LogoutRequestDTO data) {
         authService.logout(data.refreshToken(), data.deviceId());
         return ResponseEntity.noContent().build();
+    }
+
+    // Exclusivo de conta criada via login social que ainda não informou peso, meta
+    // e aceite dos termos (ver User.isProfileComplete / ProfileCompletionFilter).
+    @PostMapping("/complete-profile")
+    public ResponseEntity<UserResponseDTO> completeProfile(@AuthenticationPrincipal User user,
+            @RequestBody @Valid CompleteProfileRequestDTO data) {
+        return ResponseEntity.ok(authService.completeProfile(user, data));
     }
 
     @GetMapping("/me")

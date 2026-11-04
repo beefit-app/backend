@@ -233,6 +233,10 @@ class AdminEndpointSecurityTest {
         user.setUsername(role.name().toLowerCase());
         user.setRole(role);
         user.setBannedUntil(bannedUntil);
+        // Conta com cadastro completo: sem peso/meta o ProfileCompletionFilter
+        // responderia PROFILE_INCOMPLETE antes da autorização de admin.
+        user.setBodyWeight(75F);
+        user.setWeeklyGoal(4);
         return user;
     }
 }
