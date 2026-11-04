@@ -31,6 +31,7 @@ public class SocialAuthService {
     private final UserRepository userRepository;
     private final UserSocialAccountRepository userSocialAccountRepository;
     private final InventoryRepository inventoryRepository;
+    private final RegistrationPolicy registrationPolicy;
 
     @Transactional
     public User resolveOrCreate(SocialProvider provider, String providerUserId, String email,
@@ -75,6 +76,12 @@ public class SocialAuthService {
             throw new UnverifiedSocialEmailException(
                     "O provedor não confirmou a verificação do seu e-mail. Verifique o e-mail na sua conta do provedor e tente novamente.");
         }
+
+        // Mesmas regras do cadastro com e-mail/senha, mas só aqui, na criação: quem
+        // já tem conta (vínculo existente ou e-mail verificado acima) continua
+        // entrando mesmo com o cadastro fechado ou fora da lista do beta.
+        registrationPolicy.ensureRegistrationOpen();
+        registrationPolicy.ensureEmailAllowed(normalizedEmail);
 
         User newUser = createUser(normalizedEmail, fullNameClaim);
         linkAccount(newUser, provider, providerUserId);

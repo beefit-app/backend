@@ -82,6 +82,9 @@ class ControllerUnitTest {
     private RegisterMapper registerMapper;
 
     @Mock
+    private com.beefit.api.service.RegistrationPolicy registrationPolicy;
+
+    @Mock
     private UserResponseMapper userResponseMapper;
 
     @Mock
@@ -124,7 +127,7 @@ class ControllerUnitTest {
 
     @Test
     void authLoginReturnsOkWithLoginResponse() {
-        AuthController controller = new AuthController(authService, registerMapper, userResponseMapper, rateLimitService, legalConsentService, socialExchangeCodeStore);
+        AuthController controller = new AuthController(authService, registerMapper, userResponseMapper, rateLimitService, legalConsentService, socialExchangeCodeStore, registrationPolicy);
         LoginResponseDTO loginResponse = new LoginResponseDTO(
                 "token",
                 "refresh-token",
@@ -142,7 +145,7 @@ class ControllerUnitTest {
 
     @Test
     void authRefreshReturnsNewTokens() {
-        AuthController controller = new AuthController(authService, registerMapper, userResponseMapper, rateLimitService, legalConsentService, socialExchangeCodeStore);
+        AuthController controller = new AuthController(authService, registerMapper, userResponseMapper, rateLimitService, legalConsentService, socialExchangeCodeStore, registrationPolicy);
         RefreshTokenResponseDTO refreshResponse = new RefreshTokenResponseDTO("new-access", "new-refresh");
 
         when(authService.refreshSession("refresh-token", "device-1")).thenReturn(refreshResponse);
@@ -157,7 +160,7 @@ class ControllerUnitTest {
 
     @Test
     void authLogoutReturnsNoContent() {
-        AuthController controller = new AuthController(authService, registerMapper, userResponseMapper, rateLimitService, legalConsentService, socialExchangeCodeStore);
+        AuthController controller = new AuthController(authService, registerMapper, userResponseMapper, rateLimitService, legalConsentService, socialExchangeCodeStore, registrationPolicy);
 
         ResponseEntity<Void> response = controller.logout(new LogoutRequestDTO("refresh-token", "device-1"));
 
@@ -167,7 +170,7 @@ class ControllerUnitTest {
 
     @Test
     void authMeMapsAuthenticatedUser() {
-        AuthController controller = new AuthController(authService, registerMapper, userResponseMapper, rateLimitService, legalConsentService, socialExchangeCodeStore);
+        AuthController controller = new AuthController(authService, registerMapper, userResponseMapper, rateLimitService, legalConsentService, socialExchangeCodeStore, registrationPolicy);
         User user = user();
         UserResponseDTO dto = new UserResponseDTO(user.getId(), user.getFullName(), user.getUsername(), user.getEmail(), user.getBodyWeight(), user.getWeeklyGoal(), user.getRole(), user.isProfileComplete());
 

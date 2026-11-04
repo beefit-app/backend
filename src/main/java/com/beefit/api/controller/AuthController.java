@@ -24,9 +24,8 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
-import org.springframework.beans.factory.annotation.Value;
+import com.beefit.api.service.RegistrationPolicy;
 import com.beefit.api.dto.auth.LegalVersionsResponseDTO;
-import com.beefit.api.exception.user.PermissionException;
 import com.beefit.api.service.LegalConsentService;
 
 @RestController
@@ -41,8 +40,7 @@ public class AuthController implements GenericController {
     private final LegalConsentService legalConsentService;
     private final SocialExchangeCodeStore socialExchangeCodeStore;
 
-    @Value("${beefit.registration.enabled:true}")
-    private boolean registrationEnabled;
+    private final RegistrationPolicy registrationPolicy;
 
     // Endpoint de Login
     @PostMapping("/login")
@@ -61,9 +59,7 @@ public class AuthController implements GenericController {
     public ResponseEntity<LoginResponseDTO> register(@RequestBody @Valid RegisterDTO data,
             HttpServletRequest request) {
 
-        if (!registrationEnabled) {
-            throw new PermissionException("O cadastro de novas contas está temporariamente fechado.");
-        }
+        registrationPolicy.ensureRegistrationOpen();
 
         rateLimitService.checkRegistration(request.getRemoteAddr());
 

@@ -3,6 +3,8 @@ package com.beefit.api.infra.security.oauth2;
 import com.beefit.api.domain.User;
 import com.beefit.api.domain.enums.SocialProvider;
 import com.beefit.api.dto.auth.LoginResponseDTO;
+import com.beefit.api.exception.user.RegistrationClosedException;
+import com.beefit.api.exception.user.RegistrationRestrictedException;
 import com.beefit.api.service.AuthService;
 import com.beefit.api.service.SocialAuthService;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -80,9 +82,26 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
             // com uma conta existente) acontece aqui dentro de um filtro de seguranca,
             // antes do DispatcherServlet/GlobalExceptionHandler — deixar propagar
             // resultaria num 500 cru. Redireciona pro mesmo fluxo de erro do provedor.
-            log.warn("Falha ao resolver/criar conta no login social: {}", e.getMessage(), e);
-            response.sendRedirect(callbackUrlResolver.buildRedirectUrl(platform, "error", "social_login_failed"));
+            String errorCode = toErrorCode(e);
+            if ("social_login_failed".equals(errorCode)) {
+                log.warn("Falha ao resolver/criar conta no login social: {}", e.getMessage(), e);
+            } else {
+                // Recusa esperada (cadastro fechado / fora do beta): não é falha do sistema.
+                log.info("Cadastro via login social recusado ({}): {}", errorCode, e.getMessage());
+            }
+            response.sendRedirect(callbackUrlResolver.buildRedirectUrl(platform, "error", errorCode));
         }
+    }
+
+    /** Código de erro do redirect: o app usa para mostrar a mensagem certa. */
+    private String toErrorCode(RuntimeException e) {
+        if (e instanceof RegistrationClosedException) {
+            return "registration_closed";
+        }
+        if (e instanceof RegistrationRestrictedException) {
+            return "registration_restricted";
+        }
+        return "social_login_failed";
     }
 
     private String readSessionAttribute(HttpSession session, String attribute) {

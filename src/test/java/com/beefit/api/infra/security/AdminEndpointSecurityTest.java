@@ -104,6 +104,9 @@ class AdminEndpointSecurityTest {
     private RegisterMapper registerMapper;
 
     @MockitoBean
+    private com.beefit.api.service.RegistrationPolicy registrationPolicy;
+
+    @MockitoBean
     private SocialExchangeCodeStore socialExchangeCodeStore;
 
     @MockitoBean

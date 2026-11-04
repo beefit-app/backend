@@ -64,6 +64,10 @@ class AuthServiceTest {
     @Mock
     private AuthenticationManager authenticationManager;
 
+    // Instância real (beta desligado por padrão); os testes de beta ligam via reflexão.
+    @org.mockito.Spy
+    private RegistrationPolicy registrationPolicy = new RegistrationPolicy();
+
     @InjectMocks
     private AuthService authService;
 
@@ -236,8 +240,8 @@ class AuthServiceTest {
 
     @Test
     void registerThrowsWhenBetaEnabledAndEmailNotInAllowlist() {
-        org.springframework.test.util.ReflectionTestUtils.setField(authService, "betaEnabled", true);
-        org.springframework.test.util.ReflectionTestUtils.setField(authService, "allowedEmails", new String[]{"allowed@example.com"});
+        org.springframework.test.util.ReflectionTestUtils.setField(registrationPolicy, "betaEnabled", true);
+        org.springframework.test.util.ReflectionTestUtils.setField(registrationPolicy, "allowedEmails", new String[]{"allowed@example.com"});
 
         User user = user();
         user.setEmail("unauthorized@example.com");
@@ -249,8 +253,8 @@ class AuthServiceTest {
 
     @Test
     void registerSucceedsWhenBetaEnabledAndEmailInAllowlist() {
-        org.springframework.test.util.ReflectionTestUtils.setField(authService, "betaEnabled", true);
-        org.springframework.test.util.ReflectionTestUtils.setField(authService, "allowedEmails", new String[]{"allowed@example.com"});
+        org.springframework.test.util.ReflectionTestUtils.setField(registrationPolicy, "betaEnabled", true);
+        org.springframework.test.util.ReflectionTestUtils.setField(registrationPolicy, "allowedEmails", new String[]{"allowed@example.com"});
 
         User user = user();
         user.setEmail("ALLOWED@EXAMPLE.COM");

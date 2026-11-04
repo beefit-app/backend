@@ -6,12 +6,14 @@ import com.beefit.api.domain.enums.UserRole;
 import com.beefit.api.repository.UserRepository;
 import com.beefit.api.repository.UserSocialAccountRepository;
 import com.beefit.api.service.LegalConsentService;
+import com.beefit.api.service.RegistrationPolicy;
 import com.jayway.jsonpath.JsonPath;
 import com.beefit.api.support.OAuth2ProviderStubSupport;
 import com.beefit.api.support.PostgreSqlTestSupport;
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,6 +24,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.MockMvc;
@@ -104,11 +107,19 @@ class SocialLoginIntegrationTest {
     @Autowired UserSocialAccountRepository socialAccountRepository;
     @Autowired PasswordEncoder passwordEncoder;
     @Autowired LegalConsentService legalConsentService;
+    @Autowired RegistrationPolicy registrationPolicy;
 
     @BeforeEach
     void resetStubs() {
         WIREMOCK.resetAll();
         STUBS.stubJwksEndpoints(PROVIDER_PATH, APPLE_PROVIDER_PATH);
+    }
+
+    /** O RegistrationPolicy é um singleton do contexto compartilhado: volta ao padrão do perfil test. */
+    @AfterEach
+    void resetRegistrationPolicy() {
+        setRegistration(true);
+        setBeta(false);
     }
 
     @Test
@@ -364,6 +375,72 @@ class SocialLoginIntegrationTest {
         String redirectLocation = callbackResult.getResponse().getHeader("Location");
         assertNotNull(redirectLocation);
         return redirectLocation;
+    }
+
+    // ---- Cadastro fechado / beta restrito (mesmas regras do cadastro com e-mail e senha) ----
+
+    @Test
+    void closedRegistrationBlocksNewSocialAccount() throws Exception {
+        setRegistration(false);
+        String email = "fechado." + UUID.randomUUID() + "@gmail.com";
+        String providerUserId = "google-sub-" + UUID.randomUUID();
+
+        String redirectLocation = runAuthorizationCodeFlow(providerUserId, email, true, "Cadastro Fechado");
+
+        assertEquals("registration_closed", queryParam(redirectLocation, "error"));
+        assertNull(queryParam(redirectLocation, "code"));
+        assertTrue(userRepository.findOptionalByEmailIgnoreCase(email).isEmpty());
+        assertTrue(socialAccountRepository.findByProviderAndProviderUserId(SocialProvider.GOOGLE, providerUserId).isEmpty());
+    }
+
+    @Test
+    void closedRegistrationStillLetsExistingAccountSignInWithSocialLogin() throws Exception {
+        String email = "jatem." + UUID.randomUUID() + "@gmail.com";
+        User existing = newTraditionalUser(email);
+        setRegistration(false);
+        String providerUserId = "google-sub-" + UUID.randomUUID();
+
+        String exchangeCode = queryParam(runAuthorizationCodeFlow(providerUserId, email, true, "Conta Existente"), "code");
+
+        mvc.perform(post("/auth/social/exchange").contentType("application/json")
+                        .content("{\"code\":\"" + exchangeCode + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.user.id").value(existing.getId().toString()));
+        assertTrue(socialAccountRepository.findByProviderAndProviderUserId(SocialProvider.GOOGLE, providerUserId).isPresent());
+    }
+
+    @Test
+    void betaBlocksNewSocialAccountOutsideAllowlist() throws Exception {
+        setBeta(true, "convidado@gmail.com");
+        String email = "intruso." + UUID.randomUUID() + "@gmail.com";
+        String providerUserId = "google-sub-" + UUID.randomUUID();
+
+        String redirectLocation = runAuthorizationCodeFlow(providerUserId, email, true, "Fora do Beta");
+
+        assertEquals("registration_restricted", queryParam(redirectLocation, "error"));
+        assertTrue(userRepository.findOptionalByEmailIgnoreCase(email).isEmpty());
+        assertTrue(socialAccountRepository.findByProviderAndProviderUserId(SocialProvider.GOOGLE, providerUserId).isEmpty());
+    }
+
+    @Test
+    void betaAllowsNewSocialAccountInAllowlist() throws Exception {
+        String email = "convidado." + UUID.randomUUID() + "@gmail.com";
+        setBeta(true, email.toUpperCase());
+        String providerUserId = "google-sub-" + UUID.randomUUID();
+
+        String redirectLocation = runAuthorizationCodeFlow(providerUserId, email, true, "Convidado Beta");
+
+        assertNotNull(queryParam(redirectLocation, "code"));
+        assertTrue(userRepository.findOptionalByEmailIgnoreCase(email).isPresent());
+    }
+
+    private void setRegistration(boolean enabled) {
+        ReflectionTestUtils.setField(registrationPolicy, "registrationEnabled", enabled);
+    }
+
+    private void setBeta(boolean enabled, String... allowedEmails) {
+        ReflectionTestUtils.setField(registrationPolicy, "betaEnabled", enabled);
+        ReflectionTestUtils.setField(registrationPolicy, "allowedEmails", allowedEmails);
     }
 
     // ---- "Complete seu cadastro" (conta social recém-criada) ----
