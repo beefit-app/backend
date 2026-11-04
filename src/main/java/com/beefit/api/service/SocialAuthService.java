@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Resolve a conta local correspondente a um login social, aplicando a regra de
@@ -43,7 +44,15 @@ public class SocialAuthService {
         Optional<UserSocialAccount> existingLink =
                 userSocialAccountRepository.findByProviderAndProviderUserId(provider, providerUserId);
         if (existingLink.isPresent()) {
-            return existingLink.get().getUser();
+            // UserSocialAccount.user é @ManyToOne(LAZY): getUser() devolve um proxy do
+            // Hibernate. getId() não dispara select (o FK já é conhecido), mas qualquer
+            // outro campo dispararia — e o caller (OAuth2LoginSuccessHandler) usa esse
+            // User fora da transação desse service, onde a sessão do Hibernate já
+            // fechou. Buscar pelo id devolve a entidade de verdade, já inicializada.
+            UUID existingUserId = existingLink.get().getUser().getId();
+            return userRepository.findById(existingUserId)
+                    .orElseThrow(() -> new IllegalStateException(
+                            "user_social_accounts aponta para um usuário inexistente: " + existingUserId));
         }
 
         String normalizedEmail = normalizeEmail(email);

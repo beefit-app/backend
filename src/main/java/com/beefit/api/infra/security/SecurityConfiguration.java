@@ -3,6 +3,8 @@ package com.beefit.api.infra.security;
 import com.beefit.api.infra.security.oauth2.OAuth2LoginFailureHandler;
 import com.beefit.api.infra.security.oauth2.OAuth2LoginSuccessHandler;
 import com.beefit.api.infra.security.oauth2.OAuth2PlatformAwareAuthorizationRequestResolver;
+import org.springframework.security.oauth2.client.endpoint.OAuth2AccessTokenResponseClient;
+import org.springframework.security.oauth2.client.endpoint.OAuth2AuthorizationCodeGrantRequest;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -67,7 +69,9 @@ public class SecurityConfiguration {
             HttpSecurity http,
             OAuth2AuthorizationRequestResolver authorizationRequestResolver,
             OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler,
-            OAuth2LoginFailureHandler oAuth2LoginFailureHandler) throws Exception {
+            OAuth2LoginFailureHandler oAuth2LoginFailureHandler,
+            OAuth2AccessTokenResponseClient<OAuth2AuthorizationCodeGrantRequest> appleAwareTokenResponseClient)
+            throws Exception {
         return http
                 .securityMatcher("/oauth2/**", "/login/oauth2/**")
                 .csrf(csrf -> csrf.disable())
@@ -77,6 +81,7 @@ public class SecurityConfiguration {
                 .oauth2Login(oauth2 -> oauth2
                         .authorizationEndpoint(endpoint -> endpoint
                                 .authorizationRequestResolver(authorizationRequestResolver))
+                        .tokenEndpoint(token -> token.accessTokenResponseClient(appleAwareTokenResponseClient))
                         .successHandler(oAuth2LoginSuccessHandler)
                         .failureHandler(oAuth2LoginFailureHandler))
                 .build();

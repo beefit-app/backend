@@ -49,6 +49,17 @@ spring:
             authorization-grant-type: authorization_code
             redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
             provider: microsoft
+          apple:
+            client-id: ${APPLE_SERVICES_ID}
+            # Sem client-secret: a Apple nao usa um valor estatico, exige um JWT ES256
+            # gerado na hora (AppleClientSecretGenerator/AppleAwareTokenResponseClient).
+            # ClientRegistration.Builder nao exige clientSecret quando
+            # client-authentication-method ja esta explicito, entao omitir aqui e seguro.
+            client-authentication-method: client_secret_post
+            authorization-grant-type: authorization_code
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+            scope: openid,name,email
+            provider: apple
         # Sem issuer-uri de proposito: o endpoint /common/v2.0 da Microsoft serve contas
         # pessoais e corporativas/escolares, e o claim "iss" do id_token varia por tenant.
         # Configurar issuer-uri forcaria a OIDC discovery a validar um issuer fixo, o que
@@ -60,6 +71,17 @@ spring:
             jwk-set-uri: https://login.microsoftonline.com/common/discovery/v2.0/keys
             user-info-uri: https://graph.microsoft.com/oidc/userinfo
             user-name-attribute: sub
+          apple:
+            # response_mode=form_post embutido na propria URI: a Apple exige esse modo
+            # quando o scope inclui name/email (sem ele ela rejeita a autorizacao
+            # inteira, nao so omite os dados). DefaultUriBuilderFactory so acrescenta
+            # query params na string base, nao substitui — fica preservado no redirect.
+            authorization-uri: https://appleid.apple.com/auth/authorize?response_mode=form_post
+            token-uri: https://appleid.apple.com/auth/token
+            jwk-set-uri: https://appleid.apple.com/auth/keys
+            user-name-attribute: sub
+            # Sem user-info-uri: a Apple nao tem endpoint de userinfo; OidcUserService
+            # pula a chamada sozinho quando essa uri fica vazia.
 
 beefit:
   beta:
@@ -86,6 +108,12 @@ beefit:
     # faz proxy de /auth/** pro backend em dev, entao essa rota nunca chegaria na SPA.
     callback-base-web: ${BEEFIT_OAUTH2_CALLBACK_BASE_WEB:http://localhost:5173/oauth-callback}
     callback-base-mobile: ${BEEFIT_OAUTH2_CALLBACK_BASE_MOBILE:com.beefit.app://auth/callback}
+    apple:
+      team-id: ${APPLE_TEAM_ID}
+      key-id: ${APPLE_KEY_ID}
+      # Corpo base64 do arquivo .p8 (as linhas BEGIN/END PRIVATE KEY so delimitam
+      # esse mesmo base64 — nao recodificar, so colar o conteudo entre elas sem quebras de linha).
+      private-key-base64: ${APPLE_PRIVATE_KEY_BASE64}
 # : depois da variável cria um fallback seguro caso ela não seja encontrada no ambiente/CI
 cloudflare:
   r2:
