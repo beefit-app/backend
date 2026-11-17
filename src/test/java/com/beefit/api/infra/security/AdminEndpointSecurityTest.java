@@ -21,12 +21,18 @@ import com.beefit.api.service.WorkoutMediaService;
 import com.beefit.api.service.RateLimitService;
 import com.beefit.api.service.AuthService;
 import com.beefit.api.service.LegalConsentService;
+import com.beefit.api.infra.security.oauth2.OAuth2LoginFailureHandler;
+import com.beefit.api.infra.security.oauth2.OAuth2LoginSuccessHandler;
+import com.beefit.api.infra.security.oauth2.SocialExchangeCodeStore;
 import com.beefit.api.mapper.RegisterMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.security.oauth2.client.endpoint.OAuth2AccessTokenResponseClient;
+import org.springframework.security.oauth2.client.endpoint.OAuth2AuthorizationCodeGrantRequest;
+import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestResolver;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -96,6 +102,24 @@ class AdminEndpointSecurityTest {
 
     @MockitoBean
     private RegisterMapper registerMapper;
+
+    @MockitoBean
+    private com.beefit.api.service.RegistrationPolicy registrationPolicy;
+
+    @MockitoBean
+    private SocialExchangeCodeStore socialExchangeCodeStore;
+
+    @MockitoBean
+    private OAuth2AuthorizationRequestResolver authorizationRequestResolver;
+
+    @MockitoBean
+    private OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler;
+
+    @MockitoBean
+    private OAuth2LoginFailureHandler oAuth2LoginFailureHandler;
+
+    @MockitoBean
+    private OAuth2AccessTokenResponseClient<OAuth2AuthorizationCodeGrantRequest> appleAwareTokenResponseClient;
 
     private User commonUser;
     private User bannedAdmin;
@@ -212,6 +236,10 @@ class AdminEndpointSecurityTest {
         user.setUsername(role.name().toLowerCase());
         user.setRole(role);
         user.setBannedUntil(bannedUntil);
+        // Conta com cadastro completo: sem peso/meta o ProfileCompletionFilter
+        // responderia PROFILE_INCOMPLETE antes da autorização de admin.
+        user.setBodyWeight(75F);
+        user.setWeeklyGoal(4);
         return user;
     }
 }

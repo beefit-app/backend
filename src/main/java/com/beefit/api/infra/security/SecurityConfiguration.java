@@ -1,11 +1,17 @@
 package com.beefit.api.infra.security;
 
+import com.beefit.api.infra.security.oauth2.OAuth2LoginFailureHandler;
+import com.beefit.api.infra.security.oauth2.OAuth2LoginSuccessHandler;
+import com.beefit.api.infra.security.oauth2.OAuth2PlatformAwareAuthorizationRequestResolver;
+import org.springframework.security.oauth2.client.endpoint.OAuth2AccessTokenResponseClient;
+import org.springframework.security.oauth2.client.endpoint.OAuth2AuthorizationCodeGrantRequest;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.core.env.Environment;
 import org.springframework.core.env.Profiles;
 import org.springframework.http.HttpMethod;
@@ -18,6 +24,8 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestResolver;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
@@ -40,7 +48,53 @@ public class SecurityConfiguration {
     private final SecurityFilter securityFilter;
     private final Environment environment;
 
+    // Essa cadeia so existe pra sustentar o round-trip (redirect -> consentimento ->
+    // callback) do oauth2Login: ele depende de HttpSession pra guardar o estado
+    // entre as duas pernas da requisicao, o que conflita com o STATELESS da cadeia
+    // principal abaixo. @Order(1) garante que ela seja avaliada primeiro, so pra
+    // essas rotas; qualquer outra URL cai na cadeia principal (@Order(2)).
+    //
+    // Os handlers e o resolver entram como PARAMETROS do metodo @Bean (nao como
+    // campos da classe): OAuth2LoginSuccessHandler depende de AuthService, que por
+    // sua vez depende do bean PasswordEncoder definido mais abaixo nesta mesma
+    // classe. Se os handlers fossem campos injetados no construtor desta
+    // @Configuration, construir a instancia de SecurityConfiguration dependeria de
+    // construir o AuthService, que dependeria de um metodo @Bean desta mesma
+    // instancia ainda nao construida — ciclo. Como parametro de metodo, a resolucao
+    // so acontece quando ESTE bean especifico e pedido, depois da classe inteira
+    // (e seus outros @Bean) já existirem.
     @Bean
+    @Order(1)
+    public SecurityFilterChain oauth2LoginFilterChain(
+            HttpSecurity http,
+            OAuth2AuthorizationRequestResolver authorizationRequestResolver,
+            OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler,
+            OAuth2LoginFailureHandler oAuth2LoginFailureHandler,
+            OAuth2AccessTokenResponseClient<OAuth2AuthorizationCodeGrantRequest> appleAwareTokenResponseClient)
+            throws Exception {
+        return http
+                .securityMatcher("/oauth2/**", "/login/oauth2/**")
+                .csrf(csrf -> csrf.disable())
+                .cors(Customizer.withDefaults())
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
+                .authorizeHttpRequests(authorize -> authorize.anyRequest().permitAll())
+                .oauth2Login(oauth2 -> oauth2
+                        .authorizationEndpoint(endpoint -> endpoint
+                                .authorizationRequestResolver(authorizationRequestResolver))
+                        .tokenEndpoint(token -> token.accessTokenResponseClient(appleAwareTokenResponseClient))
+                        .successHandler(oAuth2LoginSuccessHandler)
+                        .failureHandler(oAuth2LoginFailureHandler))
+                .build();
+    }
+
+    @Bean
+    public OAuth2AuthorizationRequestResolver authorizationRequestResolver(
+            ClientRegistrationRepository clientRegistrationRepository) {
+        return new OAuth2PlatformAwareAuthorizationRequestResolver(clientRegistrationRepository);
+    }
+
+    @Bean
+    @Order(2)
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http
                 .cors(Customizer.withDefaults())
@@ -112,6 +166,7 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.GET, "/auth/legal-versions").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/refresh").permitAll()
                         .requestMatchers(HttpMethod.POST, "/auth/logout").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/auth/social/exchange").permitAll()
                         .requestMatchers(HttpMethod.GET, "/images/**").permitAll()
                         .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN");
@@ -127,6 +182,7 @@ public class SecurityConfiguration {
                         authorize.anyRequest().authenticated();
                 })
                 .addFilterBefore(securityFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterAfter(new ProfileCompletionFilter(), SecurityFilter.class)
                 .build(); // Builda o Security Filter Chain (Cadeia de verificações para a autenticação)
     };
 

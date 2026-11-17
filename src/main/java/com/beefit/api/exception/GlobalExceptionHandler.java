@@ -101,6 +101,45 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(SocialLoginRequiredException.class)
+    @ResponseStatus(HttpStatus.UNAUTHORIZED)
+    public ErrorResponse handleSocialLoginRequired(SocialLoginRequiredException e, HttpServletRequest request) {
+        return new ErrorResponse(
+                LocalDateTime.now(),
+                HttpStatus.UNAUTHORIZED.value(),
+                "SOCIAL_LOGIN_REQUIRED",
+                e.getMessage(),
+                List.of(),
+                request.getRequestURI()
+        );
+    }
+
+    @ExceptionHandler(ProfileAlreadyCompleteException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleProfileAlreadyComplete(ProfileAlreadyCompleteException e, HttpServletRequest request) {
+        return new ErrorResponse(
+                LocalDateTime.now(),
+                HttpStatus.CONFLICT.value(),
+                "PROFILE_ALREADY_COMPLETE",
+                e.getMessage(),
+                List.of(),
+                request.getRequestURI()
+        );
+    }
+
+    @ExceptionHandler(InvalidSocialExchangeCodeException.class)
+    @ResponseStatus(HttpStatus.UNAUTHORIZED)
+    public ErrorResponse handleInvalidSocialExchangeCode(InvalidSocialExchangeCodeException e, HttpServletRequest request) {
+        return new ErrorResponse(
+                LocalDateTime.now(),
+                HttpStatus.UNAUTHORIZED.value(),
+                "INVALID_SOCIAL_EXCHANGE_CODE",
+                e.getMessage(),
+                List.of(),
+                request.getRequestURI()
+        );
+    }
+
     // Sem estes dois tratadores, a excecao lancada pelo AuthenticationManager escapa
     // do DispatcherServlet, o ExceptionTranslationFilter do Spring Security a captura
     // e responde pelo authenticationEntryPoint — cujo caso padrao e "Autenticação

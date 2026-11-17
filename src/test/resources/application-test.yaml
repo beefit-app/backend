@@ -11,10 +11,54 @@ beefit:
       secret: test-secret-with-at-least-32-random-bytes
     cors:
       allowed-origins: http://localhost:3000
+  oauth2:
+    apple:
+      team-id: TEST1234TM
+      key-id: TEST1234KY
+      # Chave EC P-256 descartável, gerada só pra esse arquivo (openssl ecparam
+      # -genkey -name prime256v1 | openssl pkcs8 -topk8 -nocrypt), sem relação com
+      # nenhuma chave real da Apple. Necessária pra AppleClientSecretGenerator não
+      # falhar o @PostConstruct em QUALQUER teste que suba o contexto completo, não
+      # só nos testes de login social.
+      private-key-base64: MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgNbEQUKyVsWafbZZQ25mrsQvWscLfLoVmtfViIbRwQwehRANCAAQVxP5zLr5rlBMJqawImIk1Kj5ezNsRHoACKVihzaOuGfCdEcEHOZGjrEaHxKyBjfre+/yP+pQQnARyTRwf5fS4
 
 spring:
   jpa:
     show-sql: false
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: test-google-client-id
+            client-secret: test-google-client-secret
+            scope: openid,profile,email
+          microsoft:
+            client-id: test-microsoft-client-id
+            client-secret: test-microsoft-client-secret
+            scope: openid,profile,email
+            authorization-grant-type: authorization_code
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+            provider: microsoft
+          apple:
+            client-id: test.apple.services.id
+            client-authentication-method: client_secret_post
+            authorization-grant-type: authorization_code
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+            scope: openid,name,email
+            provider: apple
+        provider:
+          microsoft:
+            authorization-uri: https://login.microsoftonline.com/common/oauth2/v2.0/authorize
+            token-uri: https://login.microsoftonline.com/common/oauth2/v2.0/token
+            jwk-set-uri: https://login.microsoftonline.com/common/discovery/v2.0/keys
+            user-info-uri: https://graph.microsoft.com/oidc/userinfo
+            user-name-attribute: sub
+          apple:
+            authorization-uri: https://appleid.apple.com/auth/authorize?response_mode=form_post
+            token-uri: https://appleid.apple.com/auth/token
+            jwk-set-uri: https://appleid.apple.com/auth/keys
+            user-name-attribute: sub
 
 cloudflare:
   r2:

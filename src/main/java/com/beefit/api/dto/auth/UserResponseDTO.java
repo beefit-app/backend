@@ -10,5 +10,6 @@ public record UserResponseDTO(UUID id,
                               String email,
                               Float bodyWeight,
                               Integer weeklyGoal,
-                              UserRole role) {
+                              UserRole role,
+                              boolean profileComplete) {
 }

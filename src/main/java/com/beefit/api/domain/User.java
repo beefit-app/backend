@@ -39,14 +39,14 @@ public class User implements UserDetails {
     @Column(nullable = false, unique = true)
     private String email;
 
-    @NotBlank
-    @Column(name = "password_hash", nullable = false)
+    @Column(name = "password_hash")
     private String passwordHash;
 
-    @NotNull
+    // Nulo apenas em conta social recem-criada, ate o usuario completar o cadastro
+    // (POST /auth/complete-profile). Ver isProfileComplete() e ProfileCompletionFilter.
     @Positive
     @Max(300)
-    @Column(name = "body_weight", nullable = false)
+    @Column(name = "body_weight")
     private Float bodyWeight;
 
     @Column(name = "profile_picture")
@@ -63,10 +63,9 @@ public class User implements UserDetails {
     @Column(name = "ghost_mode", nullable = false)
     private Boolean ghostMode = false; // Desativado por padrão
 
-    @NotNull
     @Min(1)
     @Max(7)
-    @Column(name = "weekly_goal", nullable = false)
+    @Column(name = "weekly_goal")
     private Integer weeklyGoal;
 
     @PositiveOrZero
@@ -105,6 +104,14 @@ public class User implements UserDetails {
 
     @Column(name = "privacy_accepted_at")
     private LocalDateTime privacyAcceptedAt;
+
+    /**
+     * Conta social nasce sem peso e meta (o provedor nao os fornece) e sem aceite dos
+     * termos; ate o usuario completar, as rotas /api/** ficam bloqueadas.
+     */
+    public boolean isProfileComplete() {
+        return this.bodyWeight != null && this.weeklyGoal != null;
+    }
 
     public boolean isBanned() {
         return this.bannedUntil != null && this.bannedUntil.isAfter(LocalDateTime.now());

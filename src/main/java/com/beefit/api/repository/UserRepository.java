@@ -21,6 +21,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     UserDetails findByEmail(String email);
     UserDetails findByEmailIgnoreCase(String email);
+    Optional<User> findOptionalByEmailIgnoreCase(String email);
 
     @Query("SELECT CASE WHEN COUNT(u) > 0 THEN true ELSE false END FROM User u WHERE u.profilePicture = :profilePicture " +
             "AND (u.id = :viewerId OR (u.ghostMode = false AND EXISTS (SELECT 1 FROM Friendship f WHERE " +

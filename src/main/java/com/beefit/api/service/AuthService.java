@@ -7,8 +7,12 @@ import com.beefit.api.domain.enums.UserRole;
 import com.beefit.api.dto.auth.LoginResponseDTO;
 import com.beefit.api.dto.auth.RefreshTokenResponseDTO;
 import com.beefit.api.dto.auth.UserResponseDTO;
+import com.beefit.api.dto.auth.CompleteProfileRequestDTO;
 import com.beefit.api.exception.user.EmailAlreadyInUse;
+import com.beefit.api.exception.user.ProfileAlreadyCompleteException;
+import com.beefit.api.exception.user.UserNotFoundException;
 import com.beefit.api.exception.user.InvalidSessionException;
+import com.beefit.api.exception.user.SocialLoginRequiredException;
 import com.beefit.api.exception.user.UsernameAlreadyInUse;
 import com.beefit.api.mapper.UserResponseMapper;
 import com.beefit.api.repository.AuthSessionRepository;
@@ -47,13 +51,9 @@ public class AuthService implements UserDetailsService {
     private final TokenService tokenService;
     private final LegalConsentService legalConsentService;
     private final AuthenticationConfiguration authenticationConfiguration;
+    private final RegistrationPolicy registrationPolicy;
     private final SecureRandom secureRandom = new SecureRandom();
 
-    @org.springframework.beans.factory.annotation.Value("${beefit.beta.enabled:false}")
-    private boolean betaEnabled;
-
-    @org.springframework.beans.factory.annotation.Value("${beefit.beta.allowed-emails:}")
-    private String[] allowedEmails;
 
     @Override
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
@@ -68,7 +68,20 @@ public class AuthService implements UserDetailsService {
 
     @Transactional
     public LoginResponseDTO login(String email, String password, String deviceId) {
-        var usernamePassword = new UsernamePasswordAuthenticationToken(normalizeEmail(email), password);
+        String normalizedEmail = normalizeEmail(email);
+
+        // BCryptPasswordEncoder.matches lanca IllegalArgumentException para hash nulo,
+        // o que o DaoAuthenticationProvider interno do authenticationManager nao trata
+        // como falha de credenciais. Contas criadas via login social nao tem senha
+        // local (passwordHash == null), entao essa checagem precisa vir antes dele.
+        userRepository.findOptionalByEmailIgnoreCase(normalizedEmail)
+                .filter(user -> user.getPasswordHash() == null)
+                .ifPresent(user -> {
+                    throw new SocialLoginRequiredException(
+                            "Esta conta usa login social. Entre com Google ou Apple.");
+                });
+
+        var usernamePassword = new UsernamePasswordAuthenticationToken(normalizedEmail, password);
 
         var authenticationManager = authenticationConfiguration.getAuthenticationManager();
         var auth = authenticationManager.authenticate(usernamePassword);
@@ -76,27 +89,18 @@ public class AuthService implements UserDetailsService {
         return createSession(authenticatedUser, deviceId);
     }
 
+    /** Emite sessão (JWT + refresh token) para um usuário já resolvido pelo fluxo de login social. */
+    @Transactional
+    public LoginResponseDTO loginSocialUser(User user, String deviceId) {
+        return createSession(user, deviceId);
+    }
+
     @Transactional
     public void register(User registered) throws UsernameAlreadyInUse, EmailAlreadyInUse {
         registered.setEmail(normalizeEmail(registered.getEmail()));
         registered.setUsername(normalizeUsername(registered.getUsername()));
 
-        if (betaEnabled) {
-            String email = registered.getEmail() == null ? "" : registered.getEmail();
-            boolean isAllowed = false;
-            if (allowedEmails != null) {
-                for (String allowed : allowedEmails) {
-                    if (allowed != null && !allowed.isBlank() && allowed.trim().equalsIgnoreCase(email)) {
-                        isAllowed = true;
-                        break;
-                    }
-                }
-            }
-            if (!isAllowed) {
-                throw new com.beefit.api.exception.user.RegistrationRestrictedException(
-                        "O cadastro está restrito a participantes autorizados durante o beta.");
-            }
-        }
+        registrationPolicy.ensureEmailAllowed(registered.getEmail());
 
         if(userRepository.findByUsernameIgnoreCase(registered.getUsername()).isPresent()){
             throw new UsernameAlreadyInUse("Esse nome de usuário já está em uso.");
@@ -196,6 +200,28 @@ public class AuthService implements UserDetailsService {
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException("SHA-256 não disponível para hash de refresh token.", e);
         }
+    }
+
+    /**
+     * Fecha o cadastro de uma conta criada via login social: grava peso, meta e o
+     * aceite das versões vigentes dos documentos legais. Só vale uma vez — depois
+     * disso peso/meta mudam pelo perfil (PUT /api/profile/me).
+     */
+    @Transactional
+    public UserResponseDTO completeProfile(User principal, CompleteProfileRequestDTO data) {
+        // O principal vem do SecurityFilter, fora desta transação: recarrega para
+        // gravar sobre a entidade gerenciada.
+        User user = userRepository.findById(principal.getId())
+                .orElseThrow(UserNotFoundException::new);
+        if (user.isProfileComplete()) {
+            throw new ProfileAlreadyCompleteException();
+        }
+
+        legalConsentService.recordConsent(user, data.acceptedTermsVersion(), data.acceptedPrivacyVersion());
+        user.setBodyWeight(data.bodyWeight());
+        user.setWeeklyGoal(data.weeklyGoal());
+
+        return userResponseMapper.toDto(userRepository.save(user));
     }
 
     public void recordLegalConsent(User user, String termsVersion, String privacyVersion) {

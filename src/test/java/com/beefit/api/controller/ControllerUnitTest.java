@@ -82,6 +82,9 @@ class ControllerUnitTest {
     private RegisterMapper registerMapper;
 
     @Mock
+    private com.beefit.api.service.RegistrationPolicy registrationPolicy;
+
+    @Mock
     private UserResponseMapper userResponseMapper;
 
     @Mock
@@ -112,6 +115,9 @@ class ControllerUnitTest {
     private LegalConsentService legalConsentService;
 
     @Mock
+    private com.beefit.api.infra.security.oauth2.SocialExchangeCodeStore socialExchangeCodeStore;
+
+    @Mock
     private ExerciseCatalogService exerciseCatalogService;
 
     @AfterEach
@@ -121,11 +127,11 @@ class ControllerUnitTest {
 
     @Test
     void authLoginReturnsOkWithLoginResponse() {
-        AuthController controller = new AuthController(authService, registerMapper, userResponseMapper, rateLimitService, legalConsentService);
+        AuthController controller = new AuthController(authService, registerMapper, userResponseMapper, rateLimitService, legalConsentService, socialExchangeCodeStore, registrationPolicy);
         LoginResponseDTO loginResponse = new LoginResponseDTO(
                 "token",
                 "refresh-token",
-                new UserResponseDTO(UUID.randomUUID(), "Test User", "testuser", "test@example.com", 80.0f, 4, com.beefit.api.domain.enums.UserRole.USER));
+                new UserResponseDTO(UUID.randomUUID(), "Test User", "testuser", "test@example.com", 80.0f, 4, com.beefit.api.domain.enums.UserRole.USER, true));
 
         when(authService.login("test@example.com", "secret", "device-1")).thenReturn(loginResponse);
 
@@ -139,7 +145,7 @@ class ControllerUnitTest {
 
     @Test
     void authRefreshReturnsNewTokens() {
-        AuthController controller = new AuthController(authService, registerMapper, userResponseMapper, rateLimitService, legalConsentService);
+        AuthController controller = new AuthController(authService, registerMapper, userResponseMapper, rateLimitService, legalConsentService, socialExchangeCodeStore, registrationPolicy);
         RefreshTokenResponseDTO refreshResponse = new RefreshTokenResponseDTO("new-access", "new-refresh");
 
         when(authService.refreshSession("refresh-token", "device-1")).thenReturn(refreshResponse);
@@ -154,7 +160,7 @@ class ControllerUnitTest {
 
     @Test
     void authLogoutReturnsNoContent() {
-        AuthController controller = new AuthController(authService, registerMapper, userResponseMapper, rateLimitService, legalConsentService);
+        AuthController controller = new AuthController(authService, registerMapper, userResponseMapper, rateLimitService, legalConsentService, socialExchangeCodeStore, registrationPolicy);
 
         ResponseEntity<Void> response = controller.logout(new LogoutRequestDTO("refresh-token", "device-1"));
 
@@ -164,9 +170,9 @@ class ControllerUnitTest {
 
     @Test
     void authMeMapsAuthenticatedUser() {
-        AuthController controller = new AuthController(authService, registerMapper, userResponseMapper, rateLimitService, legalConsentService);
+        AuthController controller = new AuthController(authService, registerMapper, userResponseMapper, rateLimitService, legalConsentService, socialExchangeCodeStore, registrationPolicy);
         User user = user();
-        UserResponseDTO dto = new UserResponseDTO(user.getId(), user.getFullName(), user.getUsername(), user.getEmail(), user.getBodyWeight(), user.getWeeklyGoal(), user.getRole());
+        UserResponseDTO dto = new UserResponseDTO(user.getId(), user.getFullName(), user.getUsername(), user.getEmail(), user.getBodyWeight(), user.getWeeklyGoal(), user.getRole(), user.isProfileComplete());
 
         when(userResponseMapper.toDto(user)).thenReturn(dto);
 
