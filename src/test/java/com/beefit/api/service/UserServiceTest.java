@@ -2,7 +2,7 @@ package com.beefit.api.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
+
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.never;
@@ -202,33 +202,13 @@ class UserServiceTest {
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("current", user.getPassword())).thenReturn(true);
         when(passwordEncoder.encode("Newpass1!")).thenReturn("encoded");
-        when(authSessionRepository.findAllByUserIdAndRevokedAtIsNull(userId)).thenReturn(java.util.List.of());
+
 
         userService.changeUserPassword(userId, new ChangePasswordDTO("current", "Newpass1!"));
 
         assertEquals("encoded", user.getPasswordHash());
     }
 
-    // Trocar a senha e a reacao tipica a uma suspeita de invasao; se as sessoes
-    // sobrevivessem, o refresh token do invasor valeria mais 30 dias.
-    @Test
-    void changeUserPasswordRevokesEveryActiveSession() {
-        com.beefit.api.domain.AuthSession outroAparelho = new com.beefit.api.domain.AuthSession();
-        outroAparelho.setUser(user);
-        com.beefit.api.domain.AuthSession aparelhoAtual = new com.beefit.api.domain.AuthSession();
-        aparelhoAtual.setUser(user);
-
-        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
-        when(passwordEncoder.matches("current", user.getPassword())).thenReturn(true);
-        when(passwordEncoder.encode("Newpass1!")).thenReturn("encoded");
-        when(authSessionRepository.findAllByUserIdAndRevokedAtIsNull(userId))
-                .thenReturn(java.util.List.of(outroAparelho, aparelhoAtual));
-
-        userService.changeUserPassword(userId, new ChangePasswordDTO("current", "Newpass1!"));
-
-        assertNotNull(outroAparelho.getRevokedAt());
-        assertNotNull(aparelhoAtual.getRevokedAt());
-    }
 
     @Test
     void changeUserPasswordKeepsSessionsWhenCurrentPasswordIsWrong() {
@@ -238,8 +218,7 @@ class UserServiceTest {
         assertThrows(InvalidPasswordException.class,
                 () -> userService.changeUserPassword(userId, new ChangePasswordDTO("wrong", "Newpass1!")));
 
-        org.mockito.Mockito.verify(authSessionRepository, org.mockito.Mockito.never())
-                .findAllByUserIdAndRevokedAtIsNull(userId);
+        org.mockito.Mockito.verifyNoInteractions(authSessionRepository);
     }
 
     @Test

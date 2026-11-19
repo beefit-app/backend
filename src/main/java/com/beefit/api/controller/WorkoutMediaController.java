@@ -21,7 +21,6 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.net.URI;
-import java.time.Duration;
 import java.util.UUID;
 
 @RestController
@@ -51,7 +50,7 @@ public class WorkoutMediaController {
         String presignedUrl = workoutMediaService.getPresignedUrl(media);
         return ResponseEntity.status(HttpStatus.FOUND)
                 .location(URI.create(presignedUrl))
-                .cacheControl(CacheControl.maxAge(Duration.ofMinutes(15)).cachePrivate())
+                .cacheControl(CacheControl.noStore())
                 .build();
     }
 }

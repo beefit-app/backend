@@ -1,6 +1,6 @@
 package com.beefit.api.service;
 
-import com.beefit.api.domain.AuthSession;
+
 import com.beefit.api.domain.User;
 import com.beefit.api.dto.user.ChangePasswordDTO;
 import com.beefit.api.dto.user.DeleteUserRequestDTO;
@@ -21,6 +21,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.time.YearMonth;
@@ -28,6 +31,8 @@ import java.time.LocalDate;
 import com.beefit.api.repository.WorkoutSessionRepository;
 import com.beefit.api.domain.enums.WorkoutStatus;
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.EntityNotFoundException;
+import jakarta.persistence.LockModeType;
 
 @Service
 @RequiredArgsConstructor
@@ -163,9 +168,7 @@ public class UserService {
 
     @Transactional
     public void changeUserPassword(UUID userId, ChangePasswordDTO dto) {
-
-        User user = userRepository.findById(userId)
-                .orElseThrow(UserNotFoundException::new);
+        User user = findUserForUpdate(userId);
 
         if (user.getPassword() == null || !passwordEncoder.matches(dto.currentPassword(), user.getPassword())) {
             throw new InvalidPasswordException("Senha atual incorreta.");
@@ -178,30 +181,34 @@ public class UserService {
         // 30 dias e se renova. Cai tambem o aparelho que fez a troca, que precisa
         // entrar de novo: poupar a sessao atual exigiria carregar o id dela ate
         // aqui, e o ganho nao paga a complexidade.
-        revokeAllSessions(userId);
+        authSessionRepository.revokeAllForOwner(userId, LocalDateTime.now());
     }
 
-    private void revokeAllSessions(UUID userId) {
-        LocalDateTime revokedAt = LocalDateTime.now();
-        for (AuthSession session : authSessionRepository.findAllByUserIdAndRevokedAtIsNull(userId)) {
-            session.setRevokedAt(revokedAt);
-            session.setLastUsedAt(revokedAt);
+    private User findUserForUpdate(UUID userId) {
+        User user = userRepository.findById(userId).orElseThrow(UserNotFoundException::new);
+        try {
+            // Trava a mesma linha usada por AuthService. O refresh da entidade
+            // descarta uma leitura anterior ao lock, inclusive com open-in-view.
+            entityManager.refresh(user, LockModeType.PESSIMISTIC_WRITE);
+        } catch (EntityNotFoundException removedDuringLock) {
+            throw new UserNotFoundException();
         }
+        return user;
     }
 
     @Transactional
     public void updateUserGhostMode(UUID userId, UpdateAccountSettingsRequestDTO request) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(UserNotFoundException::new);
+        User user = findUserForUpdate(userId);
+        if (Objects.equals(user.getGhostMode(), request.ghostMode())) return;
 
         user.setGhostMode(request.ghostMode());
+        List<User> friends = friendshipService.getFriends(userId).orElseGet(List::of);
+        sseService.broadcastToFriends(new SocialEventDTO<>(SocialEvent.SOCIAL_VISIBILITY_CHANGED, Map.of()), friends);
     }
 
     @Transactional
     public void deleteAccount(UUID userId, DeleteUserRequestDTO dto) {
-
-        User user = userRepository.findById(userId)
-                .orElseThrow(UserNotFoundException::new);
+        User user = findUserForUpdate(userId);
 
         if (user.getPassword() != null && !passwordEncoder.matches(dto.password(), user.getPassword())) {
             throw new InvalidPasswordException("Senha incorreta.");

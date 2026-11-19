@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.when;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
@@ -81,7 +82,8 @@ class SecurityFilterTest {
 
     private void tokenPointsToSession() {
         when(tokenService.validateToken(TOKEN)).thenReturn(
-                new TokenService.TokenValidationResult(TokenService.TokenValidationStatus.VALID, EMAIL, sessionId));
+                new TokenService.TokenValidationResult(TokenService.TokenValidationStatus.VALID, EMAIL, sessionId,
+                                        Instant.now().plusSeconds(900)));
         when(userRepository.findByEmail(EMAIL)).thenReturn(user);
     }
 

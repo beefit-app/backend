@@ -3,8 +3,11 @@ package com.beefit.api.service;
 import com.beefit.api.domain.Post;
 import com.beefit.api.domain.PostComment;
 import com.beefit.api.domain.User;
+import com.beefit.api.domain.enums.SocialEvent;
 import com.beefit.api.domain.enums.UserRole;
+import com.beefit.api.dto.comment.CommentsChangedEventDTO;
 import com.beefit.api.dto.comment.CreateCommentDTO;
+import com.beefit.api.dto.social.SocialEventDTO;
 import com.beefit.api.exception.friendship.PostNotFoundException;
 import com.beefit.api.repository.PostCommentRepository;
 import com.beefit.api.repository.PostRepository;
@@ -30,7 +33,6 @@ import static org.mockito.Mockito.*;
 class PostCommentServiceTest {
     @Mock PostCommentRepository comments;
     @Mock PostRepository posts;
-    @Mock FriendshipService friendships;
     @Mock SseService sse;
     @InjectMocks PostCommentService service;
     User author;
@@ -140,12 +142,11 @@ class PostCommentServiceTest {
     @Test
     void sendsOnlyInvalidationToVisibleRecipients() {
         when(comments.findById(comment.getId())).thenReturn(Optional.of(comment));
-        when(friendships.getFriends(owner.getId())).thenReturn(Optional.of(List.of(author)));
-        when(posts.findVisibleById(post.getId(), author.getId())).thenReturn(Optional.empty());
-        when(posts.findVisibleById(post.getId(), owner.getId())).thenReturn(Optional.of(post));
+        when(posts.findVisibleAudienceIds(post.getId())).thenReturn(List.of(owner.getId()));
         service.moderate(comment.getId());
-        verify(sse).broadcastToFriend(argThat(event -> event.type().name().equals("POST_COMMENTS_CHANGED")), eq(owner.getId()));
-        verify(sse, never()).broadcastToFriend(any(), eq(author.getId()));
+        var event = new SocialEventDTO<>(SocialEvent.POST_COMMENTS_CHANGED, new CommentsChangedEventDTO(post.getId()));
+        verify(sse).broadcastToUsers(event, List.of(owner.getId()));
+        verifyNoMoreInteractions(sse);
     }
 
     private User user() {

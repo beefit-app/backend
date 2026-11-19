@@ -35,18 +35,17 @@ public class PostService {
     private final LikeRepository likeRepository;
     private final UserRepository userRepository;
     private final FriendshipRepository friendshipRepository;
-    private final FriendshipService friendshipService;
     private final SseService sseService;
     private final PostCommentRepository commentRepository;
 
     public PostService(PostRepository postRepository, LikeRepository likeRepository, UserRepository userRepository,
-            FriendshipRepository friendshipRepository, FriendshipService friendshipService, SseService sseService,
+            FriendshipRepository friendshipRepository, SseService sseService,
             PostCommentRepository commentRepository) {
         this.postRepository = postRepository;
         this.likeRepository = likeRepository;
         this.userRepository = userRepository;
         this.friendshipRepository = friendshipRepository;
-        this.friendshipService = friendshipService;
+
         this.sseService = sseService;
         this.commentRepository = commentRepository;
     }
@@ -172,12 +171,9 @@ public class PostService {
 
         // Cada pessoa que pode ver este post recebe o novo contador. A marcação
         // "curtido por mim" continua local ao usuário que acionou o endpoint.
-        List<User> recipients = new java.util.ArrayList<>(friendshipService.getFriends(post.getUser().getId())
-                .orElseGet(List::of));
-        recipients.add(post.getUser());
-        sseService.broadcastToFriends(
-                new SocialEventDTO<>(SocialEvent.POST_LIKED, new PostLikeEventDTO(post.getId(), post.getTotalLikes())),
-                recipients.stream().distinct().toList());
+        sseService.broadcastToUsers(
+                new SocialEventDTO<>(SocialEvent.POST_LIKED, new PostLikeEventDTO(postId, post.getTotalLikes())),
+                postRepository.findVisibleAudienceIds(postId));
 
         // retorna o contrário da variável de post já curtido pois o valor foi invertido
         // após o processamento da função

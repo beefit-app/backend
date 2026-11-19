@@ -2,7 +2,10 @@ package com.beefit.api.service;
 
 import com.beefit.api.domain.Post;
 import com.beefit.api.domain.User;
+import com.beefit.api.domain.WorkoutSession;
+import com.beefit.api.domain.enums.SocialEvent;
 import com.beefit.api.dto.feed.PostLikeDTO;
+import com.beefit.api.dto.feed.PostLikeEventDTO;
 import com.beefit.api.dto.social.SocialEventDTO;
 import com.beefit.api.exception.friendship.PostNotFoundException;
 import com.beefit.api.exception.user.UserNotFoundException;
@@ -19,8 +22,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.PageRequest;
 
-import java.util.Optional;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -31,6 +34,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -51,8 +56,6 @@ class PostServiceTest {
     @Mock
     private FriendshipRepository friendshipRepository;
 
-    @Mock
-    private FriendshipService friendshipService;
 
     @Mock
     private SseService sseService;
@@ -73,16 +76,21 @@ class PostServiceTest {
         user = new User();
         user.setId(userId);
 
+        WorkoutSession session = new WorkoutSession();
+        session.setUser(user);
+
         post = new Post();
         post.setId(postId);
         post.setUser(user);
+        post.setWorkoutSession(session);
         post.setTotalLikes(0);
         post.setIsRemoved(false);
     }
 
     @Test
     void toggleLikeCreatesLikeAndIncrementsCounterWhenPostWasNotLiked() {
-        when(friendshipService.getFriends(userId)).thenReturn(Optional.of(List.of()));
+        var audience = List.of(userId, UUID.randomUUID());
+        when(postRepository.findVisibleAudienceIds(postId)).thenReturn(audience);
         when(postRepository.findVisibleByIdForUpdate(postId, userId)).thenReturn(Optional.of(post));
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
         when(likeRepository.existsByLikedByAndPost(user, post)).thenReturn(false);
@@ -101,16 +109,15 @@ class PostServiceTest {
         assertEquals(user, savedPost.getLikes().get(0).getLikedBy());
         assertEquals(post, savedPost.getLikes().get(0).getPost());
         assertNotNull(savedPost.getLikes().get(0).getLikedAt());
-        ArgumentCaptor<SocialEventDTO> eventCaptor = ArgumentCaptor.forClass(SocialEventDTO.class);
-        verify(sseService).broadcastToFriends(eventCaptor.capture(), org.mockito.ArgumentMatchers.anyList());
-        assertEquals(postId, ((com.beefit.api.dto.feed.PostLikeEventDTO) eventCaptor.getValue().dataSocialEvent()).postId());
-        assertEquals(1, ((com.beefit.api.dto.feed.PostLikeEventDTO) eventCaptor.getValue().dataSocialEvent()).totalLikes());
+        var event = new SocialEventDTO<>(SocialEvent.POST_LIKED, new PostLikeEventDTO(postId, 1));
+        verify(sseService).broadcastToUsers(event, audience);
+        verifyNoMoreInteractions(sseService);
     }
 
     @Test
     void toggleLikeRemovesExistingLikeAndDecrementsCounter() {
         post.setTotalLikes(1);
-        when(friendshipService.getFriends(userId)).thenReturn(Optional.of(List.of()));
+        when(postRepository.findVisibleAudienceIds(postId)).thenReturn(List.of(userId));
 
         when(postRepository.findVisibleByIdForUpdate(postId, userId)).thenReturn(Optional.of(post));
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
@@ -123,6 +130,8 @@ class PostServiceTest {
         assertEquals(0, post.getTotalLikes());
         verify(likeRepository).deleteByLikedByAndPost(user, post);
         verify(postRepository, never()).save(any(Post.class));
+        verify(sseService).broadcastToUsers(new SocialEventDTO<>(SocialEvent.POST_LIKED, new PostLikeEventDTO(postId, 0)),
+                List.of(userId));
     }
 
     @Test
@@ -132,6 +141,7 @@ class PostServiceTest {
         assertThrows(PostNotFoundException.class, () -> postService.toggleLike(userId, postId));
 
         verify(userRepository, never()).findById(any(UUID.class));
+        verifyNoInteractions(sseService);
     }
 
     @Test

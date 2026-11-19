@@ -8,10 +8,11 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.net.URI;
+import java.time.YearMonth;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import java.time.YearMonth;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -32,6 +33,7 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 import com.beefit.api.domain.CatalogExercise;
 import com.beefit.api.domain.TemplateExercise;
 import com.beefit.api.domain.User;
+import com.beefit.api.domain.WorkoutMedia;
 import com.beefit.api.domain.enums.CardRarity;
 import com.beefit.api.domain.enums.MuscleGroups;
 import com.beefit.api.dto.CardFilterDTO;
@@ -65,6 +67,7 @@ import com.beefit.api.service.AuthService;
 import com.beefit.api.service.InventoryService;
 import com.beefit.api.service.RateLimitService;
 import com.beefit.api.service.UserService;
+import com.beefit.api.service.WorkoutMediaService;
 import com.beefit.api.service.WorkoutModerationService;
 import com.beefit.api.service.WorkoutSessionService;
 import com.beefit.api.service.WorkoutTemplateService;
@@ -98,6 +101,9 @@ class ControllerUnitTest {
 
     @Mock
     private WorkoutModerationService workoutModerationService;
+
+    @Mock
+    private WorkoutMediaService workoutMediaService;
 
     @Mock
     private WorkoutSessionService workoutSessionService;
@@ -180,6 +186,23 @@ class ControllerUnitTest {
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(dto, response.getBody());
+    }
+
+    @Test
+    void privateMediaRedirectIsNotStoredByHttpCaches() {
+        WorkoutMediaController controller = new WorkoutMediaController(workoutMediaService, rateLimitService);
+        User viewer = user();
+        UUID mediaId = UUID.randomUUID();
+        WorkoutMedia media = new WorkoutMedia();
+        URI signedLocation = URI.create("https://storage.example.com/photo.jpg");
+        when(workoutMediaService.getVisible(mediaId, viewer)).thenReturn(media);
+        when(workoutMediaService.getPresignedUrl(media)).thenReturn(signedLocation.toString());
+
+        ResponseEntity<Void> response = controller.get(viewer, mediaId);
+
+        assertEquals(HttpStatus.FOUND, response.getStatusCode());
+        assertEquals(signedLocation, response.getHeaders().getLocation());
+        assertEquals("no-store", response.getHeaders().getCacheControl());
     }
 
     @Test

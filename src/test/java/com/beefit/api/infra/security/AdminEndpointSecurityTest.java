@@ -151,7 +151,7 @@ class AdminEndpointSecurityTest {
     @Test
     void everyAdminEndpointRejectsInvalidTokens() throws Exception {
         when(tokenService.validateToken("invalid-token"))
-                .thenReturn(new TokenService.TokenValidationResult(TokenService.TokenValidationStatus.INVALID, null, null));
+                .thenReturn(new TokenService.TokenValidationResult(TokenService.TokenValidationStatus.INVALID, null, null, null));
         for (MockHttpServletRequestBuilder request : adminRequests()) {
             mockMvc.perform(request.header("Authorization", "Bearer invalid-token"))
                     .andExpect(status().isUnauthorized());
@@ -184,7 +184,7 @@ class AdminEndpointSecurityTest {
     @Test
     void apiResponsesIncludeSecurityHeaders() throws Exception {
         when(tokenService.validateToken("invalid-token"))
-                .thenReturn(new TokenService.TokenValidationResult(TokenService.TokenValidationStatus.INVALID, null, null));
+                .thenReturn(new TokenService.TokenValidationResult(TokenService.TokenValidationStatus.INVALID, null, null, null));
 
         mockMvc.perform(get("/api/admin/dashboard").header("Authorization", "Bearer invalid-token"))
                 .andExpect(status().isUnauthorized())
@@ -200,7 +200,7 @@ class AdminEndpointSecurityTest {
         UUID sessionId = UUID.randomUUID();
         when(tokenService.validateToken(token))
                 .thenReturn(new TokenService.TokenValidationResult(
-                        TokenService.TokenValidationStatus.VALID, email, sessionId));
+                        TokenService.TokenValidationStatus.VALID, email, sessionId, java.time.Instant.now().plusSeconds(900)));
         when(userRepository.findByEmail(email)).thenReturn(user);
         // O filtro so autentica se a sessao do token ainda estiver ativa.
         when(authSessionRepository.findById(sessionId)).thenReturn(java.util.Optional.of(activeSession(user)));

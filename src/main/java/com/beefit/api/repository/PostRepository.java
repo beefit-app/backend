@@ -11,6 +11,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -52,22 +53,29 @@ public interface PostRepository extends JpaRepository<Post, UUID> {
     Optional<Post> findByIdAndIsRemovedFalse(UUID id);
     Optional<Post> findByWorkoutSessionId(UUID workoutSessionId);
 
-    @Query("SELECT p FROM Post p JOIN FETCH p.user u JOIN FETCH p.workoutSession w " +
-            "WHERE p.id = :postId AND p.isRemoved = false AND (" +
-            "u.id = :viewerId OR (u.ghostMode = false AND w.isPrivate = false AND EXISTS (" +
-            "SELECT 1 FROM Friendship f WHERE f.status = com.beefit.api.domain.enums.FriendshipStatus.ACCEPTED AND (" +
+    String NOT_REMOVED = "p.isRemoved = false";
+    String SHAREABLE_WITH_FRIENDS = "u.ghostMode = false AND w.isPrivate = false";
+    String ACCEPTED_FRIENDSHIP = "f.status = com.beefit.api.domain.enums.FriendshipStatus.ACCEPTED";
+    String VISIBLE_BY_ID = "SELECT p FROM Post p JOIN FETCH p.user u JOIN FETCH p.workoutSession w " +
+            "WHERE p.id = :postId AND " + NOT_REMOVED + " AND (u.id = :viewerId OR (" +
+            SHAREABLE_WITH_FRIENDS + " AND EXISTS (SELECT 1 FROM Friendship f WHERE " + ACCEPTED_FRIENDSHIP + " AND (" +
             "(f.requester.id = :viewerId AND f.addressee = u) OR " +
-            "(f.addressee.id = :viewerId AND f.requester = u)))))")
+            "(f.addressee.id = :viewerId AND f.requester = u)))))";
+
+    @Query(VISIBLE_BY_ID)
     Optional<Post> findVisibleById(@Param("postId") UUID postId, @Param("viewerId") UUID viewerId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("SELECT p FROM Post p JOIN FETCH p.user u JOIN FETCH p.workoutSession w " +
-            "WHERE p.id = :postId AND p.isRemoved = false AND (" +
-            "u.id = :viewerId OR (u.ghostMode = false AND w.isPrivate = false AND EXISTS (" +
-            "SELECT 1 FROM Friendship f WHERE f.status = com.beefit.api.domain.enums.FriendshipStatus.ACCEPTED AND (" +
-            "(f.requester.id = :viewerId AND f.addressee = u) OR " +
-            "(f.addressee.id = :viewerId AND f.requester = u)))))")
+    @Query(VISIBLE_BY_ID)
     Optional<Post> findVisibleByIdForUpdate(@Param("postId") UUID postId, @Param("viewerId") UUID viewerId);
+
+    // A primeira parte inclui o autor mesmo sem amizades; UNION deduplica a audiência.
+    @Query("SELECT p.user.id FROM Post p WHERE p.id = :postId AND " + NOT_REMOVED +
+            " UNION SELECT CASE WHEN f.requester = u THEN f.addressee.id ELSE f.requester.id END " +
+            "FROM Post p JOIN p.user u JOIN p.workoutSession w " +
+            "JOIN Friendship f ON (f.requester = u OR f.addressee = u) " +
+            "WHERE p.id = :postId AND " + NOT_REMOVED + " AND " + SHAREABLE_WITH_FRIENDS + " AND " + ACCEPTED_FRIENDSHIP)
+    List<UUID> findVisibleAudienceIds(@Param("postId") UUID postId);
 
     @Query("SELECT CASE WHEN COUNT(p) > 0 THEN true ELSE false END FROM Post p " +
             "JOIN p.user u JOIN p.workoutSession w " +
