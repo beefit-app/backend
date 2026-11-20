@@ -78,6 +78,23 @@ O job E2E vive no CI do frontend e faz checkout de `beefit-app/backend`. Se o
 backend for privado, configure `CROSS_REPO_TOKEN` com acesso somente de leitura;
 o token padrão do workflow normalmente não acessa outro repositório privado.
 
+## Cache de mídia privada
+
+A API responde às leituras autorizadas de mídia com um redirecionamento
+`Cache-Control: no-store`. O app também usa `no-store` no download autenticado,
+inclusive ao seguir o redirecionamento, para não reutilizar entradas do cache
+HTTP do cliente. Isso não muda o cache das imagens públicas de exercícios.
+
+Novos uploads ao R2 recebem o metadado `Cache-Control: no-store`. Objetos
+existentes preservam seus metadados: o deploy não regrava o bucket, não invalida
+respostas já armazenadas em clientes antigos nem revoga URLs assinadas ainda
+válidas. Para padronizar os cabeçalhos do acervo, planeje separadamente a
+atualização dos metadados, preservando o tipo MIME e os demais atributos.
+
+Antes do rollout, confira os cabeçalhos do redirecionamento e da resposta final
+para mídia de teste antiga e nova em homologação. Valide o isolamento de conta
+em navegador e no WebView e não registre as URLs assinadas na telemetria.
+
 ## Incidentes
 
 Registre `X-Request-ID`, horário UTC, endpoint, versão implantada e status HTTP.

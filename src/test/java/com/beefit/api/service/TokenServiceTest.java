@@ -72,6 +72,7 @@ class TokenServiceTest {
         assertEquals(TokenService.TokenValidationStatus.VALID, resultado.status());
         assertEquals(user.getEmail(), resultado.subject());
         assertEquals(sessionId, resultado.sessionId());
+        assertTrue(resultado.expiresAt().isAfter(Instant.now()));
     }
 
     @Test

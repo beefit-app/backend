@@ -8,9 +8,13 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import java.time.Clock;
@@ -25,6 +29,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -55,6 +61,7 @@ import com.beefit.api.dto.workout.FinishWorkoutSetDTO;
 import com.beefit.api.dto.workout.FinishWorkoutSnapshotRequestDTO;
 import com.beefit.api.dto.workout.StartWorkoutExerciseItemDTO;
 import com.beefit.api.dto.workout.StartWorkoutRequestDTO;
+import com.beefit.api.dto.workout.WorkoutPresenceEventDTO;
 import com.beefit.api.exception.workout.InvalidWorkoutSnapshotException;
 import com.beefit.api.dto.workout.WorkoutSessionResponseDTO;
 import com.beefit.api.exception.workout.InvalidMuscleGroupException;
@@ -154,6 +161,49 @@ class WorkoutSessionServiceTest {
         assertEquals(Boolean.TRUE, savedSession.getIsPrivate());
         assertEquals(0, savedSession.getExercises().size());
         assertEquals("in_progress", response.status());
+    }
+
+    @ParameterizedTest(name = "private={0}, ghostMode={1}")
+    @CsvSource({"false, false, true", "true, false, false", "false, true, false"})
+    void workoutLifecycleBroadcastsPresenceOnlyWhenVisibleToFriends(
+            boolean isPrivate, boolean ghostMode, boolean visibleToFriends) {
+        user.setGhostMode(ghostMode);
+        UUID workoutId = UUID.randomUUID();
+        WorkoutSession session = inProgressSession(workoutId);
+        session.setIsPrivate(isPrivate);
+        List<User> friends = List.of(user(UUID.randomUUID()));
+        StartWorkoutRequestDTO request = new StartWorkoutRequestDTO(List.of("peito"), isPrivate, null, List.of());
+
+        when(workoutSessionRepository.findByStatusAndUserId(WorkoutStatus.IN_PROGRESS, userId)).thenReturn(List.of());
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(workoutMuscleGroupMapper.toDomain(request.muscleGroups())).thenReturn(List.of(MuscleGroups.CHEST));
+        when(workoutSessionRepository.saveAndFlush(any(WorkoutSession.class))).thenAnswer(invocation -> {
+            WorkoutSession started = invocation.getArgument(0);
+            started.setId(workoutId);
+            return started;
+        });
+        when(workoutSessionRepository.findById(workoutId)).thenReturn(Optional.of(session));
+        when(workoutMuscleGroupMapper.toDomain("costas")).thenReturn(MuscleGroups.BACK);
+        when(workoutSessionRepository.save(session)).thenReturn(session);
+        lenient().when(friendshipService.getFriends(userId)).thenReturn(Optional.of(friends));
+
+        workoutSessionService.startWorkout(userId, request);
+        workoutSessionService.addMuscleGroup(userId, workoutId, "costas");
+        workoutSessionService.cancelWorkout(userId, workoutId);
+
+        if (!visibleToFriends) {
+            verifyNoInteractions(sseService);
+            return;
+        }
+
+        for (SocialEvent type : List.of(SocialEvent.WORKOUT_STARTED, SocialEvent.WORKOUT_MUSCLE_GROUP_ADDED,
+                SocialEvent.WORKOUT_CANCELED)) {
+            verify(sseService).broadcastToFriends(argThat(event -> event.type() == type
+                    && event.dataSocialEvent() instanceof WorkoutPresenceEventDTO presence
+                    && workoutId.equals(presence.workoutId())
+                    && userId.equals(presence.userId())), eq(friends));
+        }
+        verifyNoMoreInteractions(sseService);
     }
 
     @Test

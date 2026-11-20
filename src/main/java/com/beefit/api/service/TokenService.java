@@ -26,7 +26,8 @@ public class TokenService {
         MISSING
     }
 
-    public record TokenValidationResult(TokenValidationStatus status, String subject, UUID sessionId) {
+    public record TokenValidationResult(TokenValidationStatus status, String subject, UUID sessionId,
+            Instant expiresAt) {
     }
 
     // Nome curto por convencao de JWT; guarda o id da AuthSession que emitiu o
@@ -75,28 +76,30 @@ public class TokenService {
 
     public TokenValidationResult validateToken(String token){
         if (token == null || token.isBlank()) {
-            return new TokenValidationResult(TokenValidationStatus.MISSING, null, null);
+            return new TokenValidationResult(TokenValidationStatus.MISSING, null, null, null);
         }
 
         try {
             Algorithm algorithm = Algorithm.HMAC256(secret);
             DecodedJWT decoded = JWT.require(algorithm)
                     .withIssuer("auth-beefit")
+                    .withClaimPresence("exp")
                     .build()
                     .verify(token);
 
             // Token sem sid nao da para amarrar a uma sessao, entao nao da para
             // saber se ja foi revogado: recusa em vez de aceitar sem verificacao.
             UUID sessionId = readSessionId(decoded);
-            if (sessionId == null) {
-                return new TokenValidationResult(TokenValidationStatus.INVALID, null, null);
+            Instant expiresAt = decoded.getExpiresAtAsInstant();
+            if (sessionId == null || expiresAt == null) {
+                return new TokenValidationResult(TokenValidationStatus.INVALID, null, null, null);
             }
 
-            return new TokenValidationResult(TokenValidationStatus.VALID, decoded.getSubject(), sessionId);
+            return new TokenValidationResult(TokenValidationStatus.VALID, decoded.getSubject(), sessionId, expiresAt);
         } catch (TokenExpiredException tokenExpiredException) {
-            return new TokenValidationResult(TokenValidationStatus.EXPIRED, null, null);
+            return new TokenValidationResult(TokenValidationStatus.EXPIRED, null, null, null);
         } catch(JWTVerificationException jwtVerificationException){
-            return new TokenValidationResult(TokenValidationStatus.INVALID, null, null);
+            return new TokenValidationResult(TokenValidationStatus.INVALID, null, null, null);
         }
     }
 

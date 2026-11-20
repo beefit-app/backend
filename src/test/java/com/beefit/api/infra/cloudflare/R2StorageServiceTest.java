@@ -58,7 +58,7 @@ class R2StorageServiceTest {
         assertEquals("test-bucket", req.bucket());
         assertEquals("media/user1/test.jpg", req.key());
         assertEquals("image/jpeg", req.contentType());
-        assertEquals("private, max-age=604800, stale-while-revalidate=86400", req.cacheControl());
+        assertEquals("no-store", req.cacheControl());
     }
 
     @Test

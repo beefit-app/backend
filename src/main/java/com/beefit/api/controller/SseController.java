@@ -1,9 +1,12 @@
 package com.beefit.api.controller;
 
 import com.beefit.api.domain.User;
+import com.beefit.api.exception.user.InvalidSessionException;
+import com.beefit.api.infra.security.SecurityFilter;
 import com.beefit.api.service.SseService;
 import com.beefit.api.service.WorkoutSessionService;
 import com.beefit.api.dto.workout.WorkoutPresenceEventDTO;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -21,12 +24,12 @@ public class SseController {
     private final WorkoutSessionService workoutSessionService;
 
     @GetMapping(value = "/feed", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter subscribe(@AuthenticationPrincipal User user){
-        SseEmitter emitter = new SseEmitter(Long.MAX_VALUE);
-
-        sseService.addEmitter(user.getId(), emitter);
-
-        return emitter;
+    public SseEmitter subscribe(@AuthenticationPrincipal User user, HttpServletRequest request) {
+        if (!(request.getAttribute(SecurityFilter.VERIFIED_SESSION_ATTRIBUTE)
+                instanceof SecurityFilter.VerifiedSession session)) {
+            throw new InvalidSessionException("Sessão inválida.");
+        }
+        return sseService.subscribe(user.getId(), session.id(), session.accessExpiresAt(), session.sessionExpiresAt());
     }
 
     @GetMapping("/live")

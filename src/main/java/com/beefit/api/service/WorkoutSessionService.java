@@ -672,6 +672,10 @@ public class WorkoutSessionService {
         }
 
         User user = session.getUser();
+        if (Boolean.TRUE.equals(user.getGhostMode())) {
+            return;
+        }
+
         WorkoutPresenceEventDTO presenceEvent = new WorkoutPresenceEventDTO(
                 eventType.name(),
                 session.getId(),

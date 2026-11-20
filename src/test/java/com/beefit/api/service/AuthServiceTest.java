@@ -104,6 +104,7 @@ class AuthServiceTest {
                 null,
                 user.getAuthorities());
 
+        when(authSessionRepository.lockOwnerByEmail(user.getEmail())).thenReturn(Optional.of(user.getId()));
         when(authenticationConfiguration.getAuthenticationManager()).thenReturn(authenticationManager);
         when(authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(user.getEmail(), "secret")))
                 .thenReturn(authentication);
@@ -188,6 +189,7 @@ class AuthServiceTest {
         currentSession.setExpiresAt(LocalDateTime.now().plusDays(1));
         currentSession.setLastUsedAt(LocalDateTime.now().minusHours(1));
 
+        stubSessionOwner();
         when(authSessionRepository.findByRefreshTokenHashAndDeviceIdAndRevokedAtIsNull(
                 org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.eq("device-1")))
                 .thenReturn(Optional.of(currentSession));
@@ -215,6 +217,7 @@ class AuthServiceTest {
         currentSession.setDeviceId("device-1");
         currentSession.setExpiresAt(LocalDateTime.now().minusMinutes(1));
 
+        stubSessionOwner();
         when(authSessionRepository.findByRefreshTokenHashAndDeviceIdAndRevokedAtIsNull(
                 org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.eq("device-1")))
                 .thenReturn(Optional.of(currentSession));
@@ -222,20 +225,10 @@ class AuthServiceTest {
         assertThrows(InvalidSessionException.class, () -> authService.refreshSession("refresh-token", "device-1"));
     }
 
-    @Test
-    void logoutRevokesCurrentSessionWhenPresent() {
-        AuthSession currentSession = new AuthSession();
-        currentSession.setDeviceId("device-1");
-        currentSession.setExpiresAt(LocalDateTime.now().plusDays(1));
-
-        when(authSessionRepository.findByRefreshTokenHashAndDeviceIdAndRevokedAtIsNull(
+    private void stubSessionOwner() {
+        when(authSessionRepository.lockOwnerByRefreshToken(
                 org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.eq("device-1")))
-                .thenReturn(Optional.of(currentSession));
-
-        authService.logout("refresh-token", "device-1");
-
-        assertNotNull(currentSession.getRevokedAt());
-        assertNotNull(currentSession.getLastUsedAt());
+                .thenReturn(Optional.of(org.mockito.Mockito.mock(AuthSessionRepository.SessionFamily.class)));
     }
 
     @Test

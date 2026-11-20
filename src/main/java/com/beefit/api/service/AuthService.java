@@ -19,7 +19,7 @@ import com.beefit.api.repository.AuthSessionRepository;
 import com.beefit.api.repository.InventoryRepository;
 import com.beefit.api.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -27,6 +27,7 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -36,6 +37,7 @@ import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -69,6 +71,9 @@ public class AuthService implements UserDetailsService {
     @Transactional
     public LoginResponseDTO login(String email, String password, String deviceId) {
         String normalizedEmail = normalizeEmail(email);
+        // Autentique depois do lock: a troca de senha não pode deixar este login
+        // emitir uma família nova com credenciais verificadas antes da revogação.
+        var owner = authSessionRepository.lockOwnerByEmail(normalizedEmail);
 
         // BCryptPasswordEncoder.matches lanca IllegalArgumentException para hash nulo,
         // o que o DaoAuthenticationProvider interno do authenticationManager nao trata
@@ -86,12 +91,19 @@ public class AuthService implements UserDetailsService {
         var authenticationManager = authenticationConfiguration.getAuthenticationManager();
         var auth = authenticationManager.authenticate(usernamePassword);
         User authenticatedUser = (User) auth.getPrincipal();
+        if (!authenticatedUser.getId().equals(owner.orElse(null))) {
+            throw new BadCredentialsException("Credenciais inválidas.");
+        }
         return createSession(authenticatedUser, deviceId);
     }
 
     /** Emite sessão (JWT + refresh token) para um usuário já resolvido pelo fluxo de login social. */
     @Transactional
     public LoginResponseDTO loginSocialUser(User user, String deviceId) {
+        var owner = authSessionRepository.lockOwnerByEmail(normalizeEmail(user.getEmail()));
+        if (!user.getId().equals(owner.orElse(null))) {
+            throw new UserNotFoundException();
+        }
         return createSession(user, deviceId);
     }
 
@@ -123,39 +135,42 @@ public class AuthService implements UserDetailsService {
 
     @Transactional
     public RefreshTokenResponseDTO refreshSession(String refreshToken, String deviceId) {
-        AuthSession currentSession = authSessionRepository
-                .findByRefreshTokenHashAndDeviceIdAndRevokedAtIsNull(hashRefreshToken(refreshToken), deviceId)
+        String hash = hashRefreshToken(refreshToken);
+        authSessionRepository.lockOwnerByRefreshToken(hash, deviceId)
                 .orElseThrow(() -> new InvalidSessionException("Sessão inválida."));
 
-        if (currentSession.getExpiresAt().isBefore(LocalDateTime.now())) {
-            currentSession.setRevokedAt(LocalDateTime.now());
+        // Nova leitura após adquirir o lock (PostgreSQL READ COMMITTED): nunca
+        // use o estado obtido antes da espera para decidir se pode rotacionar.
+        AuthSession currentSession = authSessionRepository
+                .findByRefreshTokenHashAndDeviceIdAndRevokedAtIsNull(hash, deviceId)
+                .orElseThrow(() -> new InvalidSessionException("Sessão inválida."));
+
+        LocalDateTime now = LocalDateTime.now();
+        if (!currentSession.getExpiresAt().isAfter(now)) {
             throw new InvalidSessionException("Sessão expirada. Faça login novamente.");
         }
+        currentSession.setRevokedAt(now);
+        currentSession.setLastUsedAt(now);
 
-        currentSession.setRevokedAt(LocalDateTime.now());
-        currentSession.setLastUsedAt(LocalDateTime.now());
-
-        SessionTokens sessionTokens = createAuthSession(currentSession.getUser(), deviceId);
+        SessionTokens sessionTokens = createAuthSession(currentSession.getUser(), deviceId, currentSession.getFamilyId());
         return new RefreshTokenResponseDTO(sessionTokens.accessToken(), sessionTokens.refreshToken());
     }
 
     @Transactional
     public void logout(String refreshToken, String deviceId) {
-        authSessionRepository.findByRefreshTokenHashAndDeviceIdAndRevokedAtIsNull(hashRefreshToken(refreshToken), deviceId)
-                .ifPresent(session -> {
-                    session.setRevokedAt(LocalDateTime.now());
-                    session.setLastUsedAt(LocalDateTime.now());
-                });
+        authSessionRepository.lockOwnerByRefreshToken(hashRefreshToken(refreshToken), deviceId)
+                .ifPresent(family -> authSessionRepository.revokeFamily(
+                        family.getUserId(), family.getFamilyId(), LocalDateTime.now()));
     }
 
     private LoginResponseDTO createSession(User user, String deviceId) {
         revokeExistingSessions(user.getId(), deviceId);
-        SessionTokens sessionTokens = createAuthSession(user, deviceId);
+        SessionTokens sessionTokens = createAuthSession(user, deviceId, null);
         UserResponseDTO login = userResponseMapper.toDto(user);
         return new LoginResponseDTO(sessionTokens.accessToken(), sessionTokens.refreshToken(), login);
     }
 
-    private void revokeExistingSessions(java.util.UUID userId, String deviceId) {
+    private void revokeExistingSessions(UUID userId, String deviceId) {
         List<AuthSession> activeSessions = authSessionRepository
                 .findAllByUserIdAndDeviceIdAndRevokedAtIsNullAndExpiresAtAfter(userId, deviceId, LocalDateTime.now());
         LocalDateTime revokedAt = LocalDateTime.now();
@@ -165,13 +180,14 @@ public class AuthService implements UserDetailsService {
         }
     }
 
-    private SessionTokens createAuthSession(User user, String deviceId) {
+    private SessionTokens createAuthSession(User user, String deviceId, UUID familyId) {
         String refreshToken = generateRefreshToken();
         LocalDateTime now = LocalDateTime.now();
 
         AuthSession authSession = new AuthSession();
         authSession.setUser(user);
         authSession.setDeviceId(deviceId);
+        authSession.setFamilyId(familyId);
         authSession.setRefreshTokenHash(hashRefreshToken(refreshToken));
         authSession.setCreatedAt(now);
         authSession.setLastUsedAt(now);

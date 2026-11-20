@@ -22,8 +22,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -31,7 +29,6 @@ import java.util.UUID;
 public class PostCommentService {
     private final PostCommentRepository commentRepository;
     private final PostRepository postRepository;
-    private final FriendshipService friendshipService;
     private final SseService sseService;
 
     @Transactional(readOnly = true)
@@ -63,7 +60,7 @@ public class PostCommentService {
         comment.setAuthor(author);
         comment.setText(text.strip());
         comment = commentRepository.saveAndFlush(comment);
-        notifyChanged(post);
+        notifyChanged(postId);
         return toResponse(comment, author, post);
     }
 
@@ -73,15 +70,14 @@ public class PostCommentService {
         // Não devolvemos o conteúdo nem concedemos acesso aos demais comentários.
         PostComment comment = commentRepository.findByIdAndPostIdAndIsRemovedFalse(commentId, postId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Comentário não encontrado."));
-        Post post = comment.getPost();
         if (!comment.getAuthor().getId().equals(viewer.getId()) && viewer.getRole() != UserRole.ADMIN) {
-            post = postRepository.findVisibleByIdForUpdate(postId, viewer.getId()).orElseThrow(PostNotFoundException::new);
+            Post post = postRepository.findVisibleByIdForUpdate(postId, viewer.getId()).orElseThrow(PostNotFoundException::new);
             if (!post.getUser().getId().equals(viewer.getId())) {
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Você não pode excluir este comentário.");
             }
         }
         comment.setRemoved(true);
-        notifyChanged(post);
+        notifyChanged(postId);
     }
 
     @Transactional
@@ -90,7 +86,7 @@ public class PostCommentService {
         PostComment comment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Comentário não encontrado."));
         comment.setRemoved(true);
-        notifyChanged(comment.getPost());
+        notifyChanged(comment.getPost().getId());
     }
 
     private CommentResponseDTO toResponse(PostComment comment, User viewer, Post post) {
@@ -101,13 +97,8 @@ public class PostCommentService {
                 own || post.getUser().getId().equals(viewer.getId()) || viewer.getRole() == UserRole.ADMIN, !own);
     }
 
-    private void notifyChanged(Post post) {
-        List<User> recipients = new ArrayList<>(friendshipService.getFriends(post.getUser().getId()).orElseGet(List::of));
-        recipients.add(post.getUser());
-        var event = new SocialEventDTO<>(SocialEvent.POST_COMMENTS_CHANGED, new CommentsChangedEventDTO(post.getId()));
-        // Não enviar nem mesmo a invalidação para quem perdeu a visibilidade.
-        recipients.stream().map(User::getId).distinct()
-                .filter(id -> postRepository.findVisibleById(post.getId(), id).isPresent())
-                .forEach(id -> sseService.broadcastToFriend(event, id));
+    private void notifyChanged(UUID postId) {
+        var event = new SocialEventDTO<>(SocialEvent.POST_COMMENTS_CHANGED, new CommentsChangedEventDTO(postId));
+        sseService.broadcastToUsers(event, postRepository.findVisibleAudienceIds(postId));
     }
 }
